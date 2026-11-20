@@ -14,6 +14,8 @@ publish: {pages_project: projectorchestra, auto: true}
 # processes: chỉ những tên ở đây mới tự bật chế độ chơi game (đúng như Task Manager). Danh sách NVIDIA app quét được nằm ở
 # out/nvidia-games.json để tham khảo; không tự lấy vì nó lẫn cả phần mềm chạy nền như Logitech G Hub (nvidia: false).
 games: {auto: true, nvidia: false, processes: ['League of Legends.exe', 'PBZ.exe']}
+# chat: model Claude Code dùng cho ô chat tổng quản trong app (sonnet trả lời nhanh; đổi thành opus nếu cần nghĩ sâu hơn).
+chat: {model: sonnet}
 groups:
   - {id: luan-van, name: Luận văn SEAL}
   - {id: benh-vien, name: Sản phẩm giải phẫu bệnh và bệnh viện}

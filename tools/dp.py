@@ -940,8 +940,11 @@ def chat_run(text):
         cmd = claude_cmd()
         if not cmd:
             raise RuntimeError('PC không tìm thấy lệnh claude (Claude Code) trên PATH của server')
-        cmd += ['-p', '--output-format', 'stream-json', '--verbose', '--max-turns', '25', '--permission-mode', 'acceptEdits',
+        cmd += ['-p', '--output-format', 'stream-json', '--verbose', '--max-turns', '25', '--model', (registry().get('chat') or {}).get('model', 'sonnet'), '--permission-mode', 'acceptEdits',
                 '--allowedTools', 'Read,Grep,Glob,Edit,Write,TodoWrite,Bash(python tools/dp.py:*)']
+        sfile = HUB / 'out' / 'chat-session.txt'
+        if not CHAT['session'] and sfile.is_file():       # the server restarts when its code changes; the talk goes on
+            CHAT['session'] = sfile.read_text(encoding='ascii').strip() or None
         if CHAT['session']:
             cmd += ['--resume', CHAT['session']]
         pr = subprocess.Popen(cmd, cwd=str(HUB), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
@@ -968,6 +971,8 @@ def chat_run(text):
                 reply = str(e.get('result') or reply or '').strip() or reply
         pr.wait(timeout=30)
         killer.cancel()
+        if CHAT['session']:
+            sfile.write_text(CHAT['session'], encoding='ascii')
         if not reply:
             err = pr.stderr.read().decode('utf-8', 'replace')
             raise RuntimeError(one_line(err, 300) or 'không có câu trả lời (mã %s)' % pr.returncode)
@@ -975,6 +980,10 @@ def chat_run(text):
         reply = 'Lỗi khi gọi tổng quản trên PC: %s' % one_line(e, 300)
         if 'resume' in str(e).lower() or 'session' in str(e).lower():
             CHAT['session'] = None
+            try:
+                (HUB / 'out' / 'chat-session.txt').write_text('', encoding='ascii')
+            except OSError:
+                pass
     chat_log('boss', reply[:6000])
     CHAT.update(busy=False, step='', since=None)
     Handler.cache = (0.0, b'')

@@ -203,8 +203,8 @@ def claude_activity(projects, window=6 * 3600):
     recent = []
     try:
         for folder in base.iterdir():
-            if folder.is_dir() and now - folder.stat().st_mtime < 86400:
-                for f in folder.glob('*.jsonl'):
+            if folder.is_dir():
+                for f in folder.rglob('*.jsonl'):
                     age = now - f.stat().st_mtime
                     if age < window:
                         recent.append((age, f))
@@ -218,7 +218,8 @@ def claude_activity(projects, window=6 * 3600):
         except OSError:
             continue
         cwd = what = None
-        sub = False
+        seen_cwd = set()
+        sub = 'subagent' in str(f).lower().replace(str(base).lower(), '')
         for line in reversed(lines[-150:]):
             try:
                 e = json.loads(line)
@@ -227,6 +228,8 @@ def claude_activity(projects, window=6 * 3600):
             if not isinstance(e, dict):
                 continue
             cwd = cwd or e.get('cwd')
+            if e.get('cwd'):
+                seen_cwd.add(_norm(e['cwd']))
             sub = sub or bool(e.get('isSidechain'))
             if what is None:
                 msg = e.get('message') if isinstance(e.get('message'), dict) else {}
@@ -239,12 +242,9 @@ def claude_activity(projects, window=6 * 3600):
                     what = 'vừa trả lời xong, chờ lệnh tiếp'
                 elif e.get('type') == 'user':
                     what = 'đang suy nghĩ'
-            if cwd and what:
-                break
         if not cwd:
             continue
-        place = _norm(cwd)
-        owner = next((pid for root, pid in roots if place.startswith(root)), None)
+        owner = next((pid for root, pid in roots if any(place.startswith(root) for place in seen_cwd)), None)   # roots are longest first
         if owner and len(out.setdefault(owner, [])) < 5:
             out[owner].append({'what': (what or 'đang chạy') if age < 900 else 'phiên mở nhưng im lặng', 'age': int(age), 'sub': sub})
     return out
@@ -267,7 +267,7 @@ def token_usage(projects):
         for folder in base.iterdir():
             if not folder.is_dir():
                 continue
-            for f in folder.glob('*.jsonl'):
+            for f in folder.rglob('*.jsonl'):
                 try:
                     st = f.stat()
                 except OSError:
