@@ -32,7 +32,7 @@ import time
 import unicodedata
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import parse_qs, quote, urlsplit
 
 import yaml
 
@@ -533,13 +533,16 @@ class Handler(SimpleHTTPRequestHandler):
             f = upload_path(parse_qs(urlsplit(self.path).query).get('id', [''])[0])
             if not f:
                 return self.reply(404, {'error': 'no such file'})
-            data = f.read_bytes()
+            name = f.name.split('-', 1)[-1]
             self.send_response(200)
-            self.send_header('Content-Type', mimetypes.guess_type(f.name)[0] or 'application/octet-stream')
+            ct = mimetypes.guess_type(name)[0] or 'application/octet-stream'
+            self.send_header('Content-Type', ct + ('; charset=utf-8' if ct.startswith('text/') else ''))
             self.send_header('Cache-Control', 'private, max-age=86400')
-            self.send_header('Content-Length', str(len(data)))
+            self.send_header('Content-Disposition', "inline; filename*=UTF-8''" + quote(name))
+            self.send_header('Content-Length', str(f.stat().st_size))
             self.end_headers()
-            return self.wfile.write(data)
+            with open(f, 'rb') as fh:
+                return shutil.copyfileobj(fh, self.wfile, 1 << 20)
         if path == '/api/board/file':
             q = parse_qs(urlsplit(self.path).query)
             got = _board().image(HUB, _pairs(True), q.get('src', [''])[0], q.get('name', [''])[0])
@@ -1414,6 +1417,45 @@ def chat_log(who, text, meta=None):
         f.write(json.dumps(row, ensure_ascii=False) + '\n')
 
 
+def give_files(paths, note=''):
+    """The CEO hands files to the owner: copied to out/outbox-files/<day>/ and posted in the chat, where he taps to open them."""
+    rules = {}
+    try:
+        rules = json.loads((HUB / 'quyen-tong-quan.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        pass
+    closed = [str(x).replace('\\', '/').lower().rstrip('/') for x in rules.get('cam_vao') or []]
+    day = OUTBOX / datetime.date.today().isoformat()
+    files, bad = [], []
+    for raw in paths:
+        src = Path(str(raw).strip('"'))
+        if not src.is_file():
+            bad.append('%s: không có tệp này' % raw)
+            continue
+        if any(str(src.resolve()).replace('\\', '/').lower().startswith(c) for c in closed):
+            bad.append('%s: thư mục cấm' % src.name)
+            continue
+        if src.stat().st_size > OUT_MAX:
+            bad.append('%s: lớn hơn %d MB' % (src.name, OUT_MAX >> 20))
+            continue
+        day.mkdir(parents=True, exist_ok=True)
+        base = re.sub(r'[^\w.\- ]+', '_', src.name, flags=re.UNICODE).strip(' .') or 'tep'
+        dst = day / ('%s-%s' % (datetime.datetime.now().strftime('%H%M%S'), base[-120:]))
+        shutil.copy2(src, dst)
+        files.append({'id': 'o/' + dst.relative_to(OUTBOX).as_posix(), 'name': base, 'size': dst.stat().st_size, 'image': dst.suffix.lower() in IMAGE_EXT})
+    if files:
+        chat_log('boss', note or ('Em gửi anh %d tệp.' % len(files) if len(files) > 1 else 'Em gửi anh tệp.'), {'files': files})
+    return files, bad
+
+
+def cmd_gui(args):
+    files, bad = give_files(args.paths, ' '.join(args.loi or []))
+    for b in bad:
+        print('dp gui: ' + b)
+    print('đã gửi %d tệp vào ô chat' % len(files))
+    return 0 if files else 1
+
+
 def chat_state():
     msgs = []
     try:
@@ -1654,11 +1696,15 @@ def save_upload(name, data):
     return {'ok': True, 'id': rel, 'name': base, 'size': len(data), 'image': f.suffix.lower() in IMAGE_EXT, 'path': str(f)}
 
 
+OUTBOX = HUB / 'out' / 'outbox-files'
+OUT_MAX = 100 * 2 ** 20
+
+
 def upload_path(rel):
     rel = str(rel or '').replace('\\', '/')
     if '..' in rel.split('/') or rel.startswith('/'):
         return None
-    f = UPLOADS / rel
+    f = OUTBOX / rel[2:] if rel.startswith('o/') else UPLOADS / rel
     return f if f.is_file() else None
 QUEUE = HUB / 'out' / 'chat-queue.json'
 ASKS = HUB / 'out' / 'asks.json'
@@ -2241,6 +2287,10 @@ def main(argv=None):
     x.set_defaults(fn=cmd_xoa)
     mh = sub.add_parser('manhinh', help='chụp màn hình PC vào out/board/man-hinh.jpg (CEO đọc ảnh này để xem PC)')
     mh.set_defaults(fn=lambda a: (lambda j: ((HUB / 'out' / 'board').mkdir(parents=True, exist_ok=True), (HUB / 'out' / 'board' / 'man-hinh.jpg').write_bytes(j or b''), print(str(HUB / 'out' / 'board' / 'man-hinh.jpg') if j else 'chưa chụp được (đang cài Pillow?)'))[-1])(_board().screen_jpeg(1600)) or 0)
+    gv = sub.add_parser('gui', help='giao tệp cho anh Vinh qua ô chat (anh bấm để mở hay tải)')
+    gv.add_argument('paths', nargs='+')
+    gv.add_argument('--loi', nargs='*', help='một câu kèm theo')
+    gv.set_defaults(fn=cmd_gui)
     hq = sub.add_parser('hoi', help='hỏi anh Vinh bằng nút bấm trên bong bóng chat')
     hq.add_argument('question')
     hq.add_argument('--options', default='Đồng ý|Không', help='các lựa chọn, ngăn bằng |')
