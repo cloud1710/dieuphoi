@@ -348,6 +348,8 @@ class Handler(SimpleHTTPRequestHandler):
                 raise ValueError('body size')
             data = json.loads(self.rfile.read(n).decode('utf-8'))
             if path == '/api/chat':
+                if data.get('ask'):
+                    return self.reply(200, answer_ask(str(data['ask']), str(data.get('choice') or '')))
                 return self.reply(200, chat_send(data.get('text'), again=data.get('again') is True))
             if path == '/api/delete':
                 out = {'ok': True, 'result': _xoa().decide(HUB, str(data.get('id')), data.get('yes') is True, 'Vinh qua app')}
@@ -1161,6 +1163,26 @@ def trust_projects():
 HEAL = {}                                        # 'project:item' -> how many times it was restarted
 
 
+def bubble_questions():
+    """A new question in an orchestra's plan becomes a chat bubble with an answer box. Questions that were
+    already open when this started are not repeated (they wait in the Việc tab)."""
+    f = HUB / 'out' / 'q-seen.json'
+    first = not f.is_file()
+    try:
+        seen = set(json.loads(f.read_text(encoding='utf-8'))) if not first else set()
+    except (OSError, ValueError):
+        seen = set()
+    state = scan()
+    now = []
+    for p in state['projects']:
+        for q in p.get('questions') or []:
+            key = '%s:%s' % (p['id'], q['id'])
+            now.append(key)
+            if key not in seen and not first:
+                chat_log('boss', '@%s hỏi anh %s: %s' % (p['id'], q['id'], q['text']), {'q': {'to': p['id'], 'id': q['id']}})
+    f.write_text(json.dumps(sorted(seen | set(now))), encoding='utf-8')
+
+
 def heal_log(text):
     try:
         with open(HUB / 'out' / 'heal.log', 'a', encoding='utf-8') as f:
@@ -1286,7 +1308,9 @@ def chat_state():
         note = json.loads((HUB / 'out' / 'boss.json').read_text(encoding='utf-8'))
     except (OSError, ValueError):
         note = None
-    return {'busy': CHAT['busy'], 'step': CHAT['step'], 'since': CHAT['since'], 'model': CHAT['model'], 'messages': msgs, 'note': note}
+    return {'busy': CHAT['busy'], 'step': CHAT['step'], 'since': CHAT['since'], 'model': CHAT['model'], 'messages': msgs, 'note': note,
+            'asks': {k: {'status': v['status'], 'options': v['options'], 'choice': v.get('choice')} for k, v in _asks().items()},
+            'queued': len(_queue())}
 
 
 def claude_cmd():
@@ -1490,9 +1514,57 @@ def chat_run(text):
     CHAT.update(busy=False, step='', since=None, model=None)
     Handler.cache = (0.0, b'')
     _PLANS.clear()
+    q = _queue()
+    if q:                                        # the next message that waited for this answer
+        QUEUE.write_text(json.dumps(q[1:], ensure_ascii=False), encoding='utf-8')
+        chat_send(q[0], again=True)
 
 
 PENDING = HUB / 'out' / 'chat-pending.json'
+QUEUE = HUB / 'out' / 'chat-queue.json'
+ASKS = HUB / 'out' / 'asks.json'
+
+
+def _queue():
+    try:
+        q = json.loads(QUEUE.read_text(encoding='utf-8'))
+        return q if isinstance(q, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+def _asks():
+    try:
+        a = json.loads(ASKS.read_text(encoding='utf-8'))
+        return a if isinstance(a, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def ask_owner(question, options, by='tổng quản'):
+    """A question with buttons on a chat bubble. The owner's tap comes back as his message, so the manager
+    answers it in a normal turn."""
+    asks = _asks()
+    n = max([int(k[2:]) for k in asks if re.fullmatch(r'H-\d+', k)] + [0]) + 1
+    hid = 'H-%03d' % n
+    opts = [o.strip()[:40] for o in options if o.strip()][:4] or ['Đồng ý', 'Không']
+    asks[hid] = {'q': one_line(question, 600), 'options': opts, 'by': by, 'status': 'open',
+                 'when': datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}
+    ASKS.write_text(json.dumps(asks, ensure_ascii=False, indent=1), encoding='utf-8')
+    chat_log('boss', asks[hid]['q'], {'ask': hid})
+    return hid
+
+
+def answer_ask(hid, choice):
+    asks = _asks()
+    a = asks.get(hid)
+    if not a or a['status'] != 'open':
+        raise ValueError('câu hỏi %s đã được trả lời' % hid)
+    if choice not in a['options']:
+        raise ValueError('lựa chọn không có trong câu hỏi')
+    a.update(status='answered', choice=choice, at=datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
+    ASKS.write_text(json.dumps(asks, ensure_ascii=False, indent=1), encoding='utf-8')
+    return chat_send('%s (anh chọn ở câu hỏi %s: %s)' % (choice, hid, a['q']))
 
 
 def chat_send(text, who='vinh', again=False):
@@ -1500,7 +1572,13 @@ def chat_send(text, who='vinh', again=False):
     if not text:
         raise ValueError('empty message')
     if CHAT['busy']:
-        raise ValueError('tổng quản đang trả lời tin trước, chờ một chút')
+        if again:
+            raise ValueError('tổng quản đang trả lời tin trước, chờ một chút')
+        chat_log(who, text)
+        q = _queue()
+        q.append(text)
+        QUEUE.write_text(json.dumps(q, ensure_ascii=False), encoding='utf-8')
+        return chat_state()
     if not again:
         chat_log(who, text)
     CHAT['busy'] = True
@@ -1659,6 +1737,11 @@ def game_watch():
                 except Exception as e:
                     note = '%s: %s' % (type(e).__name__, e)
                 (HUB / 'out' / 'board-shot.log').write_text(str(note), encoding='utf-8')
+            if tick % 2 == 1:
+                try:
+                    bubble_questions()
+                except Exception as e:
+                    heal_log('questions: %s' % e)
             ask = HUB / 'out' / 'chat-in.txt'
             if ask.is_file() and ask.stat().st_size and not CHAT['busy']:
                 msg = ask.read_text(encoding='utf-8').strip()
@@ -1964,6 +2047,11 @@ def main(argv=None):
     x.add_argument('--why', required=True)
     x.add_argument('--by', default='tổng quản')
     x.set_defaults(fn=cmd_xoa)
+    hq = sub.add_parser('hoi', help='hỏi anh Vinh bằng nút bấm trên bong bóng chat')
+    hq.add_argument('question')
+    hq.add_argument('--options', default='Đồng ý|Không', help='các lựa chọn, ngăn bằng |')
+    hq.add_argument('--by', default='tổng quản')
+    hq.set_defaults(fn=lambda a: print(ask_owner(a.question, a.options.split('|'), a.by)) or 0)
     i = sub.add_parser('init')
     i.add_argument('id')
     i.set_defaults(fn=cmd_init)
