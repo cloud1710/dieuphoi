@@ -1,6 +1,7 @@
 # registry.yaml - sổ đăng ký các orchestra. dieuphoi chỉ ĐỌC kế hoạch của từng project.
 # kind: plan    = orchestra kiểu projectplaner (plan/STATUS.yaml, plan/QUESTIONS.md)
-#       seal    = orchestra riêng của luận văn SEAL (STATUS.yaml, QUESTIONS.md ở gốc), chỉ đọc
+#       seal    = orchestra riêng của luận văn SEAL (STATUS.yaml, QUESTIONS.md ở gốc): kế hoạch chỉ đọc; thư của hub
+#                 vào tệp ghi ở `mailbox` (tệp cục bộ, không lên git), phiên ORCH đọc và xử lý theo luật của repo đó
 #       tool    = công cụ, không có kế hoạch
 #       archive = bản lưu, không sửa
 # parent: id của orchestra cấp trên (bỏ trống = trực thuộc nhóm).
@@ -20,7 +21,7 @@ groups:
   - {id: ca-nhan, name: Cá nhân}
   - {id: cong-cu, name: Công cụ}
 projects:
-  - {id: cloud, name: SEAL (hub luận văn), path: 'D:/CLOUD', group: luan-van, kind: seal, aliases: [seal, luanvan, thesis, orch]}
+  - {id: cloud, name: SEAL (hub luận văn), path: 'D:/CLOUD', group: luan-van, kind: seal, mailbox: '.claude/HANDOFF-dieuphoi-inbox.md', aliases: [seal, luanvan, thesis, orch]}
   - {id: reg2026, name: REG2026, path: 'D:/reg2_2026', group: luan-van, kind: plan, parent: cloud, aliases: [reg, reg2, reg2_2026]}
   - {id: gastric-guideline, name: Đối chiếu guideline dạ dày, path: 'D:/gastric_guideline', group: luan-van, kind: plan, aliases: [guideline, dady]}
   - {id: modules, name: Module cũ (bản lưu), path: 'D:/modules', group: luan-van, kind: archive, parent: cloud}

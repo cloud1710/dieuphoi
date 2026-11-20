@@ -102,7 +102,7 @@ def mail_new(path):
 
 def scan_project(p):
     root = real(p['path'])
-    out = {k: p.get(k) for k in ('id', 'name', 'group', 'parent', 'kind', 'path')}
+    out = {k: p.get(k) for k in ('id', 'name', 'group', 'parent', 'kind', 'path', 'mailbox')}
     out['exists'] = root.is_dir()
     if p['kind'] not in FILES or not out['exists']:
         return out
@@ -149,7 +149,7 @@ def scan_project(p):
         'questions': [{'id': q['id'], 'text': short(q['text']), 'asked': q.get('asked'),
                        'unblocks': q.get('unblocks')} for q in qs if q.get('status') == 'open'],
         'updated': datetime.datetime.fromtimestamp(sfile.stat().st_mtime).strftime('%Y-%m-%d %H:%M'),
-        'mail': mail_new(root / 'plan' / 'INBOX.md') if p['kind'] == 'plan' else mail_new(HUB / 'out' / 'mail' / (p['id'] + '.md')),
+        'mail': mail_new(root / p['mailbox']) if p.get('mailbox') else mail_new(root / 'plan' / 'INBOX.md') if p['kind'] == 'plan' else mail_new(HUB / 'out' / 'mail' / (p['id'] + '.md')),
     })
     return out
 
@@ -184,6 +184,8 @@ def scan_cached(p):
     """Re-read a plan only when its files changed."""
     root = real(p['path'])
     watch = [root / f for f in FILES.get(p['kind'], ())] + [root / 'plan' / 'INBOX.md', HUB / 'out' / 'mail' / (p['id'] + '.md')]
+    if p.get('mailbox'):
+        watch.append(root / p['mailbox'])
     key = (root.is_dir(),) + tuple(f.stat().st_mtime_ns if f.is_file() else 0 for f in watch)
     hit = _PLANS.get(p['id'])
     if not hit or hit[0] != (key, p):
@@ -495,7 +497,7 @@ def cmd_who(args):
     print('parent: %s' % (parent or 'group ' + p['group']))
     print('rules: %s' % (', '.join(f for f in ('CLAUDE.md', 'plan/ORCHESTRA.md') if (root / f).is_file()) or 'none'))
     if p['kind'] in FILES:
-        print('plan: %s, mailbox: %s' % (FILES[p['kind']][0], 'plan/INBOX.md' if p['kind'] == 'plan' else 'hub out/mail/%s.md' % p['id']))
+        print('plan: %s, mailbox: %s' % (FILES[p['kind']][0], p.get('mailbox') or ('plan/INBOX.md' if p['kind'] == 'plan' else 'hub out/mail/%s.md' % p['id'])))
         print('state: %s' % (st.get('error') or 'working %d, ready %d, open questions %d, waiting %d' % (
             len(st.get('working', [])), len(st.get('ready', [])), len(st.get('questions', [])), st.get('waiting', 0))))
     return 0
@@ -507,7 +509,9 @@ def one_line(text, limit=2000):
 
 def send_msg(p, text, sender):
     """Append one message to the project's mailbox; returns (number, where)."""
-    if p['kind'] == 'plan':
+    if p.get('mailbox'):                         # a project that named its own mailbox file (the seal orchestra does)
+        box, where = real(p['path']) / p['mailbox'], '%s of @%s' % (p['mailbox'], p['id'])
+    elif p['kind'] == 'plan':
         box, where = real(p['path']) / 'plan' / 'INBOX.md', 'plan/INBOX.md of @%s' % p['id']
     else:                                        # never write into a seal orchestra, an archive or a tool
         box, where = HUB / 'out' / 'mail' / (p['id'] + '.md'), 'out/mail/%s.md in the hub (the project is %s)' % (p['id'], p['kind'])

@@ -158,12 +158,12 @@ function question(p, q) {
   const b = E('button', 'act', 'Trả lời'); b.style.display = 'block';
   b.onclick = () => { busy = true; const ta = E('textarea'); ta.placeholder = 'Câu trả lời của anh'; const go = E('button', 'act go', 'Gửi câu trả lời'), res = E('div', 'res');
     go.onclick = async () => { if (!ta.value.trim()) return; go.disabled = true;
-      try { const o = await api('api/answer', {to:p.id, q:q.id, text:ta.value}); res.textContent = p.kind === 'plan' ? 'Đã ghi câu trả lời vào kế hoạch.' : 'Đã lưu ở hub, chưa ghi vào project (project chỉ đọc): ' + o.result; busy = false; }
+      try { const o = await api('api/answer', {to:p.id, q:q.id, text:ta.value}); res.textContent = p.kind === 'plan' ? 'Đã ghi câu trả lời vào kế hoạch.' : 'Đã gửi vào hộp thư của project, phiên điều phối của nó sẽ ghi vào kế hoạch: ' + o.result; busy = false; }
       catch (e) { res.className = 'res bad'; res.textContent = e.message; go.disabled = false; } };
     b.replaceWith(ta, go, res); ta.focus(); };
   d.append(b); return d; }
 function personItem(p, i) { const d = E('div', 'q'); d.append(E('small', '', '@' + p.id + ' · ' + i.id + ' · việc của ' + i.owner), document.createTextNode(i.title));
-  if (liveMode) { const b = twoTap('Báo đã xong ' + i.id, async () => { const o = await api('api/done', {to:p.id, item:i.id}); return p.kind === 'plan' ? 'Đã ghi xong vào kế hoạch; việc sẽ tự biến mất.' : 'Đã báo về hub (project chỉ đọc): ' + o.result; }); b.style.display = 'block'; d.append(b); }
+  if (liveMode) { const b = twoTap('Báo đã xong ' + i.id, async () => { const o = await api('api/done', {to:p.id, item:i.id}); return p.kind === 'plan' ? 'Đã ghi xong vào kế hoạch; việc sẽ tự biến mất.' : 'Đã gửi vào hộp thư của project: ' + o.result; }); b.style.display = 'block'; d.append(b); }
   return d; }
 function draw(s) {
   feedDiff(STATE, s); STATE = s; office.set(s); drawCol(); if (busy) return;                              // do not redraw under an answer being typed

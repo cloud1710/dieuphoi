@@ -113,7 +113,7 @@ Cần `psutil`; số GPU cần `nvidia-smi`.
 Nhắn cho điều phối `@pathbrain chạy thêm một lượt radar`: điều phối tìm project (`dp who`), đọc luật và kế hoạch của
 project đó rồi làm việc trong đó. Việc cần một phiên riêng của project thì để lại thư (`dp msg`), phiên của project đọc
 `plan/INBOX.md` đầu phiên. Tên sau @ là `id`, tên, tên thư mục hoặc `aliases` trong `registry.yaml`.
-Orchestra SEAL và bản lưu không bị ghi: thư cho chúng nằm ở `out/mail/` của hub.
+Orchestra SEAL nhận thư ở tệp `mailbox` của nó; bản lưu và công cụ không bị ghi, thư cho chúng nằm ở `out/mail/` của hub.
 
 ## Các cấp
 
@@ -133,7 +133,8 @@ Việc đi lên: câu hỏi `status: open` và mục có `owner` là người tr
 
 ## Giới hạn
 
-- Orchestra SEAL (`kind: seal`) chỉ được đọc; dieuphoi không ghi gì vào đó.
+- Orchestra SEAL (`kind: seal`): kế hoạch chỉ được đọc. Thư của hub vào tệp `mailbox` ghi trong sổ đăng ký (một tệp cục bộ
+  của repo đó, không lên git); phiên điều phối của SEAL đọc và xử lý theo luật riêng của nó.
 - `kind: archive` là bản lưu: không tạo kế hoạch, không sửa.
 - Trang văn phòng dựng từ kế hoạch, không điều khiển phiên nào. Mở phiên vẫn là việc của `pp`.
 - `out/` không lên git.
