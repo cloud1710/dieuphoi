@@ -334,6 +334,12 @@ async function shrink(file) {              // a phone photo can be 5 MB: send at
   try { const bm = await createImageBitmap(file), k = Math.min(1, 2048 / Math.max(bm.width, bm.height)), c = document.createElement('canvas'); c.width = Math.round(bm.width * k); c.height = Math.round(bm.height * k);
     c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height); const b = await new Promise(r => c.toBlob(r, 'image/jpeg', .86)); return b ? new File([b], file.name.replace(/\.\w+$/, '') + '.jpg', {type:'image/jpeg'}) : file; } catch (e) { return file; } }
 $('att').onclick = () => $('attf').click();
+async function addFiles(list) { for (const f of [...list].slice(0, 10 - ATT.length)) { const s2 = await shrink(f); ATT.push({file:s2, url:/^image\//.test(s2.type) ? URL.createObjectURL(s2) : null}); } drawAtts(); }
+$('sayt').addEventListener('paste', e => {          // pasted pictures and files (a copied screenshot, a file from Files or Explorer)
+  const files = [...(e.clipboardData ? e.clipboardData.items : [])].filter(i => i.kind === 'file').map(i => i.getAsFile()).filter(Boolean)
+    .map((f, k) => f.name && f.name !== 'image.png' ? f : new File([f], 'dan-' + new Date().toTimeString().slice(0, 8).replace(/:/g, '') + (k ? '-' + k : '') + '.' + ((f.type.split('/')[1] || 'png').replace('jpeg', 'jpg')), {type:f.type}));
+  if (files.length) { e.preventDefault(); addFiles(files); } });
+['dragover', 'drop'].forEach(ev => $('say').addEventListener(ev, e => { if (!e.dataTransfer || ![...e.dataTransfer.types].includes('Files')) return; e.preventDefault(); if (ev === 'drop') addFiles(e.dataTransfer.files); }));
 // ---- voice: talk instead of typing, and hear the answers
 let TTS = false, REC = null; try { TTS = localStorage.getItem('dp-tts') === '1'; } catch (e) {}
 const micBtn = $('mic'), ttsBtn = $('tts'); ttsBtn.classList.toggle('on', TTS); ttsBtn.textContent = TTS ? '🔊' : '🔈';
@@ -361,7 +367,7 @@ micBtn.onclick = async () => { if (REC) { REC.stop(); return; }
   r.onerror = e => { failed = true; micOn(false); REC = null; if (/not-allowed|service-not-allowed|network|language/.test(e.error)) recordOnPC().catch(x => { $('sayt').placeholder = 'Không bật được micro: ' + x.message; }); };
   r.onend = () => { if (!failed) voiceDone(); };
   try { r.start(); REC = r; micOn(true); } catch (e) { recordOnPC().catch(() => {}); } };
-$('attf').onchange = async () => { for (const f of [...$('attf').files].slice(0, 10 - ATT.length)) { const s2 = await shrink(f); ATT.push({file:s2, url:/^image\//.test(s2.type) ? URL.createObjectURL(s2) : null}); } $('attf').value = ''; drawAtts(); };
+$('attf').onchange = async () => { const l = [...$('attf').files]; $('attf').value = ''; await addFiles(l); };
 async function upload(f) { const r = await fetch('api/upload?name=' + encodeURIComponent(f.name), {method:'POST', headers:{'X-DP-Key':KEY, 'Content-Type':'application/octet-stream'}, body:f}); const j = await r.json(); if (!r.ok || !j.ok) throw new Error(j.error || 'tải lên lỗi'); return j.id; }
 $('say').onsubmit = async e => { e.preventDefault(); const t = $('sayt').value.trim(); if (!t && !ATT.length) return; const sending = ATT; ATT = []; drawAtts(); $('sayt').value = '';
   CHATS.messages.push({t:'          ' + new Date().toTimeString().slice(0, 5), who:'vinh', text:t || '(anh gửi ' + sending.length + ' tệp)', meta:sending.length ? {files:sending.map(a => ({name:a.file.name, size:a.file.size, image:!!a.url, local:a.url}))} : undefined}); CHATS.busy = true; CHATS.step = 'đang đọc tin nhắn'; drawChat(); office.boss(); $('chat').scrollTop = $('chat').scrollHeight;
