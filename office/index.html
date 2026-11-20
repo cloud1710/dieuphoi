@@ -65,16 +65,18 @@ const C = {work:0x3f9d74, ready:0x3f73a8, ask:0xd2553d, wait:0xd39a2f, sleep:0x9
   floor:[0xd9c7a3,0xc9d6c4,0xc7d3e0,0xe2c9c0,0xd5cde0], desk:0xb98b5e, dark:0x2b2f38, leaf:0x5f9e6b, pot:0xb5653f, box:0xc9a36b};
 const canvas = document.getElementById('c');
 const renderer = new THREE.WebGLRenderer({canvas, antialias:true, alpha:true});
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFShadowMap;
+renderer.shadowMap.autoUpdate = false;                    // the scene is static: one shadow pass per rebuild
+let need = true;                                          // draw a frame only when something changed
 const scene = new THREE.Scene();
 const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, -200, 400);
 const ctl = new OrbitControls(cam, canvas);
 ctl.enableDamping = true; ctl.maxPolarAngle = Math.PI * .44; ctl.minZoom = .4; ctl.maxZoom = 6; ctl.zoomToCursor = true;
 scene.add(new THREE.HemisphereLight(0xffffff, dark?0x30323a:0xcbbfa6, dark?.8:1.0));
 const sun = new THREE.DirectionalLight(0xfff2dc, dark?2.0:2.9);
-sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); sun.shadow.bias = -0.0006; sun.shadow.normalBias = .03;
+sun.castShadow = true; sun.shadow.mapSize.set(1536, 1536); sun.shadow.bias = -0.0006; sun.shadow.normalBias = .03;
 scene.add(sun, sun.target);
 
 const mats = new Map();
@@ -182,7 +184,7 @@ function pipe(a, b, color) {
   m.rotation.y = Math.atan2(d.x, d.z); }
 
 function build(s) {
-  if (world) scene.remove(world);
+  if (world) { scene.remove(world); screens.forEach(x => x.material.dispose()); }
   world = new THREE.Group(); scene.add(world); labels = []; bots = []; screens = [];
   document.getElementById('labels').textContent = '';
   const SX = RW + GAP, SZ = RD + 2.6, PAD = 1.1, MAXC = innerWidth / innerHeight < .8 ? 3 : 6;
@@ -218,6 +220,9 @@ function build(s) {
   const R = Math.hypot(W + 7, D + 13) / 2;
   sun.position.set(-R * .55, R * 1.1, R * .75); sun.target.position.set(0, 0, 2);
   Object.assign(sun.shadow.camera, {left:-R, right:R, top:R, bottom:-R, near:1, far:R * 4}); sun.shadow.camera.updateProjectionMatrix();
+  world.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; });          // static parts keep their matrix
+  for (const b of bots) { b.g.matrixAutoUpdate = b.head.matrixAutoUpdate = true; if (b.g.userData.bub) b.g.userData.bub.matrixAutoUpdate = true; }
+  renderer.shadowMap.needsUpdate = true; need = true;
   if (!build.fit) { build.fit = true; build.W = W + 5; build.D = D + 11; ctl.target.set(0, 0, 2.2); cam.position.set(R * .55, R * 1.05, R * 1.25 + 2.2); resize(); }
 }
 
@@ -225,7 +230,7 @@ function resize() {
   const w = innerWidth, h = innerHeight, a = w / h, W = build.W || 40, D = build.D || 30;
   renderer.setSize(w, h, false);
   const half = Math.max((W * .93 + D * .4) / 2 / a, (D * .62 + W * .16) / 2 + 2.5);
-  cam.left = -half * a; cam.right = half * a; cam.top = half; cam.bottom = -half; cam.updateProjectionMatrix(); }
+  cam.left = -half * a; cam.right = half * a; cam.top = half; cam.bottom = -half; cam.updateProjectionMatrix(); need = true; }
 addEventListener('resize', resize);
 
 const panel = document.getElementById('panel'), pbody = document.getElementById('pbody');
@@ -251,36 +256,49 @@ function showInbox(s) {
   if (!n) pbody.append(T('p', 'Không có việc nào chờ.', 'meta'));
   panel.classList.add('on'); }
 
-let last = '', state = null;
+let last = '', state = null, src = 0;
+const SRC = [window.STATE_URL || '/api/state', 'state.json'];        // live server first, then the static snapshot
 async function tick() {
-  try { const r = await fetch(window.STATE_URL || '/api/state', {cache:'no-store'}); const s = await r.json();
+  if (document.hidden) return;
+  try { let r = await fetch(SRC[src], {cache:'no-cache'}).catch(() => null);
+    if ((!r || !r.ok) && src === 0) { src = 1; r = await fetch(SRC[1], {cache:'no-cache'}); }
+    const s = await r.json();
     if (s.error) throw new Error(s.error);
-    document.getElementById('meta').textContent = 'Cập nhật ' + s.generated + ' · ' + s.projects.length + ' phòng';
+    document.getElementById('meta').textContent = (src ? 'Bản chụp ' : 'Cập nhật ') + s.generated + ' · ' + s.projects.length + ' phòng';
     document.getElementById('n').textContent = s.inbox.questions + s.inbox.person;
     const key = JSON.stringify([s.groups, s.projects]); state = s;
     if (key !== last) { last = key; build(s); }
   } catch (e) { document.getElementById('meta').textContent = 'Mất kết nối với server: ' + e.message; } }
 document.getElementById('boss').onclick = () => state && showInbox(state);
-tick(); setInterval(tick, 10000);
+tick(); setInterval(tick, 15000); document.addEventListener('visibilitychange', tick);
 
 const still = matchMedia('(prefers-reduced-motion:reduce)').matches, v = new THREE.Vector3();
-renderer.setAnimationLoop(ms => {
-  const t = ms / 1000;
-  if (!still) {
+ctl.addEventListener('change', () => { need = true; });
+let lastAnim = 0;
+function frame(ms) {
+  requestAnimationFrame(frame);                           // the browser stops this while the tab is hidden
+  ctl.update();
+  const anim = !still && ms - lastAnim > (document.hasFocus() ? 100 : 500);   // 10 frames a second, 2 when the window is in the background
+  if (!need && !anim) return;
+  if (anim) { lastAnim = ms; const t = ms / 1000;
     for (const b of bots) { const p = t * 2 + b.phase;
       if (b.kind === 'work') { b.head.position.y = .98 + Math.sin(p * 4) * .015; b.head.rotation.y = Math.sin(p * .7) * .25; }
       else if (b.kind === 'ask') { b.g.position.y = Math.max(0, Math.sin(p * 1.6)) * .18; b.head.rotation.z = Math.sin(p * 1.6) * .12; }
       else if (b.kind === 'ready') { b.head.rotation.y = Math.sin(p * .5) * .5; }
-      else if (b.kind === 'wait') { b.g.rotation.y += Math.sin(p * .8) * .002; b.head.rotation.x = Math.sin(p) * .08; }
+      else if (b.kind === 'wait') { b.head.rotation.x = Math.sin(p) * .08; }
       else b.g.scale.y = 1 + Math.sin(p * .6) * .03;
       if (b.g.userData.bub) b.g.userData.bub.position.y = 1.85 + Math.sin(p * 1.3) * .07; }
-    for (const s of screens) s.material.emissiveIntensity = .75 + Math.sin(t * 9 + s.position.x * 7) * .2;
-  }
-  ctl.update(); renderer.render(scene, cam);
+    for (const s of screens) s.material.emissiveIntensity = .75 + Math.sin(t * 9 + s.position.x * 7) * .2; }
+  const moved = need; need = false;
+  renderer.render(scene, cam);
+  if (!moved && frame.done) return;                       // labels move only with the camera
+  frame.done = true;
   const w = innerWidth, h = innerHeight, k = Math.min(1, Math.max(.5, h / (cam.top - cam.bottom) * cam.zoom / 20));
   for (const l of labels) { v.copy(l.pos).project(cam); const wing = l.el.classList.contains('wing');
     l.el.style.transform = `translate(${((v.x + 1) / 2 * w).toFixed(1)}px,${((1 - v.y) / 2 * h).toFixed(1)}px) translate(${wing ? '0,-50%' : '-50%,-100%'}) scale(${k.toFixed(2)})`; }
-});
+}
+requestAnimationFrame(frame);
+window.__office = {renderer};
 </script>
 </body>
 </html>

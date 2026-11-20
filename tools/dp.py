@@ -4,16 +4,22 @@
 dp check          registry and every plan can be read
 dp scan           write out/state.json and out/INBOX.md
 dp serve          serve the agents office page (office/) and /api/state
+dp build          write the office as a static site into out/site (page + state.json snapshot)
+dp who @name      resolve an @name to one project and print where its orchestra lives
+dp msg @name text leave a message in that project's mailbox (plan/INBOX.md)
 dp init <id>      write a starter plan into a registered project that has none
 """
 import argparse
 import collections
 import datetime
+import hashlib
 import json
 import os
 import re
+import shutil
 import sys
 import time
+import unicodedata
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -49,6 +55,8 @@ def registry():
             raise ValueError('%s: unknown group %s' % (p['id'], p['group']))
         if p.get('parent') and p['parent'] not in ids:
             raise ValueError('%s: unknown parent %s' % (p['id'], p['parent']))
+        if not isinstance(p.get('aliases') or [], list):
+            raise ValueError('%s: aliases must be a list' % p['id'])
         if p.get('kind') not in ('plan', 'seal', 'tool', 'archive'):
             raise ValueError('%s: unknown kind %s' % (p['id'], p.get('kind')))
     return reg
@@ -76,6 +84,10 @@ def questions(path):
 def short(text, n=220):
     text = ' '.join(str(text or '').split())
     return text if len(text) <= n else text[:n - 1].rstrip() + '…'
+
+
+def mail_new(path):
+    return len(re.findall(r'^- status: new', path.read_text(encoding='utf-8-sig'), flags=re.M)) if path.is_file() else 0
 
 
 def scan_project(p):
@@ -127,6 +139,7 @@ def scan_project(p):
         'questions': [{'id': q['id'], 'text': short(q['text']), 'asked': q.get('asked'),
                        'unblocks': q.get('unblocks')} for q in qs if q.get('status') == 'open'],
         'updated': datetime.datetime.fromtimestamp(sfile.stat().st_mtime).strftime('%Y-%m-%d %H:%M'),
+        'mail': mail_new(root / 'plan' / 'INBOX.md') if p['kind'] == 'plan' else mail_new(HUB / 'out' / 'mail' / (p['id'] + '.md')),
     })
     return out
 
@@ -154,10 +167,30 @@ def sessions(projects):
     return dict(found)
 
 
+_PLANS, _LIVE = {}, [0.0, None]
+
+
+def scan_cached(p):
+    """Re-read a plan only when its files changed."""
+    root = real(p['path'])
+    watch = [root / f for f in FILES.get(p['kind'], ())] + [root / 'plan' / 'INBOX.md', HUB / 'out' / 'mail' / (p['id'] + '.md')]
+    key = (root.is_dir(),) + tuple(f.stat().st_mtime_ns if f.is_file() else 0 for f in watch)
+    hit = _PLANS.get(p['id'])
+    if not hit or hit[0] != (key, p):
+        hit = _PLANS[p['id']] = ((key, dict(p)), scan_project(p))
+    return dict(hit[1])
+
+
+def sessions_cached(projects):
+    if time.time() - _LIVE[0] > 30:              # walking the process list is the costly part
+        _LIVE[:] = [time.time(), sessions(projects)]
+    return _LIVE[1]
+
+
 def scan():
     reg = registry()
-    projects = [scan_project(p) for p in reg['projects']]
-    live = sessions(reg['projects'])
+    projects = [scan_cached(p) for p in reg['projects']]
+    live = sessions_cached(reg['projects'])
     for p in projects:
         p['sessions'] = None if live is None else live.get(p['id'], 0)
     return {
@@ -266,14 +299,101 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception as e:
                 body = json.dumps({'error': '%s: %s' % (type(e).__name__, e)}).encode('utf-8')
             Handler.cache = (time.time(), body)
+        body = Handler.cache[1]
+        tag = '"%s"' % hashlib.sha1(body.split(b'"hub"', 1)[-1]).hexdigest()[:16]      # the timestamp is not hashed
+        if self.headers.get('If-None-Match') == tag:
+            self.send_response(304)
+            self.send_header('ETag', tag)
+            self.end_headers()
+            return
         self.send_response(200)
         self.send_header('Content-Type', 'application/json; charset=utf-8')
-        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Cache-Control', 'no-cache')
+        self.send_header('ETag', tag)
+        self.send_header('Content-Length', str(len(body)))
         self.end_headers()
-        self.wfile.write(Handler.cache[1])
+        self.wfile.write(body)
 
     def log_message(self, *a):
         pass
+
+
+def cmd_build(_):
+    site = HUB / 'out' / 'site'
+    shutil.copytree(HUB / 'office', site, dirs_exist_ok=True)
+    (site / 'state.json').write_text(json.dumps(scan(), ensure_ascii=False), encoding='utf-8')
+    print('static site: %s (project names, paths and open questions are inside: publish it behind a login)' % site)
+    return 0
+
+
+def fold(text):
+    """'@Thư Viện' -> 'thuvien': no case, no accents, no punctuation."""
+    text = unicodedata.normalize('NFD', str(text).replace('đ', 'd').replace('Đ', 'D'))
+    return re.sub(r'[^a-z0-9]', '', ''.join(c for c in text if unicodedata.category(c) != 'Mn').lower())
+
+
+def resolve(name, reg):
+    """One project for an @name, or the list of candidates when the name fits several or none."""
+    want = fold(name)
+    keys = {p['id']: {fold(k) for k in [p['id'], p['name'], Path(str(p['path']).replace('\\', '/')).name]
+                      + list(p.get('aliases') or [])} for p in reg['projects']}
+    exact = [p for p in reg['projects'] if want in keys[p['id']]]
+    if len(exact) == 1:
+        return exact[0], []
+    near = [p for p in reg['projects'] if want and any(want in k or k.startswith(want) for k in keys[p['id']])]
+    if len(near) == 1 and not exact:
+        return near[0], []
+    return None, exact or near
+
+
+def _pick(name):
+    reg = registry()
+    p, cands = resolve(name, reg)
+    if p is None:
+        print('dp: @%s fits %s' % (name.lstrip('@'), ', '.join('@' + c['id'] for c in cands) if cands
+                                    else 'no project; known: ' + ', '.join('@' + x['id'] for x in reg['projects'])))
+    return p, reg
+
+
+def cmd_who(args):
+    p, reg = _pick(args.name)
+    if p is None:
+        return 1
+    root = real(p['path'])
+    st = scan_cached(p)
+    parent = next((x['id'] for x in reg['projects'] if x['id'] == p.get('parent')), None)
+    print('@%s  %s' % (p['id'], p['name']))
+    print('path: %s' % p['path'])
+    print('kind: %s%s' % (p['kind'], {'seal': ' (read only for the hub)', 'archive': ' (do not edit)'}.get(p['kind'], '')))
+    print('parent: %s' % (parent or 'group ' + p['group']))
+    print('rules: %s' % (', '.join(f for f in ('CLAUDE.md', 'plan/ORCHESTRA.md') if (root / f).is_file()) or 'none'))
+    if p['kind'] in FILES:
+        print('plan: %s, mailbox: %s' % (FILES[p['kind']][0], 'plan/INBOX.md' if p['kind'] == 'plan' else 'hub out/mail/%s.md' % p['id']))
+        print('state: %s' % (st.get('error') or 'working %d, ready %d, open questions %d, waiting %d' % (
+            len(st.get('working', [])), len(st.get('ready', [])), len(st.get('questions', [])), st.get('waiting', 0))))
+    return 0
+
+
+def cmd_msg(args):
+    p, _ = _pick(args.name)
+    if p is None:
+        return 1
+    text = ' '.join(args.text).strip()
+    if not text:
+        print('dp msg: empty message')
+        return 1
+    if p['kind'] == 'plan':
+        box, where = real(p['path']) / 'plan' / 'INBOX.md', 'plan/INBOX.md of @%s' % p['id']
+    else:                                        # never write into a seal orchestra, an archive or a tool
+        box, where = HUB / 'out' / 'mail' / (p['id'] + '.md'), 'out/mail/%s.md in the hub (the project is %s)' % (p['id'], p['kind'])
+    box.parent.mkdir(parents=True, exist_ok=True)
+    old = box.read_text(encoding='utf-8') if box.is_file() else '# Thư từ điều phối\n\nThư mới nhất ở cuối. Phiên của project đọc thư `status: new`, làm xong thì đổi thành `status: done` kèm một dòng kết quả.\n'
+    n = len(re.findall(r'^## M-\d+', old, flags=re.M)) + 1
+    box.write_text('%s\n## M-%03d · %s · từ %s\n%s\n- status: new\n' % (
+        old.rstrip('\n') + '\n', n, datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), args.sender, text),
+        encoding='utf-8', newline='\n')
+    print('M-%03d -> %s' % (n, where))
+    return 0
 
 
 def cmd_serve(args):
@@ -295,6 +415,15 @@ def main(argv=None):
     s.add_argument('--host', default='127.0.0.1')
     s.add_argument('--port', type=int, default=8765)
     s.set_defaults(fn=cmd_serve)
+    sub.add_parser('build').set_defaults(fn=cmd_build)
+    w = sub.add_parser('who')
+    w.add_argument('name')
+    w.set_defaults(fn=cmd_who)
+    m = sub.add_parser('msg')
+    m.add_argument('name')
+    m.add_argument('text', nargs='+')
+    m.add_argument('--from', dest='sender', default='Vinh qua dieuphoi')
+    m.set_defaults(fn=cmd_msg)
     i = sub.add_parser('init')
     i.add_argument('id')
     i.set_defaults(fn=cmd_init)

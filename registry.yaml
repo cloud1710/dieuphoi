@@ -4,6 +4,7 @@
 #       tool    = công cụ, không có kế hoạch
 #       archive = bản lưu, không sửa
 # parent: id của orchestra cấp trên (bỏ trống = trực thuộc nhóm).
+# aliases: tên gọi tắt dùng sau dấu @ (không phân biệt hoa thường, dấu, khoảng trắng).
 schema: 1
 hub: {id: dieuphoi, name: Điều phối, path: 'D:/dieuphoi'}
 groups:
@@ -13,19 +14,29 @@ groups:
   - {id: ca-nhan, name: Cá nhân}
   - {id: cong-cu, name: Công cụ}
 projects:
-  - {id: cloud, name: SEAL (hub luận văn), path: 'D:/CLOUD', group: luan-van, kind: seal}
-  - {id: reg2026, name: REG2026, path: 'D:/reg2_2026', group: luan-van, kind: plan, parent: cloud}
-  - {id: gastric-guideline, name: Đối chiếu guideline dạ dày, path: 'D:/gastric_guideline', group: luan-van, kind: plan}
+  - {id: cloud, name: SEAL (hub luận văn), path: 'D:/CLOUD', group: luan-van, kind: seal, aliases: [seal, luanvan, thesis, orch]}
+  - {id: reg2026, name: REG2026, path: 'D:/reg2_2026', group: luan-van, kind: plan, parent: cloud, aliases: [reg, reg2, reg2_2026]}
+  - {id: gastric-guideline, name: Đối chiếu guideline dạ dày, path: 'D:/gastric_guideline', group: luan-van, kind: plan, aliases: [guideline, dady]}
   - {id: modules, name: Module cũ (bản lưu), path: 'D:/modules', group: luan-van, kind: archive, parent: cloud}
   - {id: phd-thesis, name: PhD Thesis (bản lưu), path: 'D:/PhD Thesis', group: luan-van, kind: archive, parent: cloud}
   - {id: pathbrain, name: pathbrain, path: 'D:/pathbrain', group: benh-vien, kind: plan}
   - {id: path2brain, name: path2brain, path: 'D:/path2brain', group: benh-vien, kind: plan}
-  - {id: umc-library, name: Thư Viện Sức Khỏe UMC, path: 'D:/UMC Library', group: benh-vien, kind: plan}
+  - {id: umc-library, name: Thư Viện Sức Khỏe UMC, path: 'D:/UMC Library', group: benh-vien, kind: plan, aliases: [tvsk, thuvien]}
   - {id: pcare, name: PCare, path: 'D:/PCare', group: benh-vien, kind: plan}
-  - {id: lab-manager, name: Lab manager, path: 'D:/Lab_manager', group: benh-vien, kind: plan}
-  - {id: toolgpt, name: GPB UMC Toolbox, path: 'D:/toolgpt', group: benh-vien, kind: plan}
+  - {id: lab-manager, name: Lab manager, path: 'D:/Lab_manager', group: benh-vien, kind: plan, aliases: [lab]}
+  - {id: toolgpt, name: GPB UMC Toolbox, path: 'D:/toolgpt', group: benh-vien, kind: plan, aliases: [toolbox, gpb]}
   - {id: owl, name: Owl, path: 'D:/Owl', group: nghien-cuu, kind: plan}
-  - {id: vitranslate, name: vitranslate, path: 'D:/vitranslate-distill', group: nghien-cuu, kind: plan}
-  - {id: stock, name: Chứng khoán (paper trading), path: 'D:/stock', group: ca-nhan, kind: plan}
-  - {id: games, name: Games, path: 'D:/Games', group: ca-nhan, kind: plan}
-  - {id: projectplaner, name: projectplaner, path: 'D:/projectplaner', group: cong-cu, kind: tool}
+  - {id: vitranslate, name: vitranslate, path: 'D:/vitranslate-distill', group: nghien-cuu, kind: plan, aliases: [vt, dich]}
+  - {id: stock, name: Chứng khoán (paper trading), path: 'D:/stock', group: ca-nhan, kind: plan, aliases: [ck, chungkhoan]}
+  - {id: games, name: Games (xưởng chung), path: 'D:/Games', group: ca-nhan, kind: plan, aliases: [game]}
+  - {id: cat-phim, name: cat-phim, path: 'D:/Games/cat-phim', group: ca-nhan, kind: plan, parent: games}
+  - {id: ccgs-studio, name: ccgs-studio, path: 'D:/Games/ccgs-studio', group: ca-nhan, kind: plan, parent: games}
+  - {id: du-trend, name: du-trend, path: 'D:/Games/du-trend', group: ca-nhan, kind: plan, parent: games}
+  - {id: figure-lab, name: figure-lab, path: 'D:/Games/figure-lab', group: ca-nhan, kind: plan, parent: games}
+  - {id: giu-xe-saigon, name: giu-xe-saigon, path: 'D:/Games/giu-xe-saigon', group: ca-nhan, kind: plan, parent: games}
+  - {id: hop-mu, name: hop-mu, path: 'D:/Games/hop-mu', group: ca-nhan, kind: plan, parent: games}
+  - {id: ma-soi-1-dem, name: ma-soi-1-dem, path: 'D:/Games/ma-soi-1-dem', group: ca-nhan, kind: plan, parent: games}
+  - {id: skynerd, name: skynerd, path: 'D:/Games/skynerd', group: ca-nhan, kind: plan, parent: games}
+  - {id: thanh-nhac, name: thanh-nhac, path: 'D:/Games/thanh-nhac', group: ca-nhan, kind: plan, parent: games}
+  - {id: xoi-man, name: xoi-man, path: 'D:/Games/xoi-man', group: ca-nhan, kind: plan, parent: games}
+  - {id: projectplaner, name: projectplaner, path: 'D:/projectplaner', group: cong-cu, kind: tool, aliases: [pp]}

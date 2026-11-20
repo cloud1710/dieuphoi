@@ -48,6 +48,25 @@ for, one against, one checks the project's own rules), take the majority, and re
 - Down: the hub changes nothing in a project by itself; it opens a session there, which follows that project's rules.
 - A child (`parent: <id>`) reports to its parent first. The hub shows both.
 
+## Messages that start with @
+
+When the owner writes `@name ...`, the message is for that project's orchestra, and you carry it there.
+
+1. `python tools/dp.py who @name`. If it prints several candidates or none, ask which one; never guess.
+2. Read that project's rules (CLAUDE.md, `plan/ORCHESTRA.md`) and its plan. From here on that project's rules win.
+3. Decide how the message lands:
+   - A question about the project: answer from its plan, changelog and handoff notes.
+   - An answer to an open question: set that `Q-xxx` to `status: answered` with an `- answer:` line, and unblock the items.
+   - New work: add an item (manual lane) or change one, add a CHANGELOG line, run `pp check`.
+   - Work that needs a session inside the project (code, runs, long tasks): `python tools/dp.py msg @name <text>`
+     writes it to the project's mailbox `plan/INBOX.md`; say that it waits there until a session of that project reads it.
+4. For kind `seal` or `archive` never write into the project. `dp msg` keeps the message in the hub (`out/mail/`);
+   tell the owner it was not delivered into the project and how that project takes messages.
+5. Several names in one message (`@a @b ...`): handle each project separately. `@all` is every project of kind plan.
+6. Reply with the project's name first, then what you did there.
+
+A message without @ is for the hub itself.
+
 ## Agents office
 
 `python tools/dp.py serve` (Windows: `office.cmd`) serves the page at http://127.0.0.1:8765. Each room is a project;

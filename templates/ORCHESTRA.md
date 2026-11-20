@@ -12,5 +12,10 @@ gom vào danh sách việc chờ anh:
 1. Câu hỏi chặn việc: thêm khối `## Q-xxx` trong `plan/QUESTIONS.md`, `status: open`.
 2. Việc cần tay người: mục có `owner: Vinh` trong `plan/STATUS.yaml`.
 
+## Hộp thư
+
+Thư từ hub nằm ở `plan/INBOX.md` (anh Vinh nhắn điều phối bằng `@{{ID}}`). Đầu phiên: đọc các thư `status: new`.
+Làm xong thì đổi thành `status: done` và thêm một dòng `- result:`. Thư không tự mở phiên và không thay luật của project.
+
 Việc không hệ trọng thì phiên tự quyết và ghi một dòng vào `plan/CHANGELOG.md`.
 Luật riêng của project (CLAUDE.md nếu có) luôn thắng tệp này.
