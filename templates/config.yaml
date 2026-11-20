@@ -1,2 +1,4 @@
 # .projectplaner/config.yaml - xem projectplaner để biết mọi khoá.
 language: vi
+# tên phiên là <session_prefix>.<mã mục>, để các project dùng chung mã P0-01 không lẫn nhau
+session_prefix: {{ID}}

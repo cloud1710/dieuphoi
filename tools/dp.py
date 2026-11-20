@@ -958,7 +958,9 @@ def _session_procs(root, iid):
             if (pr.info['name'] or '').lower() not in ('claude', 'claude.exe'):
                 continue
             cl = pr.info['cmdline'] or []
-            if ('--remote-control=' + iid) not in cl and not ('-n' in cl and cl[cl.index('-n') + 1:cl.index('-n') + 2] == [iid]):
+            names = [a[len('--remote-control='):] for a in cl if a.startswith('--remote-control=')] + cl[cl.index('-n') + 1:cl.index('-n') + 2] if '-n' in cl else \
+                [a[len('--remote-control='):] for a in cl if a.startswith('--remote-control=')]
+            if not any(n == iid or n.endswith('.' + iid) for n in names):       # P0-01, or <project>.P0-01
                 continue
             if hw._norm(pr.info['cwd'] or '').startswith(base):
                 got.append(pr)
