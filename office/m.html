@@ -103,7 +103,11 @@ textarea{min-height:84px;resize:vertical}
 #say.on{display:flex}
 #say textarea{flex:1;margin:0;min-height:40px;max-height:110px;height:40px;border-radius:20px;padding:9px 14px;resize:none}
 #say button{flex:none;margin:0;border:0;border-radius:20px;background:var(--ready);color:#fff;font:inherit;font-weight:650;padding:0 16px}
-#say{flex-wrap:wrap}#say #att{background:var(--card);color:var(--ink);border:1px solid var(--line);padding:0 11px;font-size:18px}
+#say{flex-wrap:wrap}#say #mic,#say #tts,#say #att{background:var(--card);color:var(--ink);border:1px solid var(--line);padding:0 8px;font-size:16px}
+#say{gap:6px!important}
+#say #mic.rec{background:var(--ask);border-color:var(--ask);animation:pulse 1s infinite}#say #tts.on{background:var(--ready);border-color:var(--ready)}
+@keyframes pulse{50%{opacity:.55}}
+#say #att{background:var(--card);color:var(--ink);border:1px solid var(--line);padding:0 11px;font-size:18px}
 #atts{flex-basis:100%;display:none;gap:6px;overflow-x:auto}#atts.on{display:flex}
 #atts span{flex:none;display:flex;align-items:center;gap:5px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px 6px;font-size:12px;max-width:180px}
 #atts img{width:34px;height:34px;object-fit:cover;border-radius:6px}#atts b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#atts i{font-style:normal;cursor:pointer;padding:0 3px;color:var(--mute)}
@@ -121,7 +125,7 @@ a{color:var(--ready)}
 <section id="t-office" class="on"><div id="stage"><canvas id="cv"></canvas><button class="act" id="back">‹ Toàn cảnh</button><button class="act" id="camb" aria-label="Camera"></button><span id="hint">Chạm một bàn để phóng vào</span><div id="stats"></div><div id="log"></div></div><div id="chat"></div><div id="col"></div></section>
 <section id="t-work"></section>
 <section id="t-hw"><div id="board"></div><div id="hwfold"></div></section>
-<form id="say"><div id="atts"></div><button type="button" id="att" aria-label="Gửi tệp hoặc ảnh">📎</button><input type="file" id="attf" multiple hidden><textarea id="sayt" rows="1" placeholder="Nhắn tổng quản…" enterkeyhint="send"></textarea><button type="submit">Gửi</button></form>
+<form id="say"><div id="atts"></div><button type="button" id="att" aria-label="Gửi tệp hoặc ảnh">📎</button><button type="button" id="mic" aria-label="Nói">🎤</button><button type="button" id="tts" aria-label="Đọc câu trả lời">🔈</button><input type="file" id="attf" multiple hidden><textarea id="sayt" rows="1" placeholder="Nhắn…" enterkeyhint="send"></textarea><button type="submit">Gửi</button></form>
 <nav><button data-t="office" class="on">Văn phòng</button><button data-t="hw">Trình chiếu</button><button data-t="work">Việc <b id="nq"></b></button></nav>
 <div id="pair"><h1>Cài đặt kết nối</h1><p class="note" id="pairinfo"></p><p class="note">Nhập mật khẩu kết nối của anh, hoặc mở đường dẫn ghép có đoạn <code>#k=…</code> mà PC ghi ở <code>out/phone-link.txt</code>.</p>
   <input id="key" type="password" placeholder="Mật khẩu kết nối hoặc mã 6 số" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"><button class="act go" id="savekey">Kết nối</button> <button class="act" id="forget">Quên máy này</button> <button class="act" id="closepair">Đóng</button><p class="note" style="margin-top:12px">Ghép máy khác cho nhanh: trên máy đã nối, bấm nút dưới để lấy mã 6 số, rồi nhập mã đó vào ô mật khẩu của máy mới.</p><button class="act" id="mkcode">Tạo mã ghép 6 số</button><div class="res" id="code" style="font-size:22px;letter-spacing:.12em;font-weight:700"></div><label class="note" style="display:block;margin-top:8px"><input type="checkbox" id="showkey" style="width:auto;margin:0 6px 0 0">Hiện mật khẩu khi gõ</label><div class="res bad" id="pairerr"></div><p class="note" id="pairlinks"></p></div>
@@ -319,7 +323,7 @@ function drawChat() { if (document.activeElement && document.activeElement.tagNa
   if (CHATS.busy) c.append(E('div', 'msg boss typing', 'Tổng quản ' + (CHATS.model ? '(' + CHATS.model + ') ' : '') + (CHATS.step || 'đang trả lời') + '…' + (CHATS.queued ? ' · còn ' + CHATS.queued + ' tin chờ' : '')));
   if (near) c.scrollTop = c.scrollHeight; }                // only the history scrolls, the page stays where it is
 let chatSig = '';
-async function pollChat() { if (!liveMode || document.hidden) return; try { const c = await api('api/chat'), sig = JSON.stringify([c.busy, c.step, c.queued, c.asks, c.messages.length, (c.messages.slice(-1)[0] || {}).t]); CHATS = c; if (sig !== chatSig) { const grew = chatSig && !c.busy && /true/.test(chatSig.slice(0, 6)); chatSig = sig; drawChat(); office.boss(); if (grew) chime('mail'); } } catch (e) {} }
+async function pollChat() { if (!liveMode || document.hidden) return; try { const c = await api('api/chat'), sig = JSON.stringify([c.busy, c.step, c.queued, c.asks, c.messages.length, (c.messages.slice(-1)[0] || {}).t]); CHATS = c; if (sig !== chatSig) { const grew = chatSig && !c.busy && /true/.test(chatSig.slice(0, 6)); chatSig = sig; drawChat(); office.boss(); if (grew) { chime('mail'); speakLast(); } } } catch (e) {} }
 setInterval(() => { if (cur === 'office' && (CHATS.busy || Date.now() % 12000 < 3000)) pollChat(); }, 3000);
 let ATT = [];
 const fsize = n => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
@@ -330,6 +334,33 @@ async function shrink(file) {              // a phone photo can be 5 MB: send at
   try { const bm = await createImageBitmap(file), k = Math.min(1, 2048 / Math.max(bm.width, bm.height)), c = document.createElement('canvas'); c.width = Math.round(bm.width * k); c.height = Math.round(bm.height * k);
     c.getContext('2d').drawImage(bm, 0, 0, c.width, c.height); const b = await new Promise(r => c.toBlob(r, 'image/jpeg', .86)); return b ? new File([b], file.name.replace(/\.\w+$/, '') + '.jpg', {type:'image/jpeg'}) : file; } catch (e) { return file; } }
 $('att').onclick = () => $('attf').click();
+// ---- voice: talk instead of typing, and hear the answers
+let TTS = false, REC = null; try { TTS = localStorage.getItem('dp-tts') === '1'; } catch (e) {}
+const micBtn = $('mic'), ttsBtn = $('tts'); ttsBtn.classList.toggle('on', TTS); ttsBtn.textContent = TTS ? '🔊' : '🔈';
+function speak(text) { if (!('speechSynthesis' in window)) return; const u = new SpeechSynthesisUtterance(text.replace(/```[\s\S]*?```/g, ' ').replace(/[*_`#>|]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').slice(0, 1200));
+  u.lang = 'vi-VN'; const v = speechSynthesis.getVoices().find(x => /^vi/i.test(x.lang)); if (v) u.voice = v; u.rate = 1.05; speechSynthesis.cancel(); speechSynthesis.speak(u); }
+function speakLast() { if (!TTS) return; const m = [...CHATS.messages].reverse().find(x => x.who !== 'vinh'); if (m) speak(m.text); }
+ttsBtn.onclick = () => { TTS = !TTS; try { localStorage.setItem('dp-tts', TTS ? '1' : '0'); } catch (e) {} ttsBtn.classList.toggle('on', TTS); ttsBtn.textContent = TTS ? '🔊' : '🔈'; if (TTS) speak('Em sẽ đọc câu trả lời.'); else if ('speechSynthesis' in window) speechSynthesis.cancel(); };
+function micOn(on) { micBtn.classList.toggle('rec', on); micBtn.textContent = on ? '⏺' : '🎤'; }
+function voiceDone() { micOn(false); REC = null; if (TTS && $('sayt').value.trim()) $('say').requestSubmit(); }   // talking with the sound on: send by itself
+async function recordOnPC() {             // the browser cannot turn speech into text: record, the PC does it
+  if (!navigator.mediaDevices || !window.MediaRecorder) { $('sayt').placeholder = 'Máy này không cho ghi âm qua trang (cần mở bằng https)'; return; }
+  const st = await navigator.mediaDevices.getUserMedia({audio:true}), mr = new MediaRecorder(st), parts = [];
+  mr.ondataavailable = e => parts.push(e.data);
+  mr.onstop = async () => { st.getTracks().forEach(t => t.stop()); micOn(false); $('sayt').placeholder = 'PC đang nghe…';
+    try { const type = mr.mimeType || 'audio/mp4', ext = /webm/.test(type) ? 'webm' : /ogg/.test(type) ? 'ogg' : 'm4a', b = new Blob(parts, {type});
+      const r = await fetch('api/voice?name=giong-noi.' + ext, {method:'POST', headers:{'X-DP-Key':KEY, 'Content-Type':'application/octet-stream'}, body:b}), j = await r.json();
+      if (!r.ok || !j.ok) throw new Error(j.error || 'lỗi'); $('sayt').value = ($('sayt').value ? $('sayt').value + ' ' : '') + j.text; } catch (e) { $('sayt').placeholder = e.message.slice(0, 90); return; }
+    $('sayt').placeholder = 'Nhắn…'; voiceDone(); };
+  mr.start(); REC = {stop:() => mr.stop()}; micOn(true); }
+micBtn.onclick = async () => { if (REC) { REC.stop(); return; }
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SR) { try { await recordOnPC(); } catch (e) { micOn(false); $('sayt').placeholder = 'Không bật được micro: ' + e.message; } return; }
+  const r = new SR(), base = $('sayt').value.trim(); r.lang = 'vi-VN'; r.interimResults = true; r.continuous = false; let failed = false;
+  r.onresult = e => { let t = ''; for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript; $('sayt').value = (base ? base + ' ' : '') + t; };
+  r.onerror = e => { failed = true; micOn(false); REC = null; if (/not-allowed|service-not-allowed|network|language/.test(e.error)) recordOnPC().catch(x => { $('sayt').placeholder = 'Không bật được micro: ' + x.message; }); };
+  r.onend = () => { if (!failed) voiceDone(); };
+  try { r.start(); REC = r; micOn(true); } catch (e) { recordOnPC().catch(() => {}); } };
 $('attf').onchange = async () => { for (const f of [...$('attf').files].slice(0, 10 - ATT.length)) { const s2 = await shrink(f); ATT.push({file:s2, url:/^image\//.test(s2.type) ? URL.createObjectURL(s2) : null}); } $('attf').value = ''; drawAtts(); };
 async function upload(f) { const r = await fetch('api/upload?name=' + encodeURIComponent(f.name), {method:'POST', headers:{'X-DP-Key':KEY, 'Content-Type':'application/octet-stream'}, body:f}); const j = await r.json(); if (!r.ok || !j.ok) throw new Error(j.error || 'tải lên lỗi'); return j.id; }
 $('say').onsubmit = async e => { e.preventDefault(); const t = $('sayt').value.trim(); if (!t && !ATT.length) return; const sending = ATT; ATT = []; drawAtts(); $('sayt').value = '';

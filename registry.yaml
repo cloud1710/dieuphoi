@@ -21,6 +21,8 @@ games: {auto: true, nvidia: false, stream: true, stream_fps: 120, processes: ['L
 # chat: model cho ô chat tổng quản trong app. model: auto = tự chọn theo tin nhắn (hỏi nhanh -> light, việc thường -> normal,
 # thiết kế/phân tích/tin dài -> deep). Đặt model: sonnet (hoặc tên khác) để cố định. Mở đầu tin bằng /haiku /sonnet /opus để ép.
 # Mỗi model giữ một phiên riêng; phiên vượt max_context token thì lượt sau mở phiên mới (kèm vài tin gần nhất) để đỡ tốn.
+# voice: mô hình nhận giọng nói trên PC khi trình duyệt không tự nhận được (tools/voice.py): small, medium, large-v3-turbo.
+voice: {model: small}
 chat: {model: auto, light: haiku, normal: sonnet, deep: opus, max_context: 120000}
 groups:
   - {id: luan-van, name: Luận văn SEAL}

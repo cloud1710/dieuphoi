@@ -343,7 +343,7 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(400, {'error': short(e, 120)})
         if not pass_ok(self.headers.get('X-DP-Key'), self.ip()):
             return self.reply(401, {'error': 'key', 'why': _WHY.get(self.ip(), 'none')})
-        if path == '/api/upload':
+        if path in ('/api/upload', '/api/voice'):
             try:
                 n = int(self.headers.get('Content-Length') or 0)
                 if not 0 < n <= UPLOAD_MAX:
@@ -356,7 +356,16 @@ class Handler(SimpleHTTPRequestHandler):
                         raise ValueError('tải lên bị ngắt')
                     data += chunk
                     left -= len(chunk)
-                return self.reply(200, save_upload(name, bytes(data)))
+                saved = save_upload(name, bytes(data))
+                if path == '/api/voice':            # speech to text on this PC, for phones whose browser cannot do it
+                    sys.path.insert(0, str(Path(__file__).resolve().parent))
+                    import voice
+                    why = voice.ready()
+                    if why:
+                        return self.reply(503, {'error': 'PC đang chuẩn bị nhận giọng nói (lần đầu mất vài phút): ' + why})
+                    text, secs = voice.transcribe(saved['path'], str((registry().get('voice') or {}).get('model') or 'small'))
+                    return self.reply(200, {'ok': True, 'text': text, 'secs': secs})
+                return self.reply(200, saved)
             except Exception as e:
                 return self.reply(400, {'error': '%s: %s' % (type(e).__name__, short(e, 200))})
         try:
@@ -992,7 +1001,7 @@ def token_loop():
 
 def reload_on_change():
     """A hidden server cannot be restarted by hand: leave when its own code changes, the start script runs it again."""
-    files = [Path(__file__).resolve(), Path(__file__).resolve().parent / 'hw.py', Path(__file__).resolve().parent / 'board.py', Path(__file__).resolve().parent / 'xoa.py']      # guard.py is run fresh each time
+    files = [Path(__file__).resolve(), Path(__file__).resolve().parent / 'hw.py', Path(__file__).resolve().parent / 'board.py', Path(__file__).resolve().parent / 'xoa.py', Path(__file__).resolve().parent / 'voice.py']      # guard.py is run fresh each time
     seen = [f.stat().st_mtime_ns if f.is_file() else 0 for f in files]
     while True:
         time.sleep(20)
@@ -2084,6 +2093,21 @@ def cmd_serve(args):
         except Exception as e:
             heal_log('display tune failed: %s' % e)
     threading.Timer(25, _tune_display).start()
+    def _warm_voice():                           # install the speech-to-text engine and load its model ahead of the first use
+        try:
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            import voice
+            for _ in range(60):
+                if not voice.ready():
+                    break
+                time.sleep(30)
+            if not GAME['on'] and not voice.ready():
+                voice._model(str((registry().get('voice') or {}).get('model') or 'small'))
+                heal_log('voice: model %s loaded' % voice._V['name'])
+        except Exception as e:
+            heal_log('voice warm-up: %s: %s' % (type(e).__name__, e))
+    if args.reload:
+        threading.Timer(120, _warm_voice).start()
     threading.Timer(25, lambda: net_diag()).start()
     threading.Timer(240, lambda: net_diag()).start()         # again once a phone has had time to connect          # leaves out/net.txt for whoever looks after this PC
     links = ['http://%s:%d/m.html#k=%s' % (h, args.port, Handler.key) for h in hosts]
