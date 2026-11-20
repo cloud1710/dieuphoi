@@ -303,7 +303,10 @@ class Handler(SimpleHTTPRequestHandler):
         return self.headers.get('X-DP-Key') or parse_qs(urlsplit(self.path).query).get('k', [''])[0]
 
     def local(self):
-        return self.client_address[0] in ('127.0.0.1', '::1')
+        """From this PC itself. A request relayed by a tunnel or proxy also arrives from 127.0.0.1, so any
+        forwarding header makes it remote."""
+        relayed = any(self.headers.get(h) for h in ('CF-Connecting-IP', 'X-Forwarded-For', 'Forwarded', 'X-Real-IP'))
+        return self.client_address[0] in ('127.0.0.1', '::1') and not relayed
 
     def reply(self, code, obj):
         body = json.dumps(obj, ensure_ascii=False).encode('utf-8')
@@ -402,6 +405,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(200, activity())
             except Exception as e:
                 return self.reply(500, {'error': '%s: %s' % (type(e).__name__, e)})
+        if path == '/api/net':
+            return self.reply(200, net_diag())
         if path == '/api/hw':
             try:
                 return self.reply(200, hw_state())
@@ -628,7 +633,7 @@ def todo_build():
         if (HUB / 'office' / icon).is_file():
             shutil.copy(HUB / 'office' / icon, site / icon)
     payload, digest = todo_payload()
-    payload['app'] = (HUB / 'out' / 'phone-link.txt').read_text(encoding='ascii').split('#')[0].strip() if (HUB / 'out' / 'phone-link.txt').is_file() else None
+    payload['app'] = (HUB / 'out' / 'phone-link.txt').read_text(encoding='ascii').splitlines()[0].split('#')[0].strip() if (HUB / 'out' / 'phone-link.txt').is_file() else None
     blob = json.dumps(payload, ensure_ascii=False).encode('utf-8')
     (site / 'data.enc').write_bytes(seal(token(), blob))
     ph = HUB / 'out' / 'pass.hash'
@@ -730,6 +735,37 @@ def activity():
     return {'claude': hw.claude_activity([(p['id'], real(p['path'])) for p in reg['projects']]),
             'todo_url': 'https://%s.pages.dev/' % name if name else None,
             'passphrase': (HUB / 'out' / 'pass.hash').is_file() and (HUB / 'out' / 'pass.hash').stat().st_size > 0}
+
+
+def net_diag():
+    """How the VPN reaches the phone: ZeroTier peers (DIRECT or RELAY) and Tailscale status. Read only."""
+    flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+    tries = [('zerotier', ['zerotier-cli', 'peers']),
+             ('zerotier', [r'C:\Program Files (x86)\ZeroTier\One\zerotier-cli.bat', 'peers']),
+             ('zerotier', [r'C:\ProgramData\ZeroTier\One\zerotier-one_x64.exe', '-q', 'peers']),
+             ('tailscale', ['tailscale', 'status']),
+             ('tailscale', [r'C:\Program Files\Tailscale\tailscale.exe', 'status'])]
+    out, done = {'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}, set()
+    for name, cmd in tries:
+        if name in done:
+            continue
+        try:
+            r = subprocess.run(cmd, capture_output=True, timeout=20, creationflags=flags)
+        except (OSError, subprocess.SubprocessError):
+            continue
+        text = (r.stdout + r.stderr).decode('utf-8', 'replace').strip()
+        done.add(name)
+        out[name] = {'ok': r.returncode == 0, 'text': text[:4000]}
+        if name == 'zerotier' and r.returncode == 0:
+            leaf = [ln for ln in text.splitlines() if ' LEAF' in ln.upper()]
+            out[name].update(direct=sum('DIRECT' in ln.upper() for ln in leaf), relay=sum('RELAY' in ln.upper() for ln in leaf))
+    for name in ('zerotier', 'tailscale'):
+        out.setdefault(name, {'ok': False, 'text': 'not installed or not on the PATH'})
+    try:
+        (HUB / 'out' / 'net.txt').write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding='utf-8')
+    except OSError:
+        pass
+    return out
 
 
 def hw_state():
@@ -834,32 +870,50 @@ def vpn_address(name):
     raise SystemExit('dp serve: no network adapter named like %r with an IPv4 address; is it installed and joined?' % name)
 
 
+def vpn_addresses():
+    """Every VPN address this PC has right now (ZeroTier and Tailscale), without failing when one is missing."""
+    found = []
+    for name in ('tailscale', 'zerotier'):
+        try:
+            found.append(vpn_address(name))
+        except SystemExit:
+            pass
+    return found
+
+
 def cmd_serve(args):
-    host = args.host
-    if host in ('zerotier', 'tailscale'):
+    hosts = [args.host]
+    if args.host in ('zerotier', 'tailscale', 'vpn'):
         for attempt in range(18):                # at logon the VPN adapter can come up after this script
-            try:
-                host = vpn_address(args.host)
+            hosts = vpn_addresses() if args.host == 'vpn' else []
+            if args.host != 'vpn':
+                try:
+                    hosts = [vpn_address(args.host)]
+                except SystemExit:
+                    pass
+            if hosts:
                 break
-            except SystemExit:
-                if attempt == 17:
-                    raise
-                time.sleep(10)
+            time.sleep(10)
+        else:
+            raise SystemExit('dp serve: no %s adapter with an IPv4 address; is it installed and joined?' % args.host)
     ThreadingHTTPServer.daemon_threads = True
     Handler.key = token()
-    srv = ThreadingHTTPServer((host, args.port), Handler)
+    servers = [ThreadingHTTPServer((h, args.port), Handler) for h in hosts]
     threading.Thread(target=auto_publish, daemon=True).start()
     if args.reload:
         threading.Thread(target=reload_on_change, daemon=True).start()
-    print('agents office: http://%s:%d   (Ctrl+C to stop)' % (host, args.port))
-    link = 'http://%s:%d/m.html#k=%s' % (host, args.port, Handler.key)
-    (HUB / 'out' / 'phone-link.txt').write_text(link + '\n', encoding='ascii')     # a hidden server has no console to read it from
-    print('phone app, open once to pair: %s' % link)
-    if host not in ('127.0.0.1', 'localhost'):
-        print('other devices need the key in that link (kept in out/token.txt; delete the file to make a new one).')
+    threading.Timer(25, lambda: net_diag()).start()          # leaves out/net.txt for whoever looks after this PC
+    links = ['http://%s:%d/m.html#k=%s' % (h, args.port, Handler.key) for h in hosts]
+    (HUB / 'out' / 'phone-link.txt').write_text('\n'.join(links) + '\n', encoding='ascii')     # a hidden server has no console
+    for h, link in zip(hosts, links):
+        print('agents office: http://%s:%d   phone app, open once to pair: %s' % (h, args.port, link))
+    if any(h not in ('127.0.0.1', 'localhost') for h in hosts):
+        print('other devices need the passphrase or the key in that link (out/token.txt; delete the file to make a new one).')
         print('allow port %d in the firewall for that network only.' % args.port)
+    for srv in servers[1:]:
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
     try:
-        srv.serve_forever()
+        servers[0].serve_forever()
     except KeyboardInterrupt:
         pass
     return 0
@@ -871,7 +925,7 @@ def main(argv=None):
     sub.add_parser('check').set_defaults(fn=cmd_check)
     sub.add_parser('scan').set_defaults(fn=cmd_scan)
     s = sub.add_parser('serve')
-    s.add_argument('--host', default='127.0.0.1', help="an address, or 'zerotier' / 'tailscale' to use that adapter's address")
+    s.add_argument('--host', default='127.0.0.1', help="an address; 'zerotier' or 'tailscale' for that adapter's address; 'vpn' for every one of them found")
     s.add_argument('--port', type=int, default=8765)
     s.add_argument('--reload', action='store_true', help='exit when tools/dp.py or tools/hw.py changes (the start script restarts it)')
     s.set_defaults(fn=cmd_serve)
