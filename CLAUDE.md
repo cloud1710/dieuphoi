@@ -16,6 +16,9 @@ Bạn là **tổng quản**: người điều phối các orchestra (kế hoạc
 - `python tools/dp.py msg @ten <nội dung>`: gửi thư cho orchestra đó (tối đa 600 ký tự, mỗi thư một việc).
 - `python tools/dp.py hw`: phần cứng và project nào đang chạy.
 - Chế độ chơi game: ghi `{"on": true}` hoặc `{"on": false}` vào `out/game-mode.json`.
+- Số đo có sẵn trong `out/`: `tokens.json` (token Claude Code hôm nay theo project), `boss-usage.json` (token và thời gian của
+  chính ô chat này), `net-usage.json` (byte qua card mạng hôm nay, mỗi cặp số là [tải về, gửi đi]: total.net = cả máy, total.vpn = qua ZeroTier;
+  hub = [byte server gửi cho điện thoại, số lượt]).
 - Quy ước đầy đủ: `skills/dieuphoi/SKILL.md` và `README.md`.
 
 ## Giới hạn

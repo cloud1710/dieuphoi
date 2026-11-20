@@ -14,8 +14,10 @@ publish: {pages_project: projectorchestra, auto: true}
 # processes: chỉ những tên ở đây mới tự bật chế độ chơi game (đúng như Task Manager). Danh sách NVIDIA app quét được nằm ở
 # out/nvidia-games.json để tham khảo; không tự lấy vì nó lẫn cả phần mềm chạy nền như Logitech G Hub (nvidia: false).
 games: {auto: true, nvidia: false, processes: ['League of Legends.exe', 'PBZ.exe']}
-# chat: model Claude Code dùng cho ô chat tổng quản trong app (sonnet trả lời nhanh; đổi thành opus nếu cần nghĩ sâu hơn).
-chat: {model: sonnet}
+# chat: model cho ô chat tổng quản trong app. model: auto = tự chọn theo tin nhắn (hỏi nhanh -> light, việc thường -> normal,
+# thiết kế/phân tích/tin dài -> deep). Đặt model: sonnet (hoặc tên khác) để cố định. Mở đầu tin bằng /haiku /sonnet /opus để ép.
+# Mỗi model giữ một phiên riêng; phiên vượt max_context token thì lượt sau mở phiên mới (kèm vài tin gần nhất) để đỡ tốn.
+chat: {model: auto, light: haiku, normal: sonnet, deep: opus, max_context: 120000}
 groups:
   - {id: luan-van, name: Luận văn SEAL}
   - {id: benh-vien, name: Sản phẩm giải phẫu bệnh và bệnh viện}

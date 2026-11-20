@@ -395,6 +395,8 @@ class Handler(SimpleHTTPRequestHandler):
                 body, tag = self.current()
                 if tag != sent:
                     self.wfile.write(b'data: ' + body + b'\n\n')
+                    if not self.local() and 'hw' in sys.modules:
+                        sys.modules['hw'].net_hub(len(body) + 8)
                     sent, quiet = tag, 0
                 elif quiet >= 20:
                     self.wfile.write(b': ping\n\n')         # keeps phones and proxies from closing the stream
@@ -446,6 +448,15 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
+
+    def send_header(self, keyword, value):
+        if keyword.lower() == 'content-length':          # what goes out to phones, for the traffic count
+            try:
+                if not self.local():
+                    sys.modules['hw'].net_hub(int(value))
+            except (KeyError, ValueError, AttributeError):
+                pass
+        super().send_header(keyword, value)
 
     def log_message(self, *a):
         pass
@@ -778,7 +789,9 @@ def token_loop():
     time.sleep(20)
     while True:
         try:
-            got = hw.token_usage([(p['id'], real(p['path'])) for p in registry()['projects']])
+            hw.net_sample()                           # keeps today's traffic total moving when no phone is looking
+            hw._net_save(True)
+            got = hw.token_usage([(p['id'], real(p['path'])) for p in registry()['projects']] + [('tong-quan', str(HUB))])
             (HUB / 'out' / 'tokens.json').write_text(json.dumps({'day': hw._TOK['day'], 'projects': got}, ensure_ascii=False, indent=1), encoding='utf-8')
         except Exception as e:
             (HUB / 'out' / 'tokens.json').write_text(json.dumps({'error': '%s: %s' % (type(e).__name__, e)}), encoding='utf-8')
@@ -848,7 +861,7 @@ def activity():
     name = (reg.get('publish') or {}).get('pages_project')
     pairs = [(p['id'], real(p['path'])) for p in reg['projects']]
     return {'claude': hw.claude_activity(pairs), 'programs': hw.project_programs(pairs), 'game': game_state(), 'tokens': hw._TOK['out'],
-            'boss': {k: v for k, v in chat_state().items() if k != 'messages'},
+            'boss': {k: v for k, v in chat_state().items() if k != 'messages'}, 'boss_usage': boss_usage(), 'net': hw.net_today(),
             'todo_url': 'https://%s.pages.dev/' % name if name else None,
             'passphrase': (HUB / 'out' / 'pass.hash').is_file() and (HUB / 'out' / 'pass.hash').stat().st_size > 0}
 
@@ -895,14 +908,17 @@ def net_diag():
 
 
 # ---- chat with the general manager: a Claude Code session of this folder answers the owner's messages
-CHAT = {'busy': False, 'step': '', 'since': None, 'session': None, 'note': None}
+CHAT = {'busy': False, 'step': '', 'since': None, 'session': None, 'note': None, 'model': None}
 STEP_VI = {'Bash': 'đang chạy lệnh', 'Read': 'đang đọc tệp', 'Edit': 'đang sửa tệp', 'Write': 'đang viết tệp', 'Grep': 'đang tìm',
            'Glob': 'đang tìm tệp', 'TodoWrite': 'đang lập danh sách việc', 'Task': 'đang giao việc cho nhân viên'}
 
 
-def chat_log(who, text):
+def chat_log(who, text, meta=None):
+    row = {'t': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), 'who': who, 'text': text}
+    if meta:
+        row['meta'] = meta
     with open(HUB / 'out' / 'chat.jsonl', 'a', encoding='utf-8') as f:
-        f.write(json.dumps({'t': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), 'who': who, 'text': text}, ensure_ascii=False) + '\n')
+        f.write(json.dumps(row, ensure_ascii=False) + '\n')
 
 
 def chat_state():
@@ -916,7 +932,7 @@ def chat_state():
         note = json.loads((HUB / 'out' / 'boss.json').read_text(encoding='utf-8'))
     except (OSError, ValueError):
         note = None
-    return {'busy': CHAT['busy'], 'step': CHAT['step'], 'since': CHAT['since'], 'messages': msgs, 'note': note}
+    return {'busy': CHAT['busy'], 'step': CHAT['step'], 'since': CHAT['since'], 'model': CHAT['model'], 'messages': msgs, 'note': note}
 
 
 def claude_cmd():
@@ -931,32 +947,99 @@ def claude_cmd():
     return ['cmd', '/c', exe] if exe.lower().endswith(('.cmd', '.bat')) else [exe]
 
 
-def chat_run(text):
-    """One turn: the message goes to `claude -p` on standard input (never on the command line), the steps are
-    followed from the JSON stream, the final text is the reply. The session is resumed on the next turn."""
-    CHAT.update(busy=True, step='đang đọc tin nhắn', since=datetime.datetime.now().strftime('%H:%M:%S'))
-    reply = None
+def pick_model(text):
+    """Which model answers this message. `chat.model` in registry.yaml: a fixed name, or `auto` = a quick look at
+    the message: status questions go to the light model, design and analysis to the deep one, the rest to the
+    normal one. The owner can force it by starting the message with /haiku, /sonnet or /opus."""
+    cfg = registry().get('chat') or {}
+    m = re.match(r'\s*/(haiku|sonnet|opus)\b\s*', text, re.I)
+    if m:
+        return m.group(1).lower(), text[m.end():] or text, 'anh chọn'
+    fixed = str(cfg.get('model') or 'auto')
+    if fixed != 'auto':
+        return fixed, text, 'cố định'
+    f = fold(text)
+    deep = ('thietke', 'kehoach', 'phantich', 'chienluoc', 'nguyennhan', 'taisao', 'visao', 'sosanh', 'dexuat', 'nghiky', 'nghisau',
+            'kientruc', 'rasoat', 'ralai', 'toiuu', 'danhgia', 'quyetdinh', 'hoidong', 'uutien', 'lotrinh')
+    light = ('tinhhinh', 'aidang', 'danglamgi', 'phancung', 'gpu', 'ram', 'cpu', 'baonhieu', 'trangthai', 'viecnaocho', 'choanh',
+             'chao', 'hello', 'token', 'luuluong', 'conchay', 'xongchua', 'camon')
+    if len(text) > 400 or any(k in f for k in deep):
+        return str(cfg.get('deep') or 'opus'), text, 'việc cần nghĩ sâu'
+    if len(text) < 90 and '@' not in text and any(k in f for k in light):
+        return str(cfg.get('light') or 'haiku'), text, 'câu hỏi nhanh'
+    return str(cfg.get('normal') or 'sonnet'), text, 'việc thường'
+
+
+def boss_usage(add=None):
+    """Today's cost of the manager's chat: turns, tokens, seconds, per model. Kept in out/boss-usage.json."""
+    f = HUB / 'out' / 'boss-usage.json'
+    today = datetime.date.today().isoformat()
     try:
-        cmd = claude_cmd()
-        if not cmd:
-            raise RuntimeError('PC không tìm thấy lệnh claude (Claude Code) trên PATH của server')
-        cmd += ['-p', '--output-format', 'stream-json', '--verbose', '--max-turns', '25', '--model', (registry().get('chat') or {}).get('model', 'sonnet'), '--permission-mode', 'acceptEdits',
-                '--allowedTools', 'Read,Grep,Glob,Edit,Write,TodoWrite,Bash(python tools/dp.py:*)']
-        sfile = HUB / 'out' / 'chat-session.txt'
-        if not CHAT['session'] and sfile.is_file():       # the server restarts when its code changes; the talk goes on
-            CHAT['session'] = sfile.read_text(encoding='ascii').strip() or None
-        if CHAT['session']:
-            cmd += ['--resume', CHAT['session']]
-        pr = subprocess.Popen(cmd, cwd=str(HUB), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
-                              creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-        killer = threading.Timer(420, pr.kill)
-        killer.start()
+        u = json.loads(f.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        u = {}
+    if u.get('day') != today:
+        u = {'day': today, 'turns': 0, 'in': 0, 'out': 0, 'cache_read': 0, 'cache_write': 0, 'cost_usd': 0.0, 'secs': 0, 'models': {}, 'last': None}
+    if add:
+        u['turns'] += 1
+        for k in ('in', 'out', 'cache_read', 'cache_write', 'secs'):
+            u[k] += add.get(k) or 0
+        u['cost_usd'] = round(u['cost_usd'] + (add.get('cost_usd') or 0), 4)
+        row = u['models'].setdefault(add['model'], {'turns': 0, 'tokens': 0})
+        row['turns'] += 1
+        row['tokens'] += (add.get('in') or 0) + (add.get('out') or 0) + (add.get('cache_read') or 0) + (add.get('cache_write') or 0)
+        u['last'] = add
+        f.write_text(json.dumps(u, ensure_ascii=False, indent=1), encoding='utf-8')
+    return u
+
+
+def chat_sessions(save=None):
+    """One Claude Code session per model: changing the model inside a session makes it read the whole talk again
+    at full price. The light model has none: every quick question starts clean."""
+    f = HUB / 'out' / 'chat-sessions.json'
+    if save is not None:
+        f.write_text(json.dumps(save), encoding='ascii')
+        return save
+    try:
+        got = json.loads(f.read_text(encoding='ascii'))
+        return got if isinstance(got, dict) else {}
+    except (OSError, ValueError):
+        return {}
+
+
+def chat_recent(n=6):
+    """The last lines of the talk, for a model that was not there when they were said."""
+    rows = chat_state()['messages'][-(n + 1):-1]            # the newest line is the message being answered
+    if not rows:
+        return ''
+    return 'Các tin gần đây trong ô chat (để nắm mạch chuyện, không cần trả lời lại):\n' + '\n'.join(
+        '- %s: %s' % ('anh Vinh' if r.get('who') == 'vinh' else 'tổng quản', short(r.get('text', ''), 400)) for r in rows) + '\n\nTin mới của anh Vinh:\n'
+
+
+def chat_turn(text, model, session=None):
+    """Runs `claude -p` once. Returns (reply, result event)."""
+    cmd = claude_cmd()
+    if not cmd:
+        raise RuntimeError('PC không tìm thấy lệnh claude (Claude Code) trên PATH của server')
+    cmd += ['-p', '--output-format', 'stream-json', '--verbose', '--max-turns', '25', '--model', model, '--permission-mode', 'acceptEdits',
+            '--allowedTools', 'Read,Grep,Glob,Edit,Write,TodoWrite,Bash(python tools/dp.py:*)']
+    CHAT['session'] = None
+    if session:
+        cmd += ['--resume', session]
+    pr = subprocess.Popen(cmd, cwd=str(HUB), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    killer = threading.Timer(420, pr.kill)
+    killer.start()
+    reply, result = None, {}
+    try:
         pr.stdin.write(text.encode('utf-8'))
         pr.stdin.close()
         for raw in pr.stdout:
             try:
                 e = json.loads(raw.decode('utf-8', 'replace'))
             except ValueError:
+                continue
+            if not isinstance(e, dict):
                 continue
             if e.get('session_id'):
                 CHAT['session'] = e['session_id']
@@ -968,24 +1051,69 @@ def chat_run(text):
                         CHAT['step'] = 'đang soạn câu trả lời'
                         reply = part['text'].strip()
             elif e.get('type') == 'result':
+                result = e
                 reply = str(e.get('result') or reply or '').strip() or reply
         pr.wait(timeout=30)
+    finally:
         killer.cancel()
-        if CHAT['session']:
-            sfile.write_text(CHAT['session'], encoding='ascii')
-        if not reply:
-            err = pr.stderr.read().decode('utf-8', 'replace')
-            raise RuntimeError(one_line(err, 300) or 'không có câu trả lời (mã %s)' % pr.returncode)
+    if not reply or result.get('is_error'):
+        err = pr.stderr.read().decode('utf-8', 'replace')
+        raise RuntimeError(one_line(err or reply or '', 300) or 'không có câu trả lời (mã %s)' % pr.returncode)
+    return reply, result
+
+
+def chat_run(text):
+    """One turn: the message goes to `claude -p` on standard input (never on the command line), the steps are
+    followed from the JSON stream, the final text is the reply. The session is resumed on the next turn."""
+    CHAT.update(busy=True, step='đang đọc tin nhắn', since=datetime.datetime.now().strftime('%H:%M:%S'))
+    reply, meta, began = None, {}, time.time()
+    try:
+        model, text, why = pick_model(text)
+        CHAT['model'] = model
+        cfg = registry().get('chat') or {}
+        normal = str(cfg.get('normal') or 'sonnet')
+        light = model == str(cfg.get('light') or 'haiku') and model != normal
+        book = chat_sessions()
+        session = None if light else book.get(model)
+        before = [r for r in chat_state()['messages'][:-1] if r.get('who') != 'vinh'][-1:]
+        same = bool(session) and bool(before) and (before[0].get('meta') or {}).get('model') == model
+        ask = text if same else chat_recent() + text       # this model missed the last lines: hand them over
+        try:
+            reply, result = chat_turn(ask, model, session)
+        except RuntimeError as e:
+            if 'PATH' in str(e):
+                raise
+            if session:                                     # the kept session is gone or broken: start a clean one
+                CHAT['step'] = 'mở phiên mới'
+                why += ', phiên cũ lỗi nên mở mới'
+            elif model != normal:                           # the chosen model was refused: the normal one answers
+                CHAT['step'] = 'đổi sang model %s' % normal
+                why += ', %s lỗi nên đổi' % model
+                model, light = normal, False
+                CHAT['model'] = model
+            else:
+                raise
+            reply, result = chat_turn(chat_recent() + text, model, None)
+        use = result.get('usage') if isinstance(result.get('usage'), dict) else {}
+        meta = {'model': model, 'why': why, 'secs': round(time.time() - began),
+                'in': int(use.get('input_tokens') or 0), 'out': int(use.get('output_tokens') or 0),
+                'cache_read': int(use.get('cache_read_input_tokens') or 0), 'cache_write': int(use.get('cache_creation_input_tokens') or 0),
+                'cost_usd': round(float(result.get('total_cost_usd') or 0), 4), 'steps': result.get('num_turns')}
+        size = (meta['in'] + meta['cache_read'] + meta['cache_write']) // max(1, int(meta['steps'] or 1))
+        meta['context'] = size
+        if not light:
+            book = chat_sessions()
+            if size > int(cfg.get('max_context') or 120000):      # a long talk costs its whole length on every step
+                book.pop(model, None)
+                meta['why'] += ', phiên dài nên lượt sau mở phiên mới'
+            elif CHAT['session']:
+                book[model] = CHAT['session']
+            chat_sessions(book)
+        boss_usage(meta)
     except Exception as e:
         reply = 'Lỗi khi gọi tổng quản trên PC: %s' % one_line(e, 300)
-        if 'resume' in str(e).lower() or 'session' in str(e).lower():
-            CHAT['session'] = None
-            try:
-                (HUB / 'out' / 'chat-session.txt').write_text('', encoding='ascii')
-            except OSError:
-                pass
-    chat_log('boss', reply[:6000])
-    CHAT.update(busy=False, step='', since=None)
+    chat_log('boss', reply[:6000], meta)
+    CHAT.update(busy=False, step='', since=None, model=None)
     Handler.cache = (0.0, b'')
     _PLANS.clear()
 

@@ -111,7 +111,104 @@ def lite():
         _gpu_cache[:] = [time.time(), gpus()[0]]
     return {'time': time.strftime('%H:%M:%S'), 'cpu': None if cpu is None else round(cpu), 'ram': None if ram is None else round(ram),
             'ram_used_gb': None if used is None else round(used, 1), 'ram_total_gb': None if total is None else round(total, 1),
-            'gpu': _gpu_cache[1]}
+            'gpu': _gpu_cache[1], 'net': _net_lite()}
+
+
+# ---- network: bytes through the cards of this PC, speed now and total today
+NET_FILE = Path(__file__).resolve().parent.parent / 'out' / 'net-usage.json'
+_NET = {'day': None, 'total': {'net': [0, 0], 'vpn': [0, 0]}, 'hub': [0, 0], 'prev': None, 't': 0.0, 'rate': {'net': [0, 0], 'vpn': [0, 0]},
+        'boot': None, 'saved': 0.0, 'loaded': False}
+_NET_SKIP = ('loopback', 'vethernet', 'virtualbox', 'vmware', 'bluetooth', 'wsl', 'hyper-v', 'docker', 'pseudo', 'teredo', 'isatap')
+_NET_VPN = ('zerotier', 'tailscale', 'wireguard', 'radmin', 'hamachi')
+
+
+def _nic_kind(name):
+    n = name.lower()
+    if n == 'lo' or any(w in n for w in _NET_SKIP):
+        return None
+    return 'vpn' if any(w in n for w in _NET_VPN) else 'net'
+
+
+def _net_save(force=False):
+    if not force and time.time() - _NET['saved'] < 30:
+        return
+    _NET['saved'] = time.time()
+    try:
+        NET_FILE.parent.mkdir(exist_ok=True)
+        NET_FILE.write_text(json.dumps({k: _NET[k] for k in ('day', 'total', 'hub', 'prev', 't', 'boot')}), encoding='utf-8')
+    except OSError:
+        pass
+
+
+def net_sample():
+    """Reads the counters of the network cards (down, up in bytes; 'net' = real cards, so everything that leaves
+    the PC; 'vpn' = the part that goes through ZeroTier and the like). Totals survive a server restart; a reboot
+    of the PC restarts the counters and is noticed by the boot time."""
+    today = time.strftime('%Y-%m-%d')
+    if not _NET['loaded']:
+        _NET['loaded'] = True
+        try:
+            old = json.loads(NET_FILE.read_text(encoding='utf-8'))
+            if old.get('day') == today:
+                _NET.update(day=today, total=old['total'], hub=old.get('hub') or [0, 0])
+            if psutil is not None and old.get('boot') == int(psutil.boot_time()):
+                _NET.update(prev=old.get('prev'), t=float(old.get('t') or 0), boot=old['boot'])
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
+    if _NET['day'] != today:
+        _NET.update(day=today, total={'net': [0, 0], 'vpn': [0, 0]}, hub=[0, 0])
+    if psutil is None:
+        return None
+    now = time.time()
+    if now - _NET['t'] < 1 and _NET['prev']:
+        return _NET
+    cur = {'net': [0, 0], 'vpn': [0, 0]}
+    try:
+        for name, c in psutil.net_io_counters(pernic=True).items():
+            kind = _nic_kind(name)
+            if kind:
+                cur[kind][0] += c.bytes_recv
+                cur[kind][1] += c.bytes_sent
+    except Exception:
+        return None
+    boot = int(psutil.boot_time())
+    prev = _NET['prev'] if _NET['boot'] == boot else None
+    if not any(_NET['total']['net']) and time.strftime('%Y-%m-%d', time.localtime(boot)) == today:
+        _NET['total'] = {k: list(v) for k, v in cur.items()}      # the PC was switched on today: its counters are today's traffic
+        prev = None
+    if prev:
+        dt = max(now - _NET['t'], 1e-3)
+        for kind in cur:
+            for i in (0, 1):
+                d = cur[kind][i] - prev[kind][i]
+                d = d if d >= 0 else 0                     # a card was reset or removed
+                _NET['total'][kind][i] += d
+                _NET['rate'][kind][i] = d / dt if dt < 900 else 0
+    _NET.update(prev=cur, t=now, boot=boot)
+    _net_save()
+    return _NET
+
+
+def net_hub(nbytes):
+    """The hub's own web server reports what it sent to phones."""
+    if _NET['day'] == time.strftime('%Y-%m-%d'):
+        _NET['hub'][0] += int(nbytes)
+        _NET['hub'][1] += 1
+
+
+def net_today():
+    n = net_sample()
+    if n is None:
+        return {'day': _NET['day'], 'ok': False, 'hub_bytes': _NET['hub'][0], 'hub_reqs': _NET['hub'][1]}
+    return {'day': n['day'], 'ok': True, 'down': n['total']['net'][0], 'up': n['total']['net'][1],
+            'vpn_down': n['total']['vpn'][0], 'vpn_up': n['total']['vpn'][1],
+            'rate_down': round(n['rate']['net'][0]), 'rate_up': round(n['rate']['net'][1]),
+            'hub_bytes': n['hub'][0], 'hub_reqs': n['hub'][1]}
+
+
+def _net_lite():
+    n = net_sample()
+    return None if n is None else {'down': round(n['rate']['net'][0]), 'up': round(n['rate']['net'][1])}
 
 
 def _norm(path):
