@@ -461,7 +461,7 @@ class Handler(SimpleHTTPRequestHandler):
         if path == '/api/board':
             b = _board()
             body = json.dumps({'servers': b.servers(_pairs(), {self.server.server_address[1]}), 'items': b.items(HUB, _pairs(True)),
-                               'can_shot': bool(b.browser())}, ensure_ascii=False).encode('utf-8')
+                               'can_shot': bool(b.browser()), 'sunshine': b.sunshine()}, ensure_ascii=False).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.send_header('Cache-Control', 'no-store')
@@ -469,6 +469,19 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header('Content-Length', str(len(body)))
             self.end_headers()
             return self.wfile.write(body)
+        if path == '/api/screen.jpg':
+            try:
+                jpg = _board().screen_jpeg(int(parse_qs(urlsplit(self.path).query).get('w', ['1280'])[0]))
+            except Exception as e:
+                return self.reply(500, {'error': '%s: %s' % (type(e).__name__, e)})
+            if not jpg:
+                return self.reply(503, {'error': 'PC đang cài Pillow để chụp màn hình, thử lại sau một phút'})
+            self.send_response(200)
+            self.send_header('Content-Type', 'image/jpeg')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Content-Length', str(len(jpg)))
+            self.end_headers()
+            return self.wfile.write(jpg)
         if path == '/api/board/file':
             q = parse_qs(urlsplit(self.path).query)
             got = _board().image(HUB, _pairs(True), q.get('src', [''])[0], q.get('name', [''])[0])

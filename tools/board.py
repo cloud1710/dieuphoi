@@ -208,3 +208,49 @@ def shot(hub, port, path='/'):
     if not out.is_file() or out.stat().st_mtime <= before:
         raise RuntimeError('trình duyệt không ghi được ảnh')
     return out.name
+
+
+# ---- the PC's own screen, for the board: a still picture taken when asked (about once a second while someone looks)
+_SCR = {'t': 0.0, 'jpg': None, 'installing': False}
+
+
+def _pillow():
+    try:
+        from PIL import ImageGrab
+        return ImageGrab
+    except ImportError:
+        pass
+    if not _SCR['installing']:                   # once per server: the hub installs Pillow by itself, in the background
+        _SCR['installing'] = True
+        import sys, threading
+        threading.Thread(target=lambda: subprocess.run([sys.executable, '-m', 'pip', 'install', '--disable-pip-version-check', 'pillow'],
+                                                       capture_output=True, timeout=600, creationflags=NOWIN), daemon=True).start()
+    return None
+
+
+def screen_jpeg(width=1280, quality=62):
+    """JPEG of all screens of the PC, at most width pixels wide; the same picture for one second. None while
+    Pillow is not there yet (it is being installed)."""
+    if time.time() - _SCR['t'] < 0.9 and _SCR['jpg']:
+        return _SCR['jpg']
+    grab = _pillow()
+    if grab is None:
+        return None
+    import io
+    img = grab.grab(all_screens=True)
+    if img.width > width:
+        img = img.resize((width, round(img.height * width / img.width)))
+    buf = io.BytesIO()
+    img.convert('RGB').save(buf, 'JPEG', quality=quality, optimize=True)
+    _SCR.update(t=time.time(), jpg=buf.getvalue())
+    return _SCR['jpg']
+
+
+def sunshine():
+    """Sunshine (game streaming host) running on this PC: its process name, or None."""
+    if psutil is None:
+        return None
+    for p in psutil.process_iter(['name']):
+        if (p.info['name'] or '').lower() in ('sunshine.exe', 'sunshine', 'apollo.exe'):
+            return p.info['name']
+    return None

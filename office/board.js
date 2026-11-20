@@ -77,6 +77,14 @@ details.grp>summary{padding:10px 12px}details.grp>.in .row{padding-left:33px}
     const sc = $('bscreen'), bar = $('bbar'); sc.textContent = ''; bar.textContent = ''; sc.classList.remove('full', 'fs');
     if (!sel) { sc.append(bossSlide()); bar.append(E('span', '', 'Màn chiếu: tổng quản')); return; }
     const home = E('button', 'act', 'Tổng quản'); home.onclick = () => { sel = null; screen(); lists(); };
+    if (sel.kind === 'pc') {
+      const i = E('img'); i.alt = 'Màn hình PC'; sc.append(i); let on = true, fails = 0;
+      const next = () => { if (!on || !document.body.contains(i)) return; const n = new Image(); n.onload = () => { i.src = n.src; fails = 0; setTimeout(next, document.hidden ? 4000 : 1200); };
+        n.onerror = () => { fails++; if (fails === 3) { sc.textContent = ''; sc.append(E('div', 'slide', 'Chưa lấy được màn hình PC. Nếu PC vừa cài Pillow để chụp, chờ một phút rồi bấm lại.')); on = false; return; } setTimeout(next, 3000); };
+        n.src = 'api/screen.jpg?w=' + (sc.classList.contains('full') ? 1920 : 1280) + '&t=' + Date.now(); }; next();
+      const out = fsBtn(sc); bar.append(E('span', '', 'Màn hình PC · khoảng 1 hình mỗi giây · chỉ xem'), out, home);
+      if (B && B.sunshine) bar.append(E('span', '', 'Muốn điều khiển mượt: mở app Moonlight trên iPhone, thêm PC 10.147.17.77 (cần ZeroTier). Sunshine đang chạy trên PC.'));
+      return; }
     if (sel.kind === 'server') {
       const f = E('iframe'); f.src = 'p/' + sel.port + '/'; f.setAttribute('sandbox', 'allow-scripts allow-same-origin allow-forms'); f.referrerPolicy = 'same-origin'; sc.append(f);
       const zoom = E('button', 'act', 'Cỡ thật'); zoom.onclick = () => { zoom.textContent = sc.classList.toggle('full') ? 'Thu nhỏ' : 'Cỡ thật'; };
@@ -93,6 +101,9 @@ details.grp>summary{padding:10px 12px}details.grp>.in .row{padding-left:33px}
   function lists() {
     const l = $('blists'); l.textContent = ''; if (!B) return;
     const sv = B.servers, ks = E('div', 'card');
+    { const me = {kind:'pc', id:'pc'}, d = E('div', 'row line pick' + (same(sel, me) ? ' on' : '')); d.append(E('span', 'dot work')); const nm = E('span', 'nm');
+      nm.append(E('b', '', 'Màn hình PC'), E('small', '', 'xem trực tiếp, khoảng 1 hình mỗi giây' + (B.sunshine ? ' · Sunshine đang chạy (Moonlight để điều khiển)' : ''))); d.append(nm, E('span', 'chip', 'Xem'));
+      d.onclick = () => { sel = me; screen(); lists(); scrollTo(0, 0); }; ks.append(d); }
     if (sv === null) ks.append(E('div', 'empty', 'PC chưa đọc được danh sách cổng (thiếu psutil hoặc thiếu quyền).'));
     else if (!sv.length) ks.append(E('div', 'empty', 'Không có server local nào đang chạy.'));
     else sv.forEach(s => { const me = {kind:'server', id:'s' + s.port, ...s}, d = E('div', 'row line pick' + (same(sel, me) ? ' on' : '')); d.append(E('span', 'dot work')); const nm = E('span', 'nm');
