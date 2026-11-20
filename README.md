@@ -56,6 +56,10 @@ Cài:
 3. Mở tường lửa Windows cho cổng 8765, chỉ với mạng ZeroTier.
 4. Mở đường dẫn đó trên điện thoại một lần (khoá được lưu trên máy), rồi "Thêm vào màn hình chính".
 
+Chạy ngầm: bấm đúp `start-hidden.vbs` (không hiện cửa sổ; nhật ký ở `out/serve.log`, đường dẫn ghép khoá ở
+`out/phone-link.txt`). Muốn tự bật khi đăng nhập Windows: bấm đúp `autostart.cmd` một lần (nó đặt một tệp nhỏ vào thư mục Startup, bật server
+ngay và in đường dẫn ghép). Gỡ: xoá `dieuphoi-server.vbs` trong `shell:startup`.
+
 Khoá nằm ở `out/token.txt`; xoá tệp rồi chạy lại server để đổi khoá. Mọi lệnh ghi (trả lời, nhắn, mở phiên) đều cần
 khoá, kể cả gọi từ chính PC. Kết nối là HTTP trong mạng riêng: iPhone vẫn thêm được app toàn màn hình; Chrome trên
 Android chỉ tạo lối tắt, vì cài PWA đầy đủ và chạy ngoại tuyến cần HTTPS.

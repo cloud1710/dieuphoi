@@ -578,12 +578,23 @@ def vpn_address(name):
 
 
 def cmd_serve(args):
-    host = vpn_address(args.host) if args.host in ('zerotier', 'tailscale') else args.host
+    host = args.host
+    if host in ('zerotier', 'tailscale'):
+        for attempt in range(18):                # at logon the VPN adapter can come up after this script
+            try:
+                host = vpn_address(args.host)
+                break
+            except SystemExit:
+                if attempt == 17 or 'psutil' not in sys.modules:
+                    raise
+                time.sleep(10)
     ThreadingHTTPServer.daemon_threads = True
     Handler.key = token()
     srv = ThreadingHTTPServer((host, args.port), Handler)
     print('agents office: http://%s:%d   (Ctrl+C to stop)' % (host, args.port))
-    print('phone app, open once to pair: http://%s:%d/m.html#k=%s' % (host, args.port, Handler.key))
+    link = 'http://%s:%d/m.html#k=%s' % (host, args.port, Handler.key)
+    (HUB / 'out' / 'phone-link.txt').write_text(link + '\n', encoding='ascii')     # a hidden server has no console to read it from
+    print('phone app, open once to pair: %s' % link)
     if host not in ('127.0.0.1', 'localhost'):
         print('other devices need the key in that link (kept in out/token.txt; delete the file to make a new one).')
         print('allow port %d in the firewall for that network only.' % args.port)
