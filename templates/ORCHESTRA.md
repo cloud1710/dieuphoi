@@ -1,7 +1,7 @@
 # Orchestra của {{NAME}}
 
 - Mã trong sổ đăng ký của dieuphoi: `{{ID}}`
-- Cấp trên: {{PARENT}}, rồi tới hub dieuphoi (nhóm trưởng).
+- Cấp trên: {{PARENT}}, rồi tới hub dieuphoi (tổng quản).
 - Kế hoạch: `plan/STATUS.yaml`. Câu hỏi: `plan/QUESTIONS.md`. Quyết định: `plan/CHANGELOG.md`.
 
 ## Báo lên cấp trên

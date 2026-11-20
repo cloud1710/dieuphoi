@@ -27,7 +27,7 @@ Trên Windows: bấm đúp `office.cmd`.
 ## Văn phòng agents
 
 `office/index.html` là cảnh 3D (three.js r187, đóng gói sẵn trong `office/vendor/`, giấy phép MIT, chạy không cần mạng).
-Cảnh là một diorama ba khu: phòng trưởng phòng (mỗi orchestra một bàn, điều phối đứng trước bảng), văn phòng lớn
+Cảnh là một diorama ba khu: phòng trưởng phòng (mỗi orchestra một bàn, tổng quản đứng trước bảng), văn phòng lớn
 (mỗi việc đang làm hoặc sắp làm là một nhân viên, cờ trên bàn cùng màu với nhóm), và kho (bản lưu và project đã xong
 chỉ còn hộp). Kéo để xoay, cuộn để phóng, bấm biển tên để xem việc. `office/flat.html` là bản phẳng cho máy không có WebGL.
 
@@ -59,7 +59,7 @@ Orchestra SEAL và bản lưu không bị ghi: thư cho chúng nằm ở `out/ma
 
 ## Các cấp
 
-1. Hub dieuphoi (nhóm trưởng).
+1. Hub dieuphoi (tổng quản).
 2. Nhóm (`groups` trong `registry.yaml`).
 3. Orchestra của từng project.
 4. Orchestra con: project có `parent` trỏ tới một orchestra khác.

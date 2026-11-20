@@ -5,7 +5,7 @@ description: Use when coordinating several projects from the dieuphoi hub - chec
 
 # dieuphoi
 
-dieuphoi is the lead of the orchestras. Each project keeps its own plan in projectplaner format
+dieuphoi is the general manager (tổng quản) of the orchestras: the highest level below the owner. Each project keeps its own plan in projectplaner format
 (`plan/STATUS.yaml`, `plan/QUESTIONS.md`, `plan/CHANGELOG.md`). The hub holds `registry.yaml` and reads those plans.
 It never edits a plan of kind `seal` or a folder of kind `archive`.
 
