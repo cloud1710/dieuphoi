@@ -17,14 +17,12 @@ It never edits a plan of kind `seal` or a folder of kind `archive`.
 
 ## What goes to the owner, what you decide
 
-Goes to the owner:
-- Anything that cannot be undone: deleting files or branches, pushing, publishing, deploying.
-- Paid or GPU runs.
+Goes to the owner (on 2026-11-20 he delegated everything else to the general manager):
+- Deleting any file, folder or branch: always ask first.
+- What a project's own written rules reserve for him (for example GPU runs in the thesis hub).
 - Anything touching patient data or private folders.
-- Starting, pausing or archiving a whole project.
-- A conflict between two projects' rules.
 
-You decide, and record one line in that project's `plan/CHANGELOG.md`:
+You decide everything else, act, then report what you did. Record one line in that project's `plan/CHANGELOG.md`:
 - Splitting, ordering and wording of items.
 - Which lane an item sits in, as long as nothing moves into the auto lane without the owner's word.
 - Registry grouping and parent links.

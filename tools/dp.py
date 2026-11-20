@@ -668,7 +668,7 @@ def todo_publish():
     npx = ['cmd', '/c', 'npx'] if os.name == 'nt' else ['npx']
     try:
         r = subprocess.run(npx + ['--yes', 'wrangler', 'pages', 'deploy', str(site), '--project-name', name, '--branch', 'main',
-                                  '--commit-dirty=true'], capture_output=True, text=True, timeout=420,
+                                  '--commit-dirty=true'], capture_output=True, text=True, timeout=420, stdin=subprocess.DEVNULL,
                            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         ok, out = r.returncode == 0, (r.stdout or '') + (r.stderr or '')
     except (OSError, subprocess.SubprocessError) as e:
@@ -680,6 +680,48 @@ def todo_publish():
         (HUB / 'out' / 'todo.hash').write_text(digest, encoding='ascii')
         (HUB / 'out' / 'todo-link.txt').write_text('https://%s.pages.dev/#k=%s\n' % (name, token()), encoding='ascii')
     return ok, ('%d tasks published to https://%s.pages.dev' % (n, name)) if ok else one_line(out, 400)
+
+
+def bootstrap():
+    """Things a hidden server can settle by itself, tried at most once a day and logged in out/setup.log:
+    install psutil when it is missing, and make the first Cloudflare Pages deploy of the to-do page."""
+    time.sleep(40)
+    log, mark = HUB / 'out' / 'setup.log', HUB / 'out' / 'setup.json'
+    today = datetime.date.today().isoformat()
+    try:
+        done = json.loads(mark.read_text(encoding='ascii'))
+    except (OSError, ValueError):
+        done = {}
+
+    def note(text):
+        with open(log, 'a', encoding='utf-8') as f:
+            f.write('%s %s\n' % (datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), text))
+
+    flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+    if _psutil() is None and done.get('psutil') != today:
+        done['psutil'] = today
+        mark.write_text(json.dumps(done), encoding='ascii')
+        try:
+            r = subprocess.run([sys.executable, '-m', 'pip', 'install', '--disable-pip-version-check', 'psutil'],
+                               capture_output=True, text=True, timeout=600, creationflags=flags)
+            note('pip install psutil: %s %s' % ('OK' if r.returncode == 0 else 'FAILED', one_line((r.stdout or '')[-200:] + ' ' + (r.stderr or '')[-300:], 400)))
+            if r.returncode == 0:
+                os._exit(3)                          # the start script runs the server again, now with psutil
+        except (OSError, subprocess.SubprocessError) as e:
+            note('pip install psutil: FAILED %s' % e)
+    name = (registry().get('publish') or {}).get('pages_project')
+    if name and not (HUB / 'out' / 'todo.hash').is_file() and done.get('publish') != today:
+        done['publish'] = today
+        mark.write_text(json.dumps(done), encoding='ascii')
+        npx = ['cmd', '/c', 'npx'] if os.name == 'nt' else ['npx']
+        try:
+            r = subprocess.run(npx + ['--yes', 'wrangler', 'pages', 'project', 'create', name, '--production-branch', 'main'],
+                               capture_output=True, text=True, timeout=300, creationflags=flags, stdin=subprocess.DEVNULL)
+            note('wrangler project create: %s %s' % (r.returncode, one_line((r.stdout or '')[-200:] + ' ' + (r.stderr or '')[-300:], 400)))
+        except (OSError, subprocess.SubprocessError) as e:
+            note('wrangler project create: FAILED %s' % e)
+        ok, msg = todo_publish()
+        note('first publish: %s %s' % ('OK' if ok else 'FAILED', msg))
 
 
 def reload_on_change():
@@ -1023,6 +1065,8 @@ def cmd_serve(args):
     if args.reload:
         threading.Thread(target=reload_on_change, daemon=True).start()
     threading.Thread(target=game_watch, daemon=True).start()
+    if args.reload:                                  # only the hidden, self-updating server settles things on its own
+        threading.Thread(target=bootstrap, daemon=True).start()
     threading.Timer(25, lambda: net_diag()).start()
     threading.Timer(240, lambda: net_diag()).start()         # again once a phone has had time to connect          # leaves out/net.txt for whoever looks after this PC
     links = ['http://%s:%d/m.html#k=%s' % (h, args.port, Handler.key) for h in hosts]
