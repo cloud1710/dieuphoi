@@ -541,3 +541,80 @@ def main(argv=None):
 
 if __name__ == '__main__':
     sys.exit(main())
+
+
+# ---- displays: a streamed PC often has only a virtual display, and its refresh rate caps the stream's frame rate
+def _devmode():
+    import ctypes
+    from ctypes import wintypes
+
+    class DEVMODE(ctypes.Structure):
+        _fields_ = [('dmDeviceName', wintypes.WCHAR * 32), ('dmSpecVersion', wintypes.WORD), ('dmDriverVersion', wintypes.WORD),
+                    ('dmSize', wintypes.WORD), ('dmDriverExtra', wintypes.WORD), ('dmFields', wintypes.DWORD), ('dmPositionX', ctypes.c_long),
+                    ('dmPositionY', ctypes.c_long), ('dmDisplayOrientation', wintypes.DWORD), ('dmDisplayFixedOutput', wintypes.DWORD),
+                    ('dmColor', ctypes.c_short), ('dmDuplex', ctypes.c_short), ('dmYResolution', ctypes.c_short), ('dmTTOption', ctypes.c_short),
+                    ('dmCollate', ctypes.c_short), ('dmFormName', wintypes.WCHAR * 32), ('dmLogPixels', wintypes.WORD),
+                    ('dmBitsPerPel', wintypes.DWORD), ('dmPelsWidth', wintypes.DWORD), ('dmPelsHeight', wintypes.DWORD),
+                    ('dmDisplayFlags', wintypes.DWORD), ('dmDisplayFrequency', wintypes.DWORD)] + [('pad%d' % i, wintypes.DWORD) for i in range(8)]
+
+    class DD(ctypes.Structure):
+        _fields_ = [('cb', wintypes.DWORD), ('DeviceName', wintypes.WCHAR * 32), ('DeviceString', wintypes.WCHAR * 128),
+                    ('StateFlags', wintypes.DWORD), ('DeviceID', wintypes.WCHAR * 128), ('DeviceKey', wintypes.WCHAR * 128)]
+    return ctypes, DEVMODE, DD
+
+
+def displays():
+    """Active displays: [{name, label, primary, w, h, hz, modes: {(w, h): [hz...]}}]. Windows only."""
+    if os.name != 'nt':
+        return []
+    ctypes, DEVMODE, DD = _devmode()
+    u, out, i = ctypes.windll.user32, [], 0
+    while True:
+        d = DD()
+        d.cb = ctypes.sizeof(d)
+        if not u.EnumDisplayDevicesW(None, i, ctypes.byref(d), 0):
+            break
+        i += 1
+        if not d.StateFlags & 1:
+            continue
+        cur = DEVMODE()
+        cur.dmSize = ctypes.sizeof(DEVMODE)
+        u.EnumDisplaySettingsW(d.DeviceName, -1, ctypes.byref(cur))
+        modes, j = {}, 0
+        while True:
+            m = DEVMODE()
+            m.dmSize = ctypes.sizeof(DEVMODE)
+            if not u.EnumDisplaySettingsW(d.DeviceName, j, ctypes.byref(m)):
+                break
+            modes.setdefault((m.dmPelsWidth, m.dmPelsHeight), set()).add(m.dmDisplayFrequency)
+            j += 1
+        out.append({'name': d.DeviceName, 'label': d.DeviceString, 'primary': bool(d.StateFlags & 4), 'w': cur.dmPelsWidth,
+                    'h': cur.dmPelsHeight, 'hz': cur.dmDisplayFrequency, 'modes': {k: sorted(v) for k, v in modes.items()}})
+    return out
+
+
+def set_display(name, w, h, hz):
+    """Change one display's mode (kept after a restart). Returns True when Windows accepted it."""
+    ctypes, DEVMODE, _ = _devmode()
+    m = DEVMODE()
+    m.dmSize = ctypes.sizeof(DEVMODE)
+    ctypes.windll.user32.EnumDisplaySettingsW(name, -1, ctypes.byref(m))
+    m.dmPelsWidth, m.dmPelsHeight, m.dmDisplayFrequency = w, h, hz
+    m.dmFields = 0x80000 | 0x100000 | 0x400000          # DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY
+    return ctypes.windll.user32.ChangeDisplaySettingsExW(name, ctypes.byref(m), None, 0x01, None) == 0   # CDS_UPDATEREGISTRY
+
+
+def tune_stream_display(target_fps=120):
+    """While a stream runs on a PC whose primary display is slow (a virtual display left at 30 Hz caps the stream at
+    30 fps): raise it. Keeps the resolution; picks the rate nearest target_fps among those of 60 Hz or more.
+    Returns a line saying what changed, or None."""
+    for d in displays():
+        if not d['primary'] or d['hz'] >= 60:
+            continue
+        rates = [r for r in d['modes'].get((d['w'], d['h']), []) if r >= 60]
+        if not rates:
+            return None
+        hz = min(rates, key=lambda r: (abs(r - target_fps), -r))
+        ok = set_display(d['name'], d['w'], d['h'], hz)
+        return '%s %s: %dx%d %d Hz -> %d Hz %s' % (d['name'], d['label'], d['w'], d['h'], d['hz'], hz, 'OK' if ok else 'FAILED')
+    return None

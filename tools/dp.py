@@ -1775,6 +1775,10 @@ def game_watch():
                     rows = hw._smi('--query-gpu=encoder.stats.sessionCount') or []
                     if any(r and r[0].isdigit() and int(r[0]) > 0 for r in rows):
                         playing = ['stream (MoonlightWeb/Sunshine)']
+                        note = hw.tune_stream_display(int(cfg.get('stream_fps') or 120))
+                        if note:
+                            heal_log('display for the stream: ' + note)
+                            chat_log('boss', 'Màn hình (ảo) của PC đang chạy chậm nên stream bị giới hạn khung hình; em đã nâng tần số quét: ' + note.split(': ', 1)[-1])
                 except Exception:
                     pass
             if playing and not GAME['on']:
@@ -2014,6 +2018,16 @@ def cmd_serve(args):
             (HUB / 'out' / 'hw.json').write_text(json.dumps({'error': '%s: %s' % (type(e).__name__, e)}), encoding='utf-8')
     threading.Timer(15, _dump_hw).start()
     threading.Timer(20, lambda: _board().moonlightweb(HUB, True)).start()
+    def _tune_display():
+        try:
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            import hw
+            note = hw.tune_stream_display(int((registry().get('games') or {}).get('stream_fps') or 120))
+            if note:
+                heal_log('display at start: ' + note)
+        except Exception as e:
+            heal_log('display tune failed: %s' % e)
+    threading.Timer(25, _tune_display).start()
     threading.Timer(25, lambda: net_diag()).start()
     threading.Timer(240, lambda: net_diag()).start()         # again once a phone has had time to connect          # leaves out/net.txt for whoever looks after this PC
     links = ['http://%s:%d/m.html#k=%s' % (h, args.port, Handler.key) for h in hosts]
