@@ -39,6 +39,7 @@ button b{color:var(--ask)}
 #legend a{color:var(--accent)}
 @media (max-width:640px){#panel{top:auto;height:46vh}#legend span.h{display:none}}
 </style>
+<script>if (matchMedia("(max-width:700px) and (pointer:coarse)").matches && !/[?&]3d=1/.test(location.search)) location.replace("m.html");</script>
 <script type="importmap">{"imports":{"three":"./vendor/three.module.js"}}</script>
 </head>
 <body>
@@ -53,7 +54,7 @@ button b{color:var(--ask)}
   <span><i style="background:#3f9d74"></i>đang làm</span><span><i style="background:#3f73a8"></i>sẵn sàng</span>
   <span><i style="background:#d2553d"></i>câu hỏi chờ anh</span><span><i style="background:#d39a2f"></i>bị chặn</span>
   <span><i style="background:#98a0ae"></i>nghỉ</span><span class="h">Phóng gần để thấy thẻ việc của nhân viên</span><span class="h">Kéo để xoay · cuộn để phóng · bấm biển tên để xem việc</span>
-  <a href="flat.html">Bản phẳng</a>
+  <a href="m.html">Bản điện thoại</a> <a href="flat.html">Bản phẳng</a>
 </div>
 <script type="module">
 import * as THREE from 'three';

@@ -36,6 +36,20 @@ bóng đổ tính một lần; server chỉ đọc lại kế hoạch nào có t
 
 Bản tĩnh (`dp build`) chứa tên project, đường dẫn và câu hỏi đang mở: chỉ đưa lên host có đăng nhập.
 
+## Xem trên điện thoại
+
+`office/m.html` là bản 2D cho điện thoại (màn hình hẹp mở `index.html` sẽ tự chuyển sang). Trang không có đồ hoạ 3D;
+PC đẩy dữ liệu qua một kết nối server-sent events (`/api/events`) và chỉ gửi khi có kế hoạch đổi.
+
+Nối thẳng điện thoại với PC bằng mạng riêng ảo, không qua host nào:
+
+1. Cài ZeroTier (hoặc Tailscale) trên PC và điện thoại, cho cả hai vào cùng một mạng.
+2. Trên PC: `office.cmd --host zerotier` (hoặc `--host tailscale`, hoặc ghi thẳng địa chỉ IP của PC trong mạng đó).
+3. Mở tường lửa Windows cho cổng 8765, chỉ với mạng đó.
+4. Trên điện thoại mở địa chỉ mà lệnh in ra, rồi thêm vào màn hình chính.
+
+Server chỉ cho đọc và không có đăng nhập: ai ở trong mạng riêng đó đều xem được. Đừng dùng `--host 0.0.0.0` trên mạng công cộng.
+
 ## Nhắn một orchestra bằng @
 
 Nhắn cho điều phối `@pathbrain chạy thêm một lượt radar`: điều phối tìm project (`dp who`), đọc luật và kế hoạch của

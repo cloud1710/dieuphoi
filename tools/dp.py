@@ -290,9 +290,9 @@ class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(HUB / 'office'), **kw)
 
-    def do_GET(self):
-        if self.path.split('?')[0] != '/api/state':
-            return super().do_GET()
+    @staticmethod
+    def current():
+        """(body, tag) of the state, rebuilt at most every 5 seconds. The tag ignores the timestamp."""
         if time.time() - Handler.cache[0] > 5:
             try:
                 body = json.dumps(scan(), ensure_ascii=False).encode('utf-8')
@@ -300,7 +300,38 @@ class Handler(SimpleHTTPRequestHandler):
                 body = json.dumps({'error': '%s: %s' % (type(e).__name__, e)}).encode('utf-8')
             Handler.cache = (time.time(), body)
         body = Handler.cache[1]
-        tag = '"%s"' % hashlib.sha1(body.split(b'"hub"', 1)[-1]).hexdigest()[:16]      # the timestamp is not hashed
+        return body, '"%s"' % hashlib.sha1(body.split(b'"hub"', 1)[-1]).hexdigest()[:16]
+
+    def events(self):
+        """Server-sent events: one message when a client connects, then one whenever a plan changes."""
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/event-stream; charset=utf-8')
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('X-Accel-Buffering', 'no')
+        self.end_headers()
+        sent, quiet = None, 0
+        try:
+            while True:
+                body, tag = self.current()
+                if tag != sent:
+                    self.wfile.write(b'data: ' + body + b'\n\n')
+                    sent, quiet = tag, 0
+                elif quiet >= 20:
+                    self.wfile.write(b': ping\n\n')         # keeps phones and proxies from closing the stream
+                    quiet = 0
+                self.wfile.flush()
+                time.sleep(4)
+                quiet += 4
+        except (BrokenPipeError, ConnectionError, OSError):
+            pass
+
+    def do_GET(self):
+        path = self.path.split('?')[0]
+        if path == '/api/events':
+            return self.events()
+        if path != '/api/state':
+            return super().do_GET()
+        body, tag = self.current()
         if self.headers.get('If-None-Match') == tag:
             self.send_response(304)
             self.send_header('ETag', tag)
@@ -396,9 +427,27 @@ def cmd_msg(args):
     return 0
 
 
+def vpn_address(name):
+    """The IPv4 address of the ZeroTier or Tailscale adapter of this PC, found by the adapter's name."""
+    try:
+        import psutil
+    except ImportError:
+        raise SystemExit('dp serve: --host %s needs psutil (pip install psutil), or pass the address itself' % name)
+    for nic, addrs in psutil.net_if_addrs().items():
+        if name in nic.lower().replace(' ', ''):
+            for a in addrs:
+                if getattr(a.family, 'name', '') == 'AF_INET':
+                    return a.address
+    raise SystemExit('dp serve: no network adapter named like %r with an IPv4 address; is it installed and joined?' % name)
+
+
 def cmd_serve(args):
-    srv = ThreadingHTTPServer((args.host, args.port), Handler)
-    print('agents office: http://%s:%d  (Ctrl+C to stop)' % (args.host, args.port))
+    host = vpn_address(args.host) if args.host in ('zerotier', 'tailscale') else args.host
+    ThreadingHTTPServer.daemon_threads = True
+    srv = ThreadingHTTPServer((host, args.port), Handler)
+    print('agents office: http://%s:%d   phone page: http://%s:%d/m.html   (Ctrl+C to stop)' % (host, args.port, host, args.port))
+    if host not in ('127.0.0.1', 'localhost'):
+        print('reachable from other devices on that network: no login, read only. Allow the port in the firewall for that network only.')
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
@@ -412,7 +461,7 @@ def main(argv=None):
     sub.add_parser('check').set_defaults(fn=cmd_check)
     sub.add_parser('scan').set_defaults(fn=cmd_scan)
     s = sub.add_parser('serve')
-    s.add_argument('--host', default='127.0.0.1')
+    s.add_argument('--host', default='127.0.0.1', help="an address, or 'zerotier' / 'tailscale' to use that adapter's address")
     s.add_argument('--port', type=int, default=8765)
     s.set_defaults(fn=cmd_serve)
     sub.add_parser('build').set_defaults(fn=cmd_build)
