@@ -21,6 +21,11 @@ Python 3.10 trở lên và `pip install pyyaml`. Có thêm `psutil` thì trang v
 
 Trên Windows: bấm đúp `office.cmd`.
 
+## Văn phòng agents
+
+`office/index.html` là cảnh 3D (three.js r187, đóng gói sẵn trong `office/vendor/`, giấy phép MIT, chạy không cần mạng).
+Kéo để xoay, cuộn để phóng, bấm biển tên để xem việc của phòng. `office/flat.html` là bản phẳng cho máy không có WebGL.
+
 ## Các cấp
 
 1. Hub dieuphoi (nhóm trưởng).

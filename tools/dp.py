@@ -251,6 +251,8 @@ def cmd_init(args):
 
 class Handler(SimpleHTTPRequestHandler):
     cache = (0.0, b'')
+    # Windows may map .js to text/plain in the registry; browsers then refuse module scripts
+    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, '.js': 'text/javascript', '.html': 'text/html; charset=utf-8'}
 
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(HUB / 'office'), **kw)
