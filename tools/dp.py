@@ -339,7 +339,7 @@ class Handler(SimpleHTTPRequestHandler):
                 raise ValueError('body size')
             data = json.loads(self.rfile.read(n).decode('utf-8'))
             if path == '/api/chat':
-                return self.reply(200, chat_send(data.get('text')))
+                return self.reply(200, chat_send(data.get('text'), again=data.get('again') is True))
             if path == '/api/delete':
                 out = {'ok': True, 'result': _xoa().decide(HUB, str(data.get('id')), data.get('yes') is True, 'Vinh qua app')}
                 chat_log('boss', out['result'])
@@ -880,6 +880,41 @@ def bootstrap():
         note('first publish: %s %s' % ('OK' if ok else 'FAILED', msg))
 
 
+WATCH_WRITES = {'prev': None, 'told': None}
+
+
+def watch_nvidia_writes(hw):
+    """The 621.x drivers are reported to rewrite a log file nonstop (NVDisplay.Container.exe, up to 30 GB an hour).
+    Every 5 minutes: bytes written by that service; above 1 GB an hour the owner is told, once a day. Kept in
+    out/nvidia-writes.json."""
+    if hw.psutil is None:
+        return
+    total = 0
+    for pr in hw.psutil.process_iter(['name']):
+        try:
+            if (pr.info['name'] or '').lower() == 'nvdisplay.container.exe':
+                total += pr.io_counters().write_bytes
+        except Exception:
+            continue
+    now, prev = time.time(), WATCH_WRITES['prev']
+    WATCH_WRITES['prev'] = (now, total)
+    if not prev or total < prev[1]:
+        return
+    per_hour = (total - prev[1]) / max(1.0, now - prev[0]) * 3600
+    row = {'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), 'mb_per_hour': round(per_hour / 2 ** 20, 1), 'mb_since_start': round(total / 2 ** 20, 1)}
+    f = HUB / 'out' / 'nvidia-writes.json'
+    try:
+        hist = json.loads(f.read_text(encoding='utf-8'))[-287:]
+    except (OSError, ValueError):
+        hist = []
+    f.write_text(json.dumps(hist + [row]), encoding='utf-8')
+    today = datetime.date.today().isoformat()
+    if per_hour > 2 ** 30 and WATCH_WRITES['told'] != today:
+        WATCH_WRITES['told'] = today
+        chat_log('boss', 'Cảnh báo SSD: dịch vụ NVIDIA Display Container đang ghi khoảng %.1f GB mỗi giờ (lỗi driver 621.x). '
+                         'Muốn chặn thì hạ driver về 621.01 hoặc tạm dừng dịch vụ đó; anh bảo em làm cách nào.' % (per_hour / 2 ** 30))
+
+
 def token_loop():
     """Counts today's tokens in the background, every 5 minutes, so no request waits for it."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -888,6 +923,10 @@ def token_loop():
     while True:
         try:
             hw.net_sample()                           # keeps today's traffic total moving when no phone is looking
+            try:
+                watch_nvidia_writes(hw)
+            except Exception:
+                pass
             hw._net_save(True)
             got = hw.token_usage([(p['id'], real(p['path'])) for p in registry()['projects']] + [('tong-quan', str(HUB))])
             (HUB / 'out' / 'tokens.json').write_text(json.dumps({'day': hw._TOK['day'], 'projects': got}, ensure_ascii=False, indent=1), encoding='utf-8')
@@ -903,6 +942,10 @@ def reload_on_change():
     while True:
         time.sleep(20)
         if [f.stat().st_mtime_ns if f.is_file() else 0 for f in files] != seen:
+            for _ in range(90):                  # never in the middle of an answer: wait for it (at most 30 minutes)
+                if not CHAT['busy']:
+                    break
+                time.sleep(20)
             os._exit(3)
 
 
@@ -1367,21 +1410,43 @@ def chat_run(text):
     except Exception as e:
         reply = 'Lỗi khi gọi tổng quản trên PC: %s' % one_line(e, 300)
     chat_log('boss', reply[:6000], meta)
+    try:
+        PENDING.write_text('', encoding='utf-8')
+    except OSError:
+        pass
     CHAT.update(busy=False, step='', since=None, model=None)
     Handler.cache = (0.0, b'')
     _PLANS.clear()
 
 
-def chat_send(text, who='vinh'):
+PENDING = HUB / 'out' / 'chat-pending.json'
+
+
+def chat_send(text, who='vinh', again=False):
     text = str(text or '').strip()[:4000]
     if not text:
         raise ValueError('empty message')
     if CHAT['busy']:
         raise ValueError('tổng quản đang trả lời tin trước, chờ một chút')
-    chat_log(who, text)
+    if not again:
+        chat_log(who, text)
     CHAT['busy'] = True
+    PENDING.write_text(json.dumps({'text': text, 'at': time.time()}, ensure_ascii=False), encoding='utf-8')
     threading.Thread(target=chat_run, args=(text,), daemon=True).start()
     return chat_state()
+
+
+def chat_resume():
+    """A message whose answer was cut by a restart of the server is answered now, once."""
+    try:
+        job = json.loads(PENDING.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return
+    PENDING.write_text('', encoding='utf-8')
+    if not job or time.time() - float(job.get('at') or 0) > 3600:
+        return
+    chat_log('boss', 'Server vừa khởi động lại giữa lúc em đang trả lời tin này, em làm lại từ đầu.')
+    chat_send(job['text'], again=True)
 
 
 # ---- game mode: the owner plays, the agents wait
@@ -1751,6 +1816,7 @@ def cmd_serve(args):
     if args.reload:
         threading.Thread(target=reload_on_change, daemon=True).start()
     threading.Thread(target=game_watch, daemon=True).start()
+    threading.Timer(8, chat_resume).start()
     threading.Thread(target=token_loop, daemon=True).start()
     if args.reload:                                  # only the hidden, self-updating server settles things on its own
         threading.Thread(target=bootstrap, daemon=True).start()
