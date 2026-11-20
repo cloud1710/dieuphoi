@@ -330,6 +330,8 @@ class Handler(SimpleHTTPRequestHandler):
             if not 0 < n <= 16384:
                 raise ValueError('body size')
             data = json.loads(self.rfile.read(n).decode('utf-8'))
+            if path == '/api/chat':
+                return self.reply(200, chat_send(data.get('text')))
             if path == '/api/game':
                 return self.reply(200, {'ok': True, 'result': game_set(bool(data.get('on')), 'manual: app')})
             if path == '/api/power':
@@ -414,6 +416,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(200, activity())
             except Exception as e:
                 return self.reply(500, {'error': '%s: %s' % (type(e).__name__, e)})
+        if path == '/api/chat':
+            return self.reply(200, chat_state())
         if path == '/api/hwlite':
             sys.path.insert(0, str(Path(__file__).resolve().parent))
             import hw
@@ -844,6 +848,7 @@ def activity():
     name = (reg.get('publish') or {}).get('pages_project')
     pairs = [(p['id'], real(p['path'])) for p in reg['projects']]
     return {'claude': hw.claude_activity(pairs), 'programs': hw.project_programs(pairs), 'game': game_state(), 'tokens': hw._TOK['out'],
+            'boss': {k: v for k, v in chat_state().items() if k != 'messages'},
             'todo_url': 'https://%s.pages.dev/' % name if name else None,
             'passphrase': (HUB / 'out' / 'pass.hash').is_file() and (HUB / 'out' / 'pass.hash').stat().st_size > 0}
 
@@ -887,6 +892,105 @@ def net_diag():
     except OSError:
         pass
     return out
+
+
+# ---- chat with the general manager: a Claude Code session of this folder answers the owner's messages
+CHAT = {'busy': False, 'step': '', 'since': None, 'session': None, 'note': None}
+STEP_VI = {'Bash': 'đang chạy lệnh', 'Read': 'đang đọc tệp', 'Edit': 'đang sửa tệp', 'Write': 'đang viết tệp', 'Grep': 'đang tìm',
+           'Glob': 'đang tìm tệp', 'TodoWrite': 'đang lập danh sách việc', 'Task': 'đang giao việc cho nhân viên'}
+
+
+def chat_log(who, text):
+    with open(HUB / 'out' / 'chat.jsonl', 'a', encoding='utf-8') as f:
+        f.write(json.dumps({'t': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), 'who': who, 'text': text}, ensure_ascii=False) + '\n')
+
+
+def chat_state():
+    msgs = []
+    try:
+        for line in (HUB / 'out' / 'chat.jsonl').read_text(encoding='utf-8').splitlines()[-40:]:
+            msgs.append(json.loads(line))
+    except (OSError, ValueError):
+        pass
+    try:                                             # what the manager did from elsewhere, for the projector screen
+        note = json.loads((HUB / 'out' / 'boss.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        note = None
+    return {'busy': CHAT['busy'], 'step': CHAT['step'], 'since': CHAT['since'], 'messages': msgs, 'note': note}
+
+
+def claude_cmd():
+    exe = shutil.which('claude') or shutil.which('claude.cmd') or shutil.which('claude.exe')
+    if not exe:
+        for cand in (Path.home() / '.local' / 'bin' / 'claude.exe', Path(os.environ.get('APPDATA', '')) / 'npm' / 'claude.cmd'):
+            if cand.is_file():
+                exe = str(cand)
+                break
+    if not exe:
+        return None
+    return ['cmd', '/c', exe] if exe.lower().endswith(('.cmd', '.bat')) else [exe]
+
+
+def chat_run(text):
+    """One turn: the message goes to `claude -p` on standard input (never on the command line), the steps are
+    followed from the JSON stream, the final text is the reply. The session is resumed on the next turn."""
+    CHAT.update(busy=True, step='đang đọc tin nhắn', since=datetime.datetime.now().strftime('%H:%M:%S'))
+    reply = None
+    try:
+        cmd = claude_cmd()
+        if not cmd:
+            raise RuntimeError('PC không tìm thấy lệnh claude (Claude Code) trên PATH của server')
+        cmd += ['-p', '--output-format', 'stream-json', '--verbose', '--max-turns', '25', '--permission-mode', 'acceptEdits',
+                '--allowedTools', 'Read,Grep,Glob,Edit,Write,TodoWrite,Bash(python tools/dp.py:*)']
+        if CHAT['session']:
+            cmd += ['--resume', CHAT['session']]
+        pr = subprocess.Popen(cmd, cwd=str(HUB), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                              creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        killer = threading.Timer(420, pr.kill)
+        killer.start()
+        pr.stdin.write(text.encode('utf-8'))
+        pr.stdin.close()
+        for raw in pr.stdout:
+            try:
+                e = json.loads(raw.decode('utf-8', 'replace'))
+            except ValueError:
+                continue
+            if e.get('session_id'):
+                CHAT['session'] = e['session_id']
+            if e.get('type') == 'assistant':
+                for part in (e.get('message') or {}).get('content') or []:
+                    if part.get('type') == 'tool_use':
+                        CHAT['step'] = STEP_VI.get(str(part.get('name')), 'đang dùng công cụ')
+                    elif part.get('type') == 'text' and part.get('text', '').strip():
+                        CHAT['step'] = 'đang soạn câu trả lời'
+                        reply = part['text'].strip()
+            elif e.get('type') == 'result':
+                reply = str(e.get('result') or reply or '').strip() or reply
+        pr.wait(timeout=30)
+        killer.cancel()
+        if not reply:
+            err = pr.stderr.read().decode('utf-8', 'replace')
+            raise RuntimeError(one_line(err, 300) or 'không có câu trả lời (mã %s)' % pr.returncode)
+    except Exception as e:
+        reply = 'Lỗi khi gọi tổng quản trên PC: %s' % one_line(e, 300)
+        if 'resume' in str(e).lower() or 'session' in str(e).lower():
+            CHAT['session'] = None
+    chat_log('boss', reply[:6000])
+    CHAT.update(busy=False, step='', since=None)
+    Handler.cache = (0.0, b'')
+    _PLANS.clear()
+
+
+def chat_send(text, who='vinh'):
+    text = str(text or '').strip()[:4000]
+    if not text:
+        raise ValueError('empty message')
+    if CHAT['busy']:
+        raise ValueError('tổng quản đang trả lời tin trước, chờ một chút')
+    chat_log(who, text)
+    CHAT['busy'] = True
+    threading.Thread(target=chat_run, args=(text,), daemon=True).start()
+    return chat_state()
 
 
 # ---- game mode: the owner plays, the agents wait
@@ -995,9 +1099,21 @@ def game_watch():
     except (OSError, ValueError):
         pass
     quiet = 0
+    try:
+        c = claude_cmd()
+        v = subprocess.run(c + ['--version'], capture_output=True, text=True, timeout=60, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)).stdout.strip() if c else 'not found'
+        (HUB / 'out' / 'claude-check.txt').write_text('%s | %s' % (' '.join(c or []), v), encoding='utf-8')
+    except Exception as e:
+        (HUB / 'out' / 'claude-check.txt').write_text('error: %s' % e, encoding='utf-8')
     while True:
         time.sleep(30)
         try:
+            ask = HUB / 'out' / 'chat-in.txt'
+            if ask.is_file() and ask.stat().st_size and not CHAT['busy']:
+                msg = ask.read_text(encoding='utf-8').strip()
+                ask.write_text('', encoding='utf-8')
+                if msg:
+                    chat_send(msg, 'vinh')
             want = json.loads(f.read_text(encoding='ascii')) if f.is_file() else {}
             if 'on' in want and bool(want['on']) != GAME['on']:
                 game_set(bool(want['on']), want.get('by') or 'manual: file')

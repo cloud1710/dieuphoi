@@ -50,6 +50,10 @@ Bốn tab:
   project đó). Cột bên dưới ghi ai đang làm gì và những gì vừa thay đổi, bằng tiếng Việt. Dòng "phiên chính/nhân viên đang chạy
   lệnh, đang đọc tệp..." lấy từ bản ghi phiên Claude Code trên PC (`~/.claude/projects`); chỉ loại bước được hiện,
   không hiện tên tệp hay nội dung. Nút bánh răng mở cài đặt kết nối (ghép lại, quên máy, liên kết sang trang việc).
+- **Ô chat ở tab Văn phòng**: nhắn tổng quản. Server gọi Claude Code của PC (`claude -p`) trong thư mục này theo
+  `CLAUDE.md`; tin nhắn đi qua stdin, phiên được nối tiếp giữa các lượt, lịch sử ở `out/chat.jsonl`. Tổng quản chỉ được đọc,
+  sửa tệp trong thư mục hub và chạy `python tools/dp.py ...`; không xoá gì. Màn chiếu hiện bước tổng quản đang làm và
+  câu trả lời gần nhất. Cảnh được vẽ hai lớp (lớp tĩnh giữ sẵn, lớp động vẽ lại) nên không giật.
 - **Việc**: việc chờ anh (trả lời câu hỏi ngay trên app), nhân viên đang làm, từng trưởng phòng; nút "Mở phiên" chạy
   `pp open <ID>` của projectplaner trên PC, mọi kiểm tra an toàn của projectplaner vẫn áp dụng.
 - **Máy**: CPU, RAM, GPU, ổ đĩa và project nào đang chạy (xem `tools/hw.py`). Chỉ đo khi tab này đang mở. Có nút
