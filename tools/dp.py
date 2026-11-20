@@ -709,6 +709,33 @@ def cmd_msg(args):
     return 0
 
 
+def cmd_mo(args):
+    """Open a session in a project's orchestra: one item, or projectplaner's next ready item. Its own checks decide."""
+    p, reg = _pick(args.name)
+    if p is None:
+        return 1
+    try:
+        if json.loads((HUB / 'out' / 'game-mode.json').read_text(encoding='utf-8')).get('on'):
+            print('dp mo: đang ở chế độ chơi game, không mở phiên mới')
+            return 1
+    except (OSError, ValueError):
+        pass
+    try:                                          # read-only projects (CLOUD): only anh Vinh opens sessions there
+        ro = json.loads((HUB / 'quyen-tong-quan.json').read_text(encoding='utf-8')).get('chi_doc') or []
+        if any(str(p['path']).replace('\\', '/').lower().rstrip('/').startswith(str(x).replace('\\', '/').lower().rstrip('/')) for x in ro):
+            print('dp mo: @%s chỉ đọc với tổng quản; anh Vinh mở phiên ở đó (nút Mở trong app)' % p['id'])
+            return 1
+    except (OSError, ValueError):
+        pass
+    try:
+        out = open_item(p, args.item, reg)
+    except Exception as e:
+        print('dp mo: %s' % e)
+        return 1
+    print(('OK ' if out['ok'] else 'KHÔNG MỞ ') + out['output'])
+    return 0 if out['ok'] else 1
+
+
 def answer(p, qid, text, sender):
     """Close an open question of a plan with the owner's answer. Other kinds get it as a message in the hub."""
     if p['kind'] != 'plan':
@@ -2169,6 +2196,10 @@ def main(argv=None):
     hq.add_argument('--options', default='Đồng ý|Không', help='các lựa chọn, ngăn bằng |')
     hq.add_argument('--by', default='tổng quản')
     hq.set_defaults(fn=lambda a: print(ask_owner(a.question, a.options.split('|'), a.by)) or 0)
+    mo = sub.add_parser('mo', help='mở phiên orchestra của một project: một mục, hoặc mục sẵn sàng kế tiếp')
+    mo.add_argument('name')
+    mo.add_argument('item', nargs='?')
+    mo.set_defaults(fn=cmd_mo)
     i = sub.add_parser('init')
     i.add_argument('id')
     i.set_defaults(fn=cmd_init)
