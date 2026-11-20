@@ -157,13 +157,40 @@ def project_processes(projects):
     return found
 
 
+_PP = [0.0, {}]
+
+
+def project_programs(projects):
+    """Per project: the programs running in it now, by name, with the script each one runs when it has one.
+    Only base names are reported, never a full path. Refreshed at most every 30 seconds."""
+    if time.time() - _PP[0] < 30:
+        return _PP[1]
+    out = {}
+    for pr, owner in project_processes(projects):
+        try:
+            name = (pr.name() or '').lower().replace('.exe', '')
+            args = pr.cmdline()[1:]
+            script = next((Path(a.replace('\\', '/')).name for a in args if a.lower().endswith(('.py', '.js', '.mjs', '.ts', '.blend', '.cmd', '.sh'))), None)
+            if script is None and '-m' in args and args.index('-m') + 1 < len(args):
+                script = args[args.index('-m') + 1]
+            mins = int((time.time() - pr.create_time()) / 60)
+        except Exception:
+            continue
+        row = out.setdefault(owner, {'n': 0, 'items': []})
+        row['n'] += 1
+        if name not in ('cmd', 'bash', 'powershell', 'pwsh', 'conhost') and len(row['items']) < 8:
+            row['items'].append({'name': name, 'script': script, 'mins': mins})
+    _PP[:] = [time.time(), out]
+    return out
+
+
 TOOL_VI = {'Bash': 'đang chạy lệnh', 'Read': 'đang đọc tệp', 'Edit': 'đang sửa tệp', 'MultiEdit': 'đang sửa tệp',
            'Write': 'đang viết tệp', 'Grep': 'đang tìm trong mã', 'Glob': 'đang tìm tệp', 'WebSearch': 'đang tra web',
            'WebFetch': 'đang đọc trang web', 'Task': 'đang giao việc cho nhân viên', 'Agent': 'đang giao việc cho nhân viên',
            'TodoWrite': 'đang cập nhật danh sách việc', 'NotebookEdit': 'đang sửa notebook', 'Skill': 'đang mở một skill'}
 
 
-def claude_activity(projects, window=900):
+def claude_activity(projects, window=6 * 3600):
     """What each Claude Code session did last, per project, read from the tail of its transcript in
     ~/.claude/projects. Only the kind of step is reported (run a command, read a file, ...): never a file
     name, a command or any text, because names inside private folders can be identifiers."""
@@ -219,7 +246,7 @@ def claude_activity(projects, window=900):
         place = _norm(cwd)
         owner = next((pid for root, pid in roots if place.startswith(root)), None)
         if owner and len(out.setdefault(owner, [])) < 5:
-            out[owner].append({'what': what or 'đang chạy', 'age': int(age), 'sub': sub})
+            out[owner].append({'what': (what or 'đang chạy') if age < 900 else 'phiên mở nhưng im lặng', 'age': int(age), 'sub': sub})
     return out
 
 
@@ -262,7 +289,9 @@ def snapshot(projects):
             owner = next((pid for place in places for root, pid in roots if place.startswith(root)), None)
             if owner is None:
                 if on_gpu or cpu > 5 or ram > 1500:
-                    other.append({'name': name, 'cpu': round(cpu, 1), 'ram_mb': round(ram), 'gpu_mb': gpu_pid.get(pr.pid)})
+                    parts = [x for x in places[0].split('/') if x] if places else []
+                    where = '/'.join(parts[:3] if len(parts) > 1 and parts[1] in ('tools', 'games', 'ai') else parts[:2])
+                    other.append({'name': name, 'cpu': round(cpu, 1), 'ram_mb': round(ram), 'gpu_mb': gpu_pid.get(pr.pid), 'on_gpu': on_gpu, 'where': where})
                 continue
             row = rows[owner]
             row['procs'] += 1
@@ -293,7 +322,7 @@ def snapshot(projects):
         row['state'] = 'running' if row['procs'] or any(a['age'] < 180 for a in row['agents']) else 'recent' if now - changed < 86400 else 'idle'
     order = {'running': 0, 'recent': 1, 'idle': 2}
     out['projects'] = sorted(rows.values(), key=lambda r: (order[r['state']], -r['cpu'], -r['ram_mb'], r['id']))
-    out['other'] = sorted(other, key=lambda r: -(r['ram_mb'] or 0))[:6]
+    out['other'] = sorted(other, key=lambda r: (not r.get('on_gpu'), -(r['ram_mb'] or 0)))[:12]
     return out
 
 

@@ -824,7 +824,8 @@ def activity():
     import hw
     reg = registry()
     name = (reg.get('publish') or {}).get('pages_project')
-    return {'claude': hw.claude_activity([(p['id'], real(p['path'])) for p in reg['projects']]), 'game': game_state(),
+    pairs = [(p['id'], real(p['path'])) for p in reg['projects']]
+    return {'claude': hw.claude_activity(pairs), 'programs': hw.project_programs(pairs), 'game': game_state(),
             'todo_url': 'https://%s.pages.dev/' % name if name else None,
             'passphrase': (HUB / 'out' / 'pass.hash').is_file() and (HUB / 'out' / 'pass.hash').stat().st_size > 0}
 
@@ -1138,6 +1139,15 @@ def cmd_serve(args):
     threading.Thread(target=game_watch, daemon=True).start()
     if args.reload:                                  # only the hidden, self-updating server settles things on its own
         threading.Thread(target=bootstrap, daemon=True).start()
+    def _dump_hw():
+        try:
+            hw_state()
+            time.sleep(3)                         # second pass has real CPU numbers
+            (HUB / 'out' / 'hw.json').write_text(json.dumps(hw_state(), ensure_ascii=False, indent=1), encoding='utf-8')
+            (HUB / 'out' / 'act.json').write_text(json.dumps(activity(), ensure_ascii=False, indent=1), encoding='utf-8')
+        except Exception as e:
+            (HUB / 'out' / 'hw.json').write_text(json.dumps({'error': '%s: %s' % (type(e).__name__, e)}), encoding='utf-8')
+    threading.Timer(15, _dump_hw).start()
     threading.Timer(25, lambda: net_diag()).start()
     threading.Timer(240, lambda: net_diag()).start()         # again once a phone has had time to connect          # leaves out/net.txt for whoever looks after this PC
     links = ['http://%s:%d/m.html#k=%s' % (h, args.port, Handler.key) for h in hosts]

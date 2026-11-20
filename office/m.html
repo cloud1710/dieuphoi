@@ -125,7 +125,7 @@ async function api(path, body) {
   if (r.status === 401) { $('pair').classList.add('on'); throw new Error('Chưa ghép khoá'); }
   const j = await r.json(); if (j.error) throw new Error(j.error); return j; }
 
-const stateOf = p => (p.questions || []).length ? 'ask' : (p.working || []).length || p.sessions ? 'work' : (p.ready || []).length ? 'ready' : p.waiting ? 'wait' : 'sleep';
+const stateOf = p => (p.questions || []).length ? 'ask' : (p.working || []).length || p.sessions || progs(p.id).length ? 'work' : (p.ready || []).length ? 'ready' : p.waiting ? 'wait' : 'sleep';
 const stored = p => p.kind === 'archive' || p.kind === 'tool' || (p.total > 0 && !(p.working || []).length && !(p.ready || []).length && !p.waiting && !(p.questions || []).length);
 const open = new Set(); let liveMode = false, busy = false, STATE = null;
 function ul(title, rows) { if (!rows.length) return []; const u = E('ul'); rows.forEach(r => u.append(E('li', '', r))); return [E('p', '', title), u]; }
@@ -244,11 +244,13 @@ function feedDiff(a, b) { if (!a || !b) return; const old = Object.fromEntries(a
     (o.person || []).forEach(i => { if (!np.has(i.id)) add(p, 'ready', 'việc ' + i.id + ' của anh đã xong'); });
     if ((p.mail || 0) > (o.mail || 0)) add(p, 'mail', 'nhận thư mới'); if ((p.mail || 0) < (o.mail || 0)) add(p, 'ready', 'đã đọc thư'); }); }
 let focusId = null, ACT = {claude:{}};
-async function pollAct(force) { if (!force && (cur !== 'office' || document.hidden || !liveMode)) return; try { const a = await api('api/activity'); const ch = JSON.stringify([a.claude, a.game]) !== JSON.stringify([ACT.claude, ACT.game]); ACT = a;
+async function pollAct(force) { if (!force && (cur !== 'office' || document.hidden || !liveMode)) return; try { const a = await api('api/activity'); const sig = x => JSON.stringify([Object.entries(x.claude || {}).map(([k, v]) => [k, v.map(i => [i.what, i.age < 300])]), x.game, Object.entries(x.programs || {}).map(([k, v]) => [k, v.n])]); const ch = sig(a) !== sig(ACT); ACT = a;
     $('pairlinks').textContent = ''; if (a.todo_url) { const l = E('a', '', 'Trang việc chờ anh trên Cloudflare'); l.href = a.todo_url; l.target = '_blank'; $('pairlinks').append(l); }
     if (ch && STATE) { office.set(STATE); drawCol(); } } catch (e) {} }
 setInterval(pollAct, 15000);
-const ago = s => s < 60 ? s + ' giây trước' : Math.round(s / 60) + ' phút trước';
+const dur = m => m < 60 ? m + ' phút' : Math.round(m / 60) + ' giờ';
+const progs = id => (((ACT.programs || {})[id] || {}).items || []).filter(i => !['claude', 'uv', 'uvx'].includes(i.name) && !/npx-cli|mcp|^index\.js$|^main\.js$|^cli\.js$|rea\.mjs/.test(i.script || '') && !(i.name === 'node' && !i.script));
+const ago = s => s < 60 ? s + ' giây trước' : s < 3600 ? Math.round(s / 60) + ' phút trước' : Math.round(s / 3600) + ' giờ trước';
 function drawOverlays() { const s = STATE; if (!s) return; const heads = s.projects.filter(p => !stored(p)), act = Object.values(ACT.claude || {}).flat().filter(a => a.age < 300).length;
   const working = heads.reduce((n, p) => n + (p.working || []).length, 0), done = s.projects.reduce((n, p) => n + ((p.counts || {}).done || 0), 0);
   const st = $('stats'); st.textContent = ''; const cell = (n, t, cls) => { const d = E('div', cls || ''); d.append(E('b', '', n), t); st.append(d); };
@@ -263,6 +265,7 @@ function drawCol() { drawOverlays(); const s = STATE, c = $('col'); if (!s || (b
   const line = (kind, id, text) => { const d = E('div', 'row line'); d.append(E('span', 'dot ' + kind)); const nm = E('span', 'nm'); nm.append(E('b', '', '@' + id), E('small', '', text)); d.append(nm); d.onclick = () => office.focus(id); return d; };
   const now = [];
   ps.forEach(p => { (ACT.claude[p.id] || []).forEach(a => now.push([a.age < 180 ? 'work' : 'wait', p.id, (a.sub ? 'nhân viên ' : 'phiên chính ') + a.what + ' · ' + ago(a.age)]));
+    progs(p.id).forEach(i => now.push(['work', p.id, 'đang chạy ' + i.name + (i.script ? ' ' + i.script : '') + ' · được ' + dur(i.mins)]));
     (p.working || []).forEach(i => now.push(['work', p.id, 'đang làm ' + i.id + ': ' + i.title]));
     if ((p.sessions || 0) > (p.working || []).length) now.push(['work', p.id, 'có ' + p.sessions + ' phiên Claude Code đang mở']);
     (p.questions || []).forEach(q => now.push(['ask', p.id, 'chờ anh trả lời ' + q.id + ': ' + q.text]));
@@ -301,6 +304,7 @@ const office = (() => {
       for (let n = (p.working || []).length; n < (p.sessions || 0); n++) st.push(['work', 'phiên']);
       if (!(p.working || []).length && (p.ready || []).length) st.push(['ready', p.ready[0].id]);
       (ACT.claude[p.id] || []).filter(a => a.age < 300).forEach((a, k) => st.push(['work', a.what.replace('đang ', '') + (k ? ' ' + (k + 1) : '')]));
+      progs(p.id).slice(0, 2).forEach(i => st.push(['work', i.script || i.name]));
       st.slice(0, 5).forEach(([kind, tag], k) => mk(p.id + ':' + tag, t, 'staff', kind, {x:t.x + 26 + k * 27, y:t.y + 92}, tag));
       if ((p.questions || []).length) mk(p.id + ':ask', t, 'asker', 'ask', {x:t.mx + 34, y:t.my + 6}, '? ' + p.questions[0].id);
       if (p.mail) mk(p.id + ':mail', t, 'mail', 'mail', {x:boss.x - 30, y:boss.y + 26}, '✉ @' + p.id);
@@ -311,6 +315,7 @@ const office = (() => {
     tiles.forEach(t => { const p = t.p; if (focusId && p.id !== focusId) return; const c = p.counts || {}, f = p.total ? ((c.done || 0) + (c.dropped || 0)) / p.total : 0, w0 = (p.working || [])[0];
       (ACT.claude[p.id] || []).filter(a => a.age < 300).forEach(a => slides.push({id:p.id, tag:'@' + p.id + ' · ' + (a.sub ? 'nhân viên' : 'phiên chính'), big:a.what.charAt(0).toUpperCase() + a.what.slice(1), sub:w0 ? w0.id + ': ' + w0.title : p.name, color:COL.work, f}));
       if (!(ACT.claude[p.id] || []).some(a => a.age < 300)) (p.working || []).forEach(i => slides.push({id:p.id, tag:'@' + p.id, big:'Đang làm ' + i.id, sub:i.title, color:COL.work, f}));
+      progs(p.id).slice(0, 2).forEach(i => slides.push({id:p.id, tag:'@' + p.id + ' · chương trình đang chạy', big:i.name + (i.script ? ' ' + i.script : ''), sub:'Chạy được ' + dur(i.mins) + (((ACT.claude[p.id] || [])[0] || {}).age > 900 ? ' · phiên Claude đã im lặng ' + ago(ACT.claude[p.id][0].age).replace(' trước', '') : ''), color:COL.work, f}));
       (p.questions || []).slice(0, 1).forEach(q => slides.push({id:p.id, tag:'@' + p.id + ' · hỏi anh ' + q.id, big:'Chờ anh trả lời', sub:q.text, color:COL.ask, f})); });
     if (focusId && !slides.length && byTile[focusId]) { const p = byTile[focusId].p, r0 = (p.ready || [])[0]; slides.push({id:p.id, tag:'@' + p.id, big:r0 ? 'Kế tiếp ' + r0.id : 'Đang nghỉ', sub:r0 ? r0.title : p.name, color:r0 ? COL.ready : COL.sleep, f:0}); }
     if (!slides.length) slides.push({tag:'TỔNG QUẢN', big:'Chưa có việc đang chạy', sub:(s.inbox.questions + s.inbox.person) + ' việc chờ anh · ' + tiles.filter(t => (t.p.ready || []).length).length + ' orchestra sẵn sàng', color:COL.ready, f:0}); }
