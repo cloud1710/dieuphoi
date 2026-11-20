@@ -7,21 +7,26 @@ dp serve          serve the agents office page (office/) and /api/state
 dp build          write the office as a static site into out/site (page + state.json snapshot)
 dp who @name      resolve an @name to one project and print where its orchestra lives
 dp msg @name text leave a message in that project's mailbox (plan/INBOX.md)
+dp hw             what the PC is doing and which project is using it (tools/hw.py)
 dp init <id>      write a starter plan into a registered project that has none
 """
 import argparse
 import collections
 import datetime
 import hashlib
+import hmac
 import json
 import os
 import re
+import secrets
 import shutil
+import subprocess
 import sys
 import time
 import unicodedata
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import yaml
 
@@ -285,7 +290,59 @@ def cmd_init(args):
 class Handler(SimpleHTTPRequestHandler):
     cache = (0.0, b'')
     # Windows may map .js to text/plain in the registry; browsers then refuse module scripts
-    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, '.js': 'text/javascript', '.html': 'text/html; charset=utf-8'}
+    extensions_map = {**SimpleHTTPRequestHandler.extensions_map, '.js': 'text/javascript', '.html': 'text/html; charset=utf-8',
+                      '.webmanifest': 'application/manifest+json'}
+    key = ''
+
+    def given(self):
+        return self.headers.get('X-DP-Key') or parse_qs(urlsplit(self.path).query).get('k', [''])[0]
+
+    def local(self):
+        return self.client_address[0] in ('127.0.0.1', '::1')
+
+    def reply(self, code, obj):
+        body = json.dumps(obj, ensure_ascii=False).encode('utf-8')
+        self.send_response(code)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self):
+        """Remote control. Always needs the key, also from this PC, so no web page can post here on its own."""
+        path = self.path.split('?')[0]
+        if not hmac.compare_digest(self.headers.get('X-DP-Key') or '', Handler.key):
+            return self.reply(401, {'error': 'key'})
+        try:
+            n = int(self.headers.get('Content-Length') or 0)
+            if not 0 < n <= 16384:
+                raise ValueError('body size')
+            data = json.loads(self.rfile.read(n).decode('utf-8'))
+            reg = registry()
+            p, cands = resolve(str(data.get('to') or ''), reg)
+            if p is None:
+                raise ValueError('which project? ' + ', '.join('@' + c['id'] for c in cands) if cands else 'unknown project')
+            sender = 'Vinh qua điện thoại'
+            if path == '/api/msg':
+                text = one_line(data.get('text'))
+                if not text:
+                    raise ValueError('empty message')
+                out = {'ok': True, 'result': 'M-%03d -> %s' % send_msg(p, text, sender)}
+            elif path == '/api/answer':
+                text = one_line(data.get('text'))
+                if not text or not re.fullmatch(r'Q-\d+', str(data.get('q'))):
+                    raise ValueError('need q and text')
+                out = {'ok': True, 'result': answer(p, data['q'], text, sender)}
+            elif path == '/api/open':
+                out = open_item(p, data.get('item') or None, reg)
+            else:
+                return self.reply(404, {'error': 'no such action'})
+            Handler.cache = (0.0, b'')
+            _PLANS.pop(p['id'], None)
+            self.reply(200, out)
+        except Exception as e:
+            self.reply(400, {'error': '%s: %s' % (type(e).__name__, short(e, 300))})
 
     def __init__(self, *a, **kw):
         super().__init__(*a, directory=str(HUB / 'office'), **kw)
@@ -327,6 +384,13 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split('?')[0]
+        if path.startswith('/api/') and not self.local() and not hmac.compare_digest(self.given(), Handler.key):
+            return self.reply(401, {'error': 'key'})
+        if path == '/api/hw':
+            try:
+                return self.reply(200, hw_state())
+            except Exception as e:
+                return self.reply(500, {'error': '%s: %s' % (type(e).__name__, e)})
         if path == '/api/events':
             return self.events()
         if path != '/api/state':
@@ -405,14 +469,12 @@ def cmd_who(args):
     return 0
 
 
-def cmd_msg(args):
-    p, _ = _pick(args.name)
-    if p is None:
-        return 1
-    text = ' '.join(args.text).strip()
-    if not text:
-        print('dp msg: empty message')
-        return 1
+def one_line(text, limit=2000):
+    return ' '.join(str(text or '').split())[:limit]
+
+
+def send_msg(p, text, sender):
+    """Append one message to the project's mailbox; returns (number, where)."""
     if p['kind'] == 'plan':
         box, where = real(p['path']) / 'plan' / 'INBOX.md', 'plan/INBOX.md of @%s' % p['id']
     else:                                        # never write into a seal orchestra, an archive or a tool
@@ -421,10 +483,84 @@ def cmd_msg(args):
     old = box.read_text(encoding='utf-8') if box.is_file() else '# Thư từ điều phối\n\nThư mới nhất ở cuối. Phiên của project đọc thư `status: new`, làm xong thì đổi thành `status: done` kèm một dòng kết quả.\n'
     n = len(re.findall(r'^## M-\d+', old, flags=re.M)) + 1
     box.write_text('%s\n## M-%03d · %s · từ %s\n%s\n- status: new\n' % (
-        old.rstrip('\n') + '\n', n, datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), args.sender, text),
+        old.rstrip('\n') + '\n', n, datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), sender, text),
         encoding='utf-8', newline='\n')
-    print('M-%03d -> %s' % (n, where))
+    return n, where
+
+
+def cmd_msg(args):
+    p, _ = _pick(args.name)
+    if p is None:
+        return 1
+    text = one_line(' '.join(args.text))
+    if not text:
+        print('dp msg: empty message')
+        return 1
+    print('M-%03d -> %s' % send_msg(p, text, args.sender))
     return 0
+
+
+def answer(p, qid, text, sender):
+    """Close an open question of a plan with the owner's answer. Other kinds get it as a message in the hub."""
+    if p['kind'] != 'plan':
+        n, where = send_msg(p, 'Trả lời %s: %s' % (qid, text), sender)
+        return 'M-%03d -> %s' % (n, where)
+    qfile = real(p['path']) / 'plan' / 'QUESTIONS.md'
+    lines, inside, done = qfile.read_text(encoding='utf-8-sig').split('\n'), False, False
+    for i, line in enumerate(lines):
+        m = HEAD.match(line.strip())
+        if m or line.startswith('## '):
+            inside = bool(m) and m.group(1) == qid
+        elif inside and line.strip() == '- status: open':
+            lines[i] = '- status: answered\n- answer: %s (%s, %s)' % (text, sender, datetime.date.today().isoformat())
+            done = True
+            break
+    if not done:
+        raise ValueError('%s is not an open question of @%s' % (qid, p['id']))
+    qfile.write_text('\n'.join(lines), encoding='utf-8', newline='\n')
+    log = real(p['path']) / 'plan' / 'CHANGELOG.md'
+    if log.is_file():
+        old = log.read_text(encoding='utf-8')
+        head, _, rest = old.partition('\n')
+        log.write_text('%s\n\n- %s: %s trả lời (%s).%s' % (head, datetime.date.today().isoformat(), qid, sender,
+                       '\n' + rest.lstrip('\n') if rest.strip() else '\n'), encoding='utf-8', newline='\n')
+    return '%s of @%s answered' % (qid, p['id'])
+
+
+def open_item(p, item, reg):
+    """Run projectplaner's own `open <ID>` (or `next`) inside the project; its safety checks decide."""
+    if p['kind'] != 'plan':
+        raise ValueError('@%s is %s: the hub opens no session there' % (p['id'], p['kind']))
+    if item and not re.fullmatch(r'[A-Z][0-9]-[0-9]{2,3}[a-z]?', item):
+        raise ValueError('bad item id')
+    pp = next((x for x in reg['projects'] if x['id'] == 'projectplaner'), None)
+    env = dict(os.environ)
+    if pp:
+        env['PYTHONPATH'] = str(real(pp['path']) / 'src') + os.pathsep + env.get('PYTHONPATH', '')
+    cmd = [os.environ.get('PP_PYTHON') or sys.executable, '-m', 'projectplaner'] + (['open', item] if item else ['next'])
+    r = subprocess.run(cmd, cwd=str(real(p['path'])), env=env, capture_output=True, text=True, timeout=90,
+                       creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    return {'ok': r.returncode == 0, 'output': one_line((r.stdout or '') + ' ' + (r.stderr or ''), 600)}
+
+
+def hw_state():
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import hw
+    return hw.snapshot([(p['id'], real(p['path'])) for p in registry()['projects']])
+
+
+def cmd_hw(args):
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import hw
+    return hw.main(args.rest)
+
+
+def token():
+    f = HUB / 'out' / 'token.txt'
+    if not f.is_file():
+        f.parent.mkdir(exist_ok=True)
+        f.write_text(secrets.token_urlsafe(18), encoding='ascii')
+    return f.read_text(encoding='ascii').strip()
 
 
 def vpn_address(name):
@@ -444,10 +580,13 @@ def vpn_address(name):
 def cmd_serve(args):
     host = vpn_address(args.host) if args.host in ('zerotier', 'tailscale') else args.host
     ThreadingHTTPServer.daemon_threads = True
+    Handler.key = token()
     srv = ThreadingHTTPServer((host, args.port), Handler)
-    print('agents office: http://%s:%d   phone page: http://%s:%d/m.html   (Ctrl+C to stop)' % (host, args.port, host, args.port))
+    print('agents office: http://%s:%d   (Ctrl+C to stop)' % (host, args.port))
+    print('phone app, open once to pair: http://%s:%d/m.html#k=%s' % (host, args.port, Handler.key))
     if host not in ('127.0.0.1', 'localhost'):
-        print('reachable from other devices on that network: no login, read only. Allow the port in the firewall for that network only.')
+        print('other devices need the key in that link (kept in out/token.txt; delete the file to make a new one).')
+        print('allow port %d in the firewall for that network only.' % args.port)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
@@ -473,6 +612,9 @@ def main(argv=None):
     m.add_argument('text', nargs='+')
     m.add_argument('--from', dest='sender', default='Vinh qua dieuphoi')
     m.set_defaults(fn=cmd_msg)
+    h = sub.add_parser('hw')
+    h.add_argument('rest', nargs=argparse.REMAINDER)
+    h.set_defaults(fn=cmd_hw)
     i = sub.add_parser('init')
     i.add_argument('id')
     i.set_defaults(fn=cmd_init)

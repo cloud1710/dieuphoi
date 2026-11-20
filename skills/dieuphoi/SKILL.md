@@ -78,3 +78,8 @@ worked or next in line, and the store holds archives and finished projects as bo
 - Print or list file names inside private folders named by a project's rules.
 - Write plan text that contains a machine path; `pp check` rejects it.
 - Run `git add -A` in someone's project; commit by explicit path, and only when asked.
+
+## Hardware
+
+`python tools/dp.py hw` shows CPU, RAM, GPU, disks and which projects are running, recently changed or idle. Check it
+before proposing a GPU or long CPU run, and say which project is already using the machine.

@@ -36,19 +36,36 @@ bóng đổ tính một lần; server chỉ đọc lại kế hoạch nào có t
 
 Bản tĩnh (`dp build`) chứa tên project, đường dẫn và câu hỏi đang mở: chỉ đưa lên host có đăng nhập.
 
-## Xem trên điện thoại
+## App điện thoại
 
-`office/m.html` là bản 2D cho điện thoại (màn hình hẹp mở `index.html` sẽ tự chuyển sang). Trang không có đồ hoạ 3D;
-PC đẩy dữ liệu qua một kết nối server-sent events (`/api/events`) và chỉ gửi khi có kế hoạch đổi.
+`office/m.html` là app 2D cho điện thoại, nối thẳng với PC qua mạng riêng ảo (ZeroTier, Tailscale). PC chỉ chạy một
+server Python nhỏ: không mở trình duyệt, không vẽ 3D, chỉ đọc kế hoạch khi có điện thoại đang nối và chỉ đẩy dữ liệu
+khi có thay đổi.
 
-Nối thẳng điện thoại với PC bằng mạng riêng ảo, không qua host nào:
+Ba tab:
 
-1. Cài ZeroTier (hoặc Tailscale) trên PC và điện thoại, cho cả hai vào cùng một mạng.
-2. Trên PC: `office.cmd --host zerotier` (hoặc `--host tailscale`, hoặc ghi thẳng địa chỉ IP của PC trong mạng đó).
-3. Mở tường lửa Windows cho cổng 8765, chỉ với mạng đó.
-4. Trên điện thoại mở địa chỉ mà lệnh in ra, rồi thêm vào màn hình chính.
+- **Việc**: việc chờ anh (trả lời câu hỏi ngay trên app), nhân viên đang làm, từng trưởng phòng; nút "Mở phiên" chạy
+  `pp open <ID>` của projectplaner trên PC, mọi kiểm tra an toàn của projectplaner vẫn áp dụng.
+- **Máy**: CPU, RAM, GPU, ổ đĩa và project nào đang chạy (xem `tools/hw.py`). Chỉ đo khi tab này đang mở.
+- **Nhắn**: gửi thư vào hộp thư của một orchestra.
 
-Server chỉ cho đọc và không có đăng nhập: ai ở trong mạng riêng đó đều xem được. Đừng dùng `--host 0.0.0.0` trên mạng công cộng.
+Cài:
+
+1. PC và điện thoại ở cùng một mạng ZeroTier. Trên PC: `pip install pyyaml psutil`.
+2. Trên PC: `office.cmd --host zerotier`. Lệnh in ra một đường dẫn có `#k=<khoá>`.
+3. Mở tường lửa Windows cho cổng 8765, chỉ với mạng ZeroTier.
+4. Mở đường dẫn đó trên điện thoại một lần (khoá được lưu trên máy), rồi "Thêm vào màn hình chính".
+
+Khoá nằm ở `out/token.txt`; xoá tệp rồi chạy lại server để đổi khoá. Mọi lệnh ghi (trả lời, nhắn, mở phiên) đều cần
+khoá, kể cả gọi từ chính PC. Kết nối là HTTP trong mạng riêng: iPhone vẫn thêm được app toàn màn hình; Chrome trên
+Android chỉ tạo lối tắt, vì cài PWA đầy đủ và chạy ngoại tuyến cần HTTPS.
+
+## Phần cứng
+
+`python tools/dp.py hw` (hoặc `python tools/hw.py --watch 5`) in CPU, RAM, GPU, ổ đĩa và một dòng cho mỗi project:
+`running` khi có chương trình (claude, python, node...) đang chạy trong thư mục project, `recent` khi kế hoạch, ghi chú
+phiên hoặc git index đổi trong 24 giờ, còn lại là `idle`. Chương trình nặng không thuộc project nào được liệt kê riêng.
+Cần `psutil`; số GPU cần `nvidia-smi`.
 
 ## Nhắn một orchestra bằng @
 

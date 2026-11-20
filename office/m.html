@@ -5,67 +5,113 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Điều phối">
 <meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme:light)">
 <meta name="theme-color" content="#17181b" media="(prefers-color-scheme:dark)">
-<link rel="icon" href="data:,">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <title>Điều phối</title>
 <style>
 :root{--bg:#f4f1ea;--ink:#23211d;--mute:#6f6a60;--card:#fffdf8;--line:#ddd6c7;--work:#2f8a63;--ready:#356fa6;--ask:#c2452f;--wait:#b7791f;--sleep:#98a0ae}
 @media (prefers-color-scheme:dark){:root{--bg:#17181b;--ink:#ecebe7;--mute:#9a9890;--card:#212329;--line:#353840;--work:#5fbf93;--ready:#7fb2e5;--ask:#ef7f6a;--wait:#e0a94a;--sleep:#6f7888}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.42 system-ui,-apple-system,"Segoe UI",sans-serif;padding:0 12px calc(24px + env(safe-area-inset-bottom))}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.42 system-ui,-apple-system,"Segoe UI",sans-serif;padding:0 12px calc(78px + env(safe-area-inset-bottom))}
 header{position:sticky;top:0;z-index:2;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 0 8px;display:flex;align-items:center;gap:10px}
 h1{font-size:19px;margin:0;flex:1}
 #live{font-size:12px;color:var(--mute);display:flex;align-items:center;gap:6px}
 #live i{width:9px;height:9px;border-radius:50%;background:var(--sleep)}
-#live.on i{background:var(--work);box-shadow:0 0 0 3px color-mix(in srgb,var(--work) 25%,transparent)}
-#live.off i{background:var(--ask)}
+#live.on i{background:var(--work)}#live.off i{background:var(--ask)}
+nav{position:fixed;left:0;right:0;bottom:0;z-index:3;display:flex;background:var(--card);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom)}
+nav button{flex:1;border:0;background:none;color:var(--mute);font:inherit;font-size:13px;padding:12px 4px 11px;border-top:2px solid transparent}
+nav button.on{color:var(--ink);font-weight:650;border-top-color:var(--ready)}
+nav b{color:var(--ask)}
+section{display:none}section.on{display:block}
 .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:4px 0 14px}
 .sum div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 4px;text-align:center;font-size:11.5px;color:var(--mute)}
 .sum b{display:block;font-size:20px;color:var(--ink)}
 h2{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--mute);margin:18px 2px 6px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 .row{display:block;padding:10px 12px;border-top:1px solid var(--line)}
-.row:first-child{border-top:0}
-summary{list-style:none;display:flex;align-items:center;gap:9px;cursor:pointer}
-summary::-webkit-details-marker{display:none}
+.row:first-child,.q:first-child{border-top:0}
+summary,.line{list-style:none;display:flex;align-items:center;gap:9px}
+summary{cursor:pointer}summary::-webkit-details-marker{display:none}
 .dot{flex:none;width:12px;height:12px;border-radius:4px;background:var(--sleep)}
-.work>summary .dot,.dot.work{background:var(--work)}.ready>summary .dot,.dot.ready{background:var(--ready)}
-.ask>summary .dot,.dot.ask{background:var(--ask)}.wait>summary .dot,.dot.wait{background:var(--wait)}
+.work>summary .dot,.dot.work,.dot.running{background:var(--work)}.ready>summary .dot,.dot.ready,.dot.recent{background:var(--ready)}
+.ask>summary .dot{background:var(--ask)}.wait>summary .dot{background:var(--wait)}
 .nm{flex:1;min-width:0}
 .nm b{display:block;font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .nm small{display:block;color:var(--mute);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.chip{flex:none;font-size:11.5px;border:1px solid var(--line);border-radius:9px;padding:1px 7px;color:var(--mute)}
+.chip{flex:none;font-size:11.5px;border:1px solid var(--line);border-radius:9px;padding:1px 7px;color:var(--mute);white-space:nowrap}
 .chip.ask{color:var(--ask);border-color:var(--ask)}
 .more{margin:8px 0 2px 21px;font-size:13.5px}
 .more p{margin:6px 0 2px;color:var(--mute);font-size:11.5px;text-transform:uppercase;letter-spacing:.05em}
 .more ul{margin:0;padding-left:16px}.more li{margin:3px 0}
-.bar{height:5px;border-radius:3px;background:var(--line);overflow:hidden;margin:6px 0 2px}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin:6px 0 2px}
 .bar span{display:block;height:100%;background:var(--work)}
+.bar.hot span{background:var(--ask)}
 .q{padding:10px 12px;border-top:1px solid var(--line);font-size:14px}
-.q:first-child{border-top:0}
 .q small{display:block;color:var(--ask);font-weight:650;font-size:12px;margin-bottom:2px}
 .empty{padding:12px;color:var(--mute);font-size:13.5px}
-footer{margin-top:18px;font-size:12.5px;color:var(--mute);text-align:center}
+button.act{font:inherit;font-size:13.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin-top:8px}
+button.act.go{background:var(--ready);border-color:var(--ready);color:#fff}
+button.act.sure{background:var(--ask);border-color:var(--ask);color:#fff}
+button:disabled{opacity:.5}
+textarea,select,input{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:9px 10px;margin-top:8px}
+textarea{min-height:84px;resize:vertical}
+.note{font-size:12.5px;color:var(--mute);margin:8px 2px}
+.res{font-size:13px;margin-top:8px;color:var(--work)}.res.bad{color:var(--ask)}
+.g{padding:10px 12px;border-top:1px solid var(--line)}.g:first-child{border-top:0}
+.g .line b{flex:1;font-size:14px}.g .line span{font-size:13px;color:var(--mute)}
+#pair{position:fixed;inset:0;z-index:9;background:var(--bg);padding:calc(40px + env(safe-area-inset-top)) 18px;display:none}
+#pair.on{display:block}
 a{color:var(--ready)}
 </style>
 </head>
 <body>
 <header><h1>Điều phối</h1><span id="live"><i></i><span id="when">Đang nối…</span></span></header>
-<main id="main"></main>
-<footer><a href="index.html?3d=1">Xem diorama 3D</a></footer>
+<section id="t-work" class="on"></section>
+<section id="t-hw"><div class="empty">Đang đọc phần cứng…</div></section>
+<section id="t-msg">
+  <h2>Nhắn một orchestra</h2>
+  <div class="card" style="padding:4px 12px 12px">
+    <select id="to" aria-label="Project"></select>
+    <textarea id="text" placeholder="Nội dung. Thư nằm trong hộp thư của project cho tới khi một phiên của project đó đọc."></textarea>
+    <button class="act go" id="send">Gửi thư</button><div class="res" id="sent"></div>
+  </div>
+  <p class="note">Thư không tự mở phiên. Muốn việc chạy ngay, vào tab Việc, mở project và bấm "Mở phiên".</p>
+  <p class="note"><a href="index.html?3d=1">Xem diorama 3D</a></p>
+</section>
+<nav><button data-t="work" class="on">Việc <b id="nq"></b></button><button data-t="hw">Máy</button><button data-t="msg">Nhắn</button></nav>
+<div id="pair"><h1>Ghép với máy</h1><p class="note">Mở đường dẫn mà lệnh <code>office.cmd --host zerotier</code> in ra trên PC (có đoạn <code>#k=…</code>), hoặc dán khoá trong <code>out/token.txt</code> vào đây.</p>
+  <input id="key" placeholder="Khoá" autocomplete="off" autocapitalize="off"><button class="act go" id="savekey">Lưu khoá</button></div>
 <script>
 const E = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+const $ = id => document.getElementById(id);
+// the key that pairs this phone with the PC: taken once from the link, kept on the phone
+let KEY = '';
+try { KEY = localStorage.getItem('dp-key') || ''; } catch (e) {}
+if (location.hash.startsWith('#k=')) { KEY = decodeURIComponent(location.hash.slice(3)); try { localStorage.setItem('dp-key', KEY); } catch (e) {} history.replaceState(null, '', location.pathname); }
+$('savekey').onclick = () => { KEY = $('key').value.trim(); try { localStorage.setItem('dp-key', KEY); } catch (e) {} $('pair').classList.remove('on'); connect(); };
+async function api(path, body) {
+  const r = await fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json', 'X-DP-Key':KEY}, body:JSON.stringify(body)} : {headers:{'X-DP-Key':KEY}, cache:'no-store'});
+  if (r.status === 401) { $('pair').classList.add('on'); throw new Error('Chưa ghép khoá'); }
+  const j = await r.json(); if (j.error) throw new Error(j.error); return j; }
+
 const stateOf = p => (p.questions || []).length ? 'ask' : (p.working || []).length || p.sessions ? 'work' : (p.ready || []).length ? 'ready' : p.waiting ? 'wait' : 'sleep';
 const stored = p => p.kind === 'archive' || p.kind === 'tool' || (p.total > 0 && !(p.working || []).length && !(p.ready || []).length && !p.waiting && !(p.questions || []).length);
-const open = new Set();                                    // rows the reader opened stay open across updates
+const open = new Set(); let liveMode = false, busy = false, STATE = null;
 function ul(title, rows) { if (!rows.length) return []; const u = E('ul'); rows.forEach(r => u.append(E('li', '', r))); return [E('p', '', title), u]; }
+// a button that asks for a second tap before it acts
+function twoTap(label, run) { const b = E('button', 'act', label); let armed = 0;
+  b.onclick = async () => { if (!armed) { armed = 1; b.classList.add('sure'); b.textContent = 'Bấm lần nữa để xác nhận'; setTimeout(() => { if (armed === 1) { armed = 0; b.classList.remove('sure'); b.textContent = label; } }, 4000); return; }
+    armed = 2; b.disabled = true; b.textContent = 'Đang gửi…'; const res = E('div', 'res');
+    try { res.textContent = await run(); } catch (e) { res.className = 'res bad'; res.textContent = e.message; }
+    b.after(res); b.textContent = label; b.classList.remove('sure'); b.disabled = false; armed = 0; }; return b; }
 function head(p, byId) {
-  const d = E('details', 'row ' + stateOf(p)); d.open = open.has(p.id);
-  d.ontoggle = () => d.open ? open.add(p.id) : open.delete(p.id);
-  const s = E('summary'); s.append(E('span', 'dot'));
-  const nm = E('span', 'nm'); nm.append(E('b', '', '@' + p.id));
+  const d = E('details', 'row ' + stateOf(p)); d.open = open.has(p.id); d.ontoggle = () => d.open ? open.add(p.id) : open.delete(p.id);
+  const s = E('summary'); s.append(E('span', 'dot')); const nm = E('span', 'nm'); nm.append(E('b', '', '@' + p.id));
   const w = (p.working || [])[0], r = (p.ready || [])[0];
   nm.append(E('small', '', p.error ? (p.error === 'no plan' ? 'Chưa có orchestra' : p.error) : w ? 'Đang làm ' + w.id + ': ' + w.title : r ? 'Kế tiếp ' + r.id + ': ' + r.title : p.waiting ? p.waiting + ' mục bị chặn' : 'Không có việc mở'));
   s.append(nm);
@@ -77,38 +123,84 @@ function head(p, byId) {
     m.append(b, E('div', '', done + '/' + p.total + ' mục xong · kế hoạch sửa ' + p.updated)); }
   m.append(...ul('Đang làm', (p.working || []).map(i => i.id + ': ' + i.title)), ...ul('Kế tiếp', (p.ready || []).map(i => i.id + ': ' + i.title)),
     ...ul('Câu hỏi chờ anh', (p.questions || []).map(q => q.id + ': ' + q.text)), ...ul('Việc của người', (p.person || []).map(i => i.id + ' (' + i.owner + '): ' + i.title)));
+  if (liveMode && p.kind === 'plan' && r && !w) m.append(twoTap('Mở phiên ' + r.id + ' trên PC', async () => { const o = await api('api/open', {to:p.id, item:r.id}); return (o.ok ? 'Đã mở. ' : 'Không mở: ') + o.output; }));
+  if (liveMode) { const b = E('button', 'act', 'Nhắn @' + p.id); b.style.marginLeft = '6px'; b.onclick = () => { $('to').value = p.id; tab('msg'); $('text').focus(); }; m.append(b); }
   d.append(m); return d; }
+function question(p, q) {
+  const d = E('div', 'q'); d.append(E('small', '', '@' + p.id + ' · ' + q.id), document.createTextNode(q.text));
+  if (!liveMode) return d;
+  const b = E('button', 'act', 'Trả lời'); b.style.display = 'block';
+  b.onclick = () => { busy = true; const ta = E('textarea'); ta.placeholder = 'Câu trả lời của anh'; const go = E('button', 'act go', 'Gửi câu trả lời'), res = E('div', 'res');
+    go.onclick = async () => { if (!ta.value.trim()) return; go.disabled = true;
+      try { const o = await api('api/answer', {to:p.id, q:q.id, text:ta.value}); res.textContent = p.kind === 'plan' ? 'Đã ghi câu trả lời vào kế hoạch.' : 'Đã lưu ở hub, chưa ghi vào project (project chỉ đọc): ' + o.result; busy = false; }
+      catch (e) { res.className = 'res bad'; res.textContent = e.message; go.disabled = false; } };
+    b.replaceWith(ta, go, res); ta.focus(); };
+  d.append(b); return d; }
 function draw(s) {
-  const m = document.getElementById('main'), y = scrollY; m.textContent = '';
+  STATE = s; if (busy) return;                              // do not redraw under an answer being typed
+  const m = $('t-work'), y = scrollY; m.textContent = '';
   const byId = Object.fromEntries(s.projects.map(p => [p.id, p])), heads = s.projects.filter(p => !stored(p)), kho = s.projects.filter(stored);
   const working = heads.flatMap(p => [...(p.working || []).map(i => ({p, i})), ...Array(Math.max(0, (p.sessions || 0) - (p.working || []).length)).fill({p, i:{id:'phiên', title:'Phiên Claude Code đang mở'}})]);
-  const sum = E('div', 'sum');
-  [[s.inbox.questions + s.inbox.person, 'chờ anh'], [working.length, 'đang làm'], [heads.length, 'orchestra'], [kho.length, 'trong kho']].forEach(([n, t]) => { const d = E('div'); d.append(E('b', '', n), document.createTextNode(t)); sum.append(d); });
-  m.append(sum);
-  m.append(E('h2', '', 'Chờ anh quyết')); const qc = E('div', 'card'); let nq = 0;
-  s.projects.forEach(p => { (p.questions || []).forEach(q => { nq++; const d = E('div', 'q'); d.append(E('small', '', '@' + p.id + ' · ' + q.id), document.createTextNode(q.text)); qc.append(d); });
-    (p.person || []).forEach(i => { nq++; const d = E('div', 'q'); d.append(E('small', '', '@' + p.id + ' · ' + i.id + ' · việc của ' + i.owner), document.createTextNode(i.title)); qc.append(d); }); });
-  if (!nq) qc.append(E('div', 'empty', 'Không có việc nào chờ.')); m.append(qc);
+  const sum = E('div', 'sum'), nq = s.inbox.questions + s.inbox.person; $('nq').textContent = nq || '';
+  [[nq, 'chờ anh'], [working.length, 'đang làm'], [heads.length, 'orchestra'], [kho.length, 'trong kho']].forEach(([n, t]) => { const d = E('div'); d.append(E('b', '', n), document.createTextNode(t)); sum.append(d); });
+  m.append(sum, E('h2', '', 'Chờ anh quyết')); const qc = E('div', 'card'); let n = 0;
+  s.projects.forEach(p => { (p.questions || []).forEach(q => { n++; qc.append(question(p, q)); });
+    (p.person || []).forEach(i => { n++; const d = E('div', 'q'); d.append(E('small', '', '@' + p.id + ' · ' + i.id + ' · việc của ' + i.owner), document.createTextNode(i.title)); qc.append(d); }); });
+  if (!n) qc.append(E('div', 'empty', 'Không có việc nào chờ.')); m.append(qc);
   m.append(E('h2', '', 'Nhân viên đang làm')); const wc = E('div', 'card');
-  working.forEach(({p, i}) => { const d = E('div', 'row'), sm = E('summary'); sm.append(E('span', 'dot work')); const nm = E('span', 'nm'); nm.append(E('b', '', i.id + ' · @' + p.id), E('small', '', i.title)); sm.append(nm); d.append(sm); wc.append(d); });
+  working.forEach(({p, i}) => { const d = E('div', 'row line'); d.append(E('span', 'dot work')); const nm = E('span', 'nm'); nm.append(E('b', '', i.id + ' · @' + p.id), E('small', '', i.title)); d.append(nm); wc.append(d); });
   if (!working.length) wc.append(E('div', 'empty', 'Chưa có việc nào đang chạy.')); m.append(wc);
   s.groups.forEach(g => { const ps = heads.filter(p => p.group === g.id).sort((a, b) => (a.parent || a.id).localeCompare(b.parent || b.id) || (a.parent ? 1 : 0) - (b.parent ? 1 : 0));
     if (!ps.length) return; m.append(E('h2', '', 'Trưởng phòng · ' + g.name)); const c = E('div', 'card'); ps.forEach(p => c.append(head(p, byId))); m.append(c); });
-  if (kho.length) { m.append(E('h2', '', 'Kho')); const c = E('div', 'card'); kho.forEach(p => { const d = E('div', 'row'), sm = E('summary'); sm.append(E('span', 'dot')); const nm = E('span', 'nm');
-    nm.append(E('b', '', p.name), E('small', '', {archive:'Bản lưu', tool:'Công cụ'}[p.kind] || 'Đã xong')); sm.append(nm); d.append(sm); c.append(d); }); m.append(c); }
+  if (kho.length) { m.append(E('h2', '', 'Kho')); const c = E('div', 'card'); kho.forEach(p => { const d = E('div', 'row line'); d.append(E('span', 'dot')); const nm = E('span', 'nm');
+    nm.append(E('b', '', p.name), E('small', '', {archive:'Bản lưu', tool:'Công cụ'}[p.kind] || 'Đã xong')); d.append(nm); c.append(d); }); m.append(c); }
+  const to = $('to'), cur = to.value; to.textContent = ''; s.projects.filter(p => p.kind !== 'archive' && p.kind !== 'tool').forEach(p => { const o = E('option', '', '@' + p.id + ' · ' + p.name); o.value = p.id; to.append(o); }); if (cur) to.value = cur;
   scrollTo(0, y); }
-const live = document.getElementById('live'), when = document.getElementById('when');
+
+// hardware: asked only while the Máy tab is on screen
+function gauge(c, name, pct, text) { const d = E('div', 'g'), l = E('div', 'line'); l.append(E('b', '', name), E('span', '', text)); const b = E('div', 'bar' + (pct > 85 ? ' hot' : '')), sp = E('span'); sp.style.width = Math.max(0, Math.min(100, pct || 0)) + '%'; b.append(sp); d.append(l, b); c.append(d); }
+function drawHw(h) {
+  const m = $('t-hw'); m.textContent = ''; m.append(E('h2', '', 'Máy lúc ' + h.time.slice(11)));
+  const c = E('div', 'card');
+  if (!h.psutil) c.append(E('div', 'empty', 'PC chưa cài psutil nên không đọc được CPU, RAM và tiến trình (pip install psutil).'));
+  else { gauge(c, 'CPU', h.cpu, Math.round(h.cpu) + '%'); gauge(c, 'RAM', h.ram.percent, h.ram.used_gb + ' / ' + h.ram.total_gb + ' GB'); }
+  (h.gpu || []).forEach(g => { gauge(c, 'GPU · ' + g.name, g.util, (g.util ?? '?') + '% · ' + (g.temp ?? '?') + ' °C'); gauge(c, 'VRAM', 100 * g.mem_used / g.mem_total, Math.round(g.mem_used) + ' / ' + Math.round(g.mem_total) + ' MB'); });
+  if (h.gpu === null) c.append(E('div', 'empty', 'Không thấy nvidia-smi nên không có số GPU.'));
+  (h.disks || []).forEach(d => gauge(c, 'Ổ ' + d.mount, 100 * (1 - d.free_gb / d.total_gb), 'còn ' + d.free_gb + ' GB'));
+  m.append(c);
+  const groups = [['running', 'Project đang chạy'], ['recent', 'Có thay đổi trong 24 giờ'], ['idle', 'Yên']];
+  groups.forEach(([st, title]) => { const ps = h.projects.filter(p => p.state === st); if (!ps.length && st !== 'running') return;
+    m.append(E('h2', '', title + ' (' + ps.length + ')')); const k = E('div', 'card');
+    if (!ps.length) k.append(E('div', 'empty', 'Không có project nào đang dùng máy.'));
+    if (st === 'idle') { k.append(E('div', 'empty', ps.map(p => '@' + p.id).join('  '))); m.append(k); return; }
+    ps.forEach(p => { const d = E('div', 'row line'); d.append(E('span', 'dot ' + st)); const nm = E('span', 'nm'); nm.append(E('b', '', '@' + p.id));
+      nm.append(E('small', '', st === 'running' ? p.procs + ' tiến trình (' + p.names.join(', ') + ') · CPU ' + p.cpu + '% · RAM ' + p.ram_mb + ' MB' : 'Sửa lần cuối ' + p.changed)); d.append(nm);
+      if (p.on_gpu) d.append(E('span', 'chip ask', 'GPU' + (p.gpu_mb ? ' ' + Math.round(p.gpu_mb) + ' MB' : ''))); k.append(d); }); m.append(k); });
+  if ((h.other || []).length) { m.append(E('h2', '', 'Chương trình nặng ngoài các project')); const k = E('div', 'card');
+    h.other.forEach(o => { const d = E('div', 'row line'); d.append(E('span', 'dot')); const nm = E('span', 'nm'); nm.append(E('b', '', o.name), E('small', '', 'CPU ' + o.cpu + '% · RAM ' + o.ram_mb + ' MB' + (o.gpu_mb ? ' · GPU ' + Math.round(o.gpu_mb) + ' MB' : ''))); d.append(nm); k.append(d); }); m.append(k); } }
+let hwTimer = null, cur = 'work';
+async function pollHw() { if (cur !== 'hw' || document.hidden) return; try { drawHw(await api('api/hw')); } catch (e) { $('t-hw').textContent = ''; $('t-hw').append(E('div', 'empty', liveMode ? e.message : 'Chỉ xem được khi nối trực tiếp với PC.')); } }
+function tab(t) { cur = t; document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === 't-' + t)); document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  clearInterval(hwTimer); if (t === 'hw') { pollHw(); hwTimer = setInterval(pollHw, 10000); } scrollTo(0, 0); }
+document.querySelectorAll('nav button').forEach(b => b.onclick = () => tab(b.dataset.t));
+$('send').onclick = async () => { const r = $('sent'), t = $('text').value.trim(); if (!t) return; $('send').disabled = true; r.className = 'res';
+  try { const o = await api('api/msg', {to:$('to').value, text:t}); r.textContent = 'Đã gửi: ' + o.result; $('text').value = ''; } catch (e) { r.className = 'res bad'; r.textContent = e.message; } $('send').disabled = false; };
+
+const live = $('live'), when = $('when');
 function show(s, mode) { if (s.error) { live.className = 'off'; when.textContent = s.error; return; }
-  draw(s); live.className = mode === 'live' ? 'on' : ''; when.textContent = (mode === 'live' ? 'Trực tiếp · ' : 'Bản chụp · ') + s.generated.slice(5, 16); }
+  liveMode = mode === 'live'; draw(s); live.className = liveMode ? 'on' : ''; when.textContent = (liveMode ? 'Trực tiếp · ' : 'Bản chụp · ') + s.generated.slice(5, 16); }
 let got = false, es = null;
-function snapshot() { fetch('state.json', {cache:'no-cache'}).then(r => r.json()).then(s => show(s, 'snap')).catch(() => { live.className = 'off'; when.textContent = 'Không nối được với máy'; }); }
-function connect() {
-  if (!window.EventSource) return snapshot();
-  es = new EventSource('api/events');                      // the PC pushes a new state only when a plan changes
-  es.onmessage = e => { got = true; show(JSON.parse(e.data), 'live'); };
-  es.onerror = () => { if (!got) { es.close(); snapshot(); } else { live.className = 'off'; when.textContent = 'Mất kết nối, đang nối lại…'; } }; }
+function snapshot() { fetch('state.json', {cache:'no-cache'}).then(r => r.json()).then(s => show(s, 'snap')).catch(() => { live.className = 'off'; when.textContent = 'Không nối được với PC'; }); }
+async function connect() {
+  if (es) es.close();
+  try { const r = await fetch('api/state', {headers:{'X-DP-Key':KEY}, cache:'no-store'}); if (r.status === 401) { $('pair').classList.add('on'); return; } if (!r.ok) throw 0; show(await r.json(), 'live'); got = true; }
+  catch (e) { return snapshot(); }
+  es = new EventSource('api/events?k=' + encodeURIComponent(KEY));      // the PC pushes only when a plan changes
+  es.onmessage = e => { show(JSON.parse(e.data), 'live'); };
+  es.onerror = () => { live.className = 'off'; when.textContent = 'Mất kết nối, đang nối lại…'; }; }
 connect();
-document.addEventListener('visibilitychange', () => { if (!document.hidden && es && es.readyState === 2) connect(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (!es || es.readyState === 2) connect(); pollHw(); });
+if ('serviceWorker' in navigator && isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>
 </html>
