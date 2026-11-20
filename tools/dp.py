@@ -563,17 +563,40 @@ def token():
     return f.read_text(encoding='ascii').strip()
 
 
+def _ipconfig_address(name):
+    """Windows without psutil: read the adapter's IPv4 address from ipconfig."""
+    try:
+        out = subprocess.run(['ipconfig'], capture_output=True, timeout=15,
+                             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)).stdout.decode('utf-8', 'replace')
+    except (OSError, subprocess.SubprocessError):
+        return None
+    inside = False
+    for line in out.splitlines():
+        if line and not line[0].isspace():
+            inside = name in line.lower().replace(' ', '')
+        elif inside:
+            m = re.search(r'IPv4[^:]*:\s*(\d+\.\d+\.\d+\.\d+)', line)
+            if m:
+                return m.group(1)
+    return None
+
+
 def vpn_address(name):
     """The IPv4 address of the ZeroTier or Tailscale adapter of this PC, found by the adapter's name."""
     try:
         import psutil
     except ImportError:
-        raise SystemExit('dp serve: --host %s needs psutil (pip install psutil), or pass the address itself' % name)
-    for nic, addrs in psutil.net_if_addrs().items():
-        if name in nic.lower().replace(' ', ''):
-            for a in addrs:
-                if getattr(a.family, 'name', '') == 'AF_INET':
-                    return a.address
+        psutil = None
+    if psutil:
+        for nic, addrs in psutil.net_if_addrs().items():
+            if name in nic.lower().replace(' ', ''):
+                for a in addrs:
+                    if getattr(a.family, 'name', '') == 'AF_INET':
+                        return a.address
+    else:
+        found = _ipconfig_address(name)
+        if found:
+            return found
     raise SystemExit('dp serve: no network adapter named like %r with an IPv4 address; is it installed and joined?' % name)
 
 
@@ -585,7 +608,7 @@ def cmd_serve(args):
                 host = vpn_address(args.host)
                 break
             except SystemExit:
-                if attempt == 17 or 'psutil' not in sys.modules:
+                if attempt == 17:
                     raise
                 time.sleep(10)
     ThreadingHTTPServer.daemon_threads = True
