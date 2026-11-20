@@ -929,7 +929,7 @@ def _board():
 
 def _pairs(kinds=False):
     ps = registry()['projects']
-    return [(p['id'], real(p['path']), p.get('kind')) for p in ps] if kinds else [(p['id'], real(p['path'])) for p in ps]
+    return [(p['id'], real(p['path']), p.get('kind'), p.get('board')) for p in ps] if kinds else [(p['id'], real(p['path'])) for p in ps]
 
 
 def activity():

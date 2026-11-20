@@ -106,14 +106,17 @@ def ports():
 
 def _folders(hub, projects):
     out = [('hub', Path(hub) / 'out' / 'board')]
-    for pid, root, kind in projects:
+    for pid, root, kind, *more in projects:
         if kind != 'seal':
             out.append((pid, Path(root) / 'plan' / 'board'))
+            extra = str(more[0] or '') if more else ''          # `board: some/folder` in registry.yaml: that folder's pictures too
+            if extra and '..' not in extra.replace('\\', '/').split('/') and not Path(extra).is_absolute():
+                out.append((pid, Path(root) / extra))
     return out
 
 
 def items(hub, projects, limit=40):
-    """projects: [(id, folder, kind)]. Newest first: {src, name, kind: image|note, when, t, text?}."""
+    """projects: [(id, folder, kind, extra board folder)]. Newest first: {src, name, kind: image|note, when, t, text?}."""
     got = []
     for src, folder in _folders(hub, projects):
         try:
@@ -151,7 +154,7 @@ def image(hub, projects, src, name):
                     return f.read_bytes(), IMG[ext]
             except OSError:
                 pass
-    return None
+    return None                                  # looked in every board folder of that source
 
 
 def fetch(port, path):

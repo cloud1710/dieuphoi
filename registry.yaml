@@ -43,7 +43,8 @@ projects:
   - {id: cat-phim, name: cat-phim, path: 'D:/Games/cat-phim', group: ca-nhan, kind: plan, parent: games}
   - {id: ccgs-studio, name: ccgs-studio, path: 'D:/Games/ccgs-studio', group: ca-nhan, kind: plan, parent: games}
   - {id: du-trend, name: du-trend, path: 'D:/Games/du-trend', group: ca-nhan, kind: plan, parent: games}
-  - {id: figure-lab, name: figure-lab, path: 'D:/Games/figure-lab', group: ca-nhan, kind: plan, parent: games}
+  # board: thư mục ảnh của project (tính từ gốc project) được đưa thẳng lên Bảng trình chiếu trong app.
+  - {id: figure-lab, name: figure-lab, path: 'D:/Games/figure-lab', group: ca-nhan, kind: plan, parent: games, board: 'viewer/shots'}
   - {id: giu-xe-saigon, name: giu-xe-saigon, path: 'D:/Games/giu-xe-saigon', group: ca-nhan, kind: plan, parent: games}
   - {id: hop-mu, name: hop-mu, path: 'D:/Games/hop-mu', group: ca-nhan, kind: plan, parent: games}
   - {id: ma-soi-1-dem, name: ma-soi-1-dem, path: 'D:/Games/ma-soi-1-dem', group: ca-nhan, kind: plan, parent: games}
