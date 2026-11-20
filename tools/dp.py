@@ -306,6 +306,15 @@ class Handler(SimpleHTTPRequestHandler):
     def given(self):
         return self.headers.get('X-DP-Key') or parse_qs(urlsplit(self.path).query).get('k', [''])[0]
 
+    def ip(self):
+        """The asking device: behind the tunnel every request arrives from 127.0.0.1, the Worker names the phone."""
+        if self.client_address[0] in ('127.0.0.1', '::1'):
+            for h in ('X-DP-Client', 'CF-Connecting-IP'):
+                v = (self.headers.get(h) or '').strip()
+                if v:
+                    return v[:64]
+        return self.client_address[0]
+
     def local(self):
         """From this PC itself. A request relayed by a tunnel or proxy also arrives from 127.0.0.1, so any
         forwarding header makes it remote."""
@@ -328,11 +337,11 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 n = int(self.headers.get('Content-Length') or 0)
                 data = json.loads(self.rfile.read(n).decode('utf-8')) if 0 < n <= 200 else {}
-                return self.reply(200, pair_use(data.get('code'), self.client_address[0]))
+                return self.reply(200, pair_use(data.get('code'), self.ip()))
             except Exception as e:
                 return self.reply(400, {'error': short(e, 120)})
-        if not pass_ok(self.headers.get('X-DP-Key'), self.client_address[0]):
-            return self.reply(401, {'error': 'key', 'why': _WHY.get(self.client_address[0], 'none')})
+        if not pass_ok(self.headers.get('X-DP-Key'), self.ip()):
+            return self.reply(401, {'error': 'key', 'why': _WHY.get(self.ip(), 'none')})
         try:
             n = int(self.headers.get('Content-Length') or 0)
             if not 0 < n <= 16384:
@@ -445,8 +454,8 @@ class Handler(SimpleHTTPRequestHandler):
             Handler.seen.add(self.client_address[0])
         if path.startswith('/p/'):
             return self.proxy(path)
-        if path.startswith('/api/') and not self.local() and not self.cookie_ok() and not pass_ok(self.given(), self.client_address[0]):
-            return self.reply(401, {'error': 'key', 'why': _WHY.get(self.client_address[0], 'none')})
+        if path.startswith('/api/') and not self.local() and not self.cookie_ok() and not pass_ok(self.given(), self.ip()):
+            return self.reply(401, {'error': 'key', 'why': _WHY.get(self.ip(), 'none')})
         if path == '/api/paircode':
             return self.reply(200, pair_code())
         if path == '/api/board':
@@ -534,7 +543,7 @@ class Handler(SimpleHTTPRequestHandler):
         Reading only (GET), and only ports the board lists."""
         b = _board()
         m = re.match(r'/p/(\d+)(/.*)?$', path)
-        if not (self.local() or self.cookie_ok() or (self.given() and pass_ok(self.given(), self.client_address[0]))):
+        if not (self.local() or self.cookie_ok() or (self.given() and pass_ok(self.given(), self.ip()))):
             return self.reply(401, {'error': 'key'})
         if not m or (b.servers(_pairs(), {self.server.server_address[1]}) is None) or int(m.group(1)) not in b.ports():
             return self.reply(404, {'error': 'no such local server'})
@@ -964,6 +973,50 @@ def auto_publish():
             wait = 3600
 
 
+SCHED = HUB / 'lich-tong-quan.json'
+
+
+def sched_due(jobs, done, now):
+    """Daily jobs to run now: past their time today, not run yet today, and less than 4 hours late (the PC was off
+    or asleep at that time: the job runs once when it is back, not in the evening)."""
+    today = now.date().isoformat()
+    out = []
+    for j in jobs:
+        try:
+            h, m = (int(x) for x in str(j.get('at', '')).split(':'))
+            at = now.replace(hour=h, minute=m, second=0, microsecond=0)
+        except (ValueError, TypeError):
+            continue
+        if j.get('id') and j.get('prompt') and done.get(j['id']) != today and at <= now < at + datetime.timedelta(hours=4):
+            out.append(j)
+    return out
+
+
+def sched_loop():
+    """Runs inside the hidden `dp serve`: each daily job in lich-tong-quan.json goes to the manager as a chat turn
+    (same guard and permissions as a message from the phone) and the answer lands in the chat. Never during a game
+    or while another answer runs: it tries again the next minute."""
+    mark = HUB / 'out' / 'lich-done.json'
+    time.sleep(60)
+    while True:
+        try:
+            jobs = json.loads(SCHED.read_text(encoding='utf-8')).get('jobs') or []
+            try:
+                done = json.loads(mark.read_text(encoding='utf-8'))
+            except (OSError, ValueError):
+                done = {}
+            due = sched_due(jobs, done, datetime.datetime.now())
+            if due and not GAME['on'] and not CHAT['busy']:
+                j = due[0]
+                done[j['id']] = datetime.date.today().isoformat()
+                mark.write_text(json.dumps(done), encoding='utf-8')
+                pre = '/%s ' % j['model'] if j.get('model') in ('haiku', 'sonnet', 'opus') else ''
+                chat_send('%s[Lịch %s] %s' % (pre, j['at'], j['prompt']), who='lich')
+        except Exception:
+            pass
+        time.sleep(60)
+
+
 def cmd_todo(args):
     if args.what == 'build':
         site, _, n = todo_build()
@@ -1134,6 +1187,13 @@ def heal_stuck():
             Handler.cache = (0.0, b'')
 
 
+def _tunnel_status():
+    try:
+        return json.loads((HUB / 'out' / 'tunnel.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+
+
 def activity():
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import hw
@@ -1143,7 +1203,7 @@ def activity():
     claude = hw.claude_activity(pairs)
     return {'claude': claude, 'stuck': stuck_sessions(claude, pairs), 'programs': hw.project_programs(pairs), 'game': game_state(), 'tokens': hw._TOK['out'],
             'boss': {k: v for k, v in chat_state().items() if k != 'messages'}, 'boss_usage': boss_usage(), 'net': hw.net_today(),
-            'todo_url': 'https://%s.pages.dev/' % name if name else None,
+            'todo_url': 'https://%s.pages.dev/' % name if name else None, 'tunnel': _tunnel_status(),
             'passphrase': (HUB / 'out' / 'pass.hash').is_file() and (HUB / 'out' / 'pass.hash').stat().st_size > 0}
 
 
@@ -1811,7 +1871,14 @@ def cmd_serve(args):
             raise SystemExit('dp serve: no %s adapter with an IPv4 address; is it installed and joined?' % args.host)
     ThreadingHTTPServer.daemon_threads = True
     Handler.key = token()
+    tun = registry().get('tunnel') or {}
+    if args.reload and tun.get('enabled') and '127.0.0.1' not in hosts:
+        hosts = hosts + ['127.0.0.1']               # cloudflared reaches the server here
     servers = [ThreadingHTTPServer((h, args.port), Handler) for h in hosts]
+    if args.reload and tun.get('enabled'):
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import tunnel
+        tunnel.start(HUB, args.port, str(tun.get('worker') or 'dieuphoi'))
     threading.Thread(target=auto_publish, daemon=True).start()
     if args.reload:
         threading.Thread(target=reload_on_change, daemon=True).start()
@@ -1820,6 +1887,7 @@ def cmd_serve(args):
     threading.Thread(target=token_loop, daemon=True).start()
     if args.reload:                                  # only the hidden, self-updating server settles things on its own
         threading.Thread(target=bootstrap, daemon=True).start()
+        threading.Thread(target=sched_loop, daemon=True).start()
     def _dump_hw():
         try:
             hw_state()

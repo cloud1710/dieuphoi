@@ -66,6 +66,13 @@ Bốn tab:
 - Camera của văn phòng tự đi theo việc (tổng quản đang trả lời, thư đang bay, robot đang đi giao việc, phòng đang làm);
   chạm vào bản đồ là giành lại quyền điều khiển, nút 🎥 bật tắt. Muốn nhắn một orchestra thì nhắn tổng quản `@tên …`.
 
+**Vào từ xa không cần VPN.** Khi `tunnel: {enabled: true}` trong `registry.yaml`, server ẩn chạy `bin/cloudflared.exe`
+(tự tải lần đầu) mở một quick tunnel tới 127.0.0.1:8765, rồi triển khai Worker `dieuphoi` lên workers.dev của tài khoản
+Cloudflare (dùng đăng nhập wrangler trên PC) để có địa chỉ cố định `https://dieuphoi.<tài khoản>.workers.dev/m.html`.
+Đường hầm sống qua các lần server tự khởi động lại; khi cloudflared đổi địa chỉ, hub tự triển khai lại Worker
+(`tools/tunnel.py`, nhật ký `out/tunnel.log`). Quick tunnel không chuyển Server-Sent Events nên app ở địa chỉ này hỏi
+trạng thái mỗi 5 giây. Mọi /api vẫn cần khoá hoặc mật khẩu kết nối.
+
 Cài:
 
 1. PC và điện thoại ở cùng một mạng ZeroTier. Trên PC: `pip install pyyaml psutil`.

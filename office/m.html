@@ -127,7 +127,7 @@ const $ = id => document.getElementById(id);
 let KEY = '';
 try { KEY = localStorage.getItem('dp-key') || ''; } catch (e) {}
 if (location.hash.startsWith('#k=')) { KEY = decodeURIComponent(location.hash.slice(3)); try { localStorage.setItem('dp-key', KEY); } catch (e) {} history.replaceState(null, '', location.pathname); }
-$('gear').onclick = () => { $('pairinfo').textContent = (liveMode ? 'Đang nối trực tiếp với PC tại ' : 'Chưa nối với PC tại ') + location.host + '. App trên màn hình chính của iPhone giữ mật khẩu riêng, nên ghép lại ở đây một lần.'; $('pair').classList.add('on'); };
+$('gear').onclick = () => { $('pairinfo').textContent = (liveMode ? 'Đang nối trực tiếp với PC tại ' : 'Chưa nối với PC tại ') + location.host + '. App trên màn hình chính của iPhone giữ mật khẩu riêng, nên ghép lại ở đây một lần.'; const tu = (typeof ACT === 'object' && ACT) ? ACT.tunnel : null; if (tu && tu.worker && !VIA_TUNNEL) $('pairinfo').textContent += ' Địa chỉ không cần VPN (Wi-Fi hay 4G đều vào được): ' + tu.worker + '/m.html'; $('pair').classList.add('on'); };
 $('closepair').onclick = () => $('pair').classList.remove('on');
 $('showkey').onchange = () => { $('key').type = $('showkey').checked ? 'text' : 'password'; };
 $('mkcode').onclick = async () => { const c = $('code'); try { const j = await api('api/paircode'); c.textContent = j.code.slice(0, 3) + ' ' + j.code.slice(3); c.className = 'res'; setTimeout(() => { c.textContent = ''; }, j.minutes * 60000); } catch (e) { c.style.fontSize = ''; c.textContent = 'Máy này chưa nối nên chưa tạo được mã.'; } };
@@ -565,17 +565,20 @@ const office = (() => {
 const live = $('live'), when = $('when');
 function show(s, mode) { if (s.error) { live.className = 'off'; when.textContent = s.error; return; }
   const was = liveMode; liveMode = mode === 'live'; draw(s); if (liveMode && !was) { pollAct(); pollBar(); pollChat(); $('say').classList.toggle('on', cur === 'office'); document.body.classList.toggle('chatting', cur === 'office'); } if (!liveMode) $('bar').textContent = ''; live.className = liveMode ? 'on' : ''; when.textContent = (liveMode ? 'Trực tiếp · ' : 'Bản chụp · ') + s.generated.slice(5, 16); }
-let got = false, es = null;
+let got = false, es = null; const VIA_TUNNEL = /\.workers\.dev$|\.trycloudflare\.com$/.test(location.hostname); let statePoll = null, stateTag = '';
 function snapshot() { fetch('state.json', {cache:'no-cache'}).then(r => r.json()).then(s => show(s, 'snap')).catch(() => { live.className = 'off'; when.textContent = 'Không nối được với PC'; }); }
 async function connect() {
   if (es) es.close();
   try { const r = await fetch('api/state', {headers:{'X-DP-Key':KEY}, cache:'no-store'}); if (r.status === 401) { $('pair').classList.add('on'); if (KEY) $('pairerr').textContent = 'Mật khẩu chưa đúng, hoặc nhập sai quá 5 lần (chờ 1 phút).'; return; } if (!r.ok) throw 0; $('pairerr').textContent = ''; show(await r.json(), 'live'); got = true; }
   catch (e) { return snapshot(); }
+  if (VIA_TUNNEL) { es = null; clearInterval(statePoll); statePoll = setInterval(pollState, 5000); return; }      // the tunnel carries no event stream: ask every 5 s
   es = new EventSource('api/events?k=' + encodeURIComponent(KEY));      // the PC pushes only when a plan changes
   es.onmessage = e => { show(JSON.parse(e.data), 'live'); };
   es.onerror = () => { live.className = 'off'; when.textContent = 'Mất kết nối, đang nối lại…'; }; }
+async function pollState() { if (document.hidden) return; try { const r = await fetch('api/state', {headers:{'X-DP-Key':KEY, ...(stateTag ? {'If-None-Match':stateTag} : {})}, cache:'no-store'});
+  if (r.status === 304) { live.className = 'on'; return; } if (!r.ok) throw 0; stateTag = r.headers.get('ETag') || ''; show(await r.json(), 'live'); } catch (e) { live.className = 'off'; when.textContent = 'Mất kết nối, đang nối lại…'; } }
 connect();
-document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (!es || es.readyState === 2) connect(); pollHw(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden) return; if (VIA_TUNNEL) pollState(); else if (!es || es.readyState === 2) connect(); pollHw(); });
 if ('serviceWorker' in navigator && isSecureContext) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>

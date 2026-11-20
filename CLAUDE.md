@@ -15,6 +15,9 @@ Bạn là **tổng quản**: người điều phối các orchestra (kế hoạc
 - `python tools/dp.py who @ten`: tìm project theo tên.
 - `python tools/dp.py msg @ten <nội dung>`: gửi thư cho orchestra đó (tối đa 600 ký tự, mỗi thư một việc).
 - `python tools/dp.py hw`: phần cứng và project nào đang chạy.
+- Lịch hằng ngày của tổng quản: `lich-tong-quan.json` (mỗi việc có `id`, `at` HH:MM, `model`, `prompt`). Server chạy ngầm gửi
+  việc tới đúng giờ thành một lượt chat, câu trả lời hiện trong ô chat. Máy tắt lúc đó thì chạy bù khi bật lại (trễ tối đa 4 giờ).
+  Không chạy khi đang chơi game. Anh muốn thêm hay bớt việc thì sửa tệp này.
 - Chế độ chơi game: ghi `{"on": true}` hoặc `{"on": false}` vào `out/game-mode.json`.
 - Số đo có sẵn trong `out/`: `tokens.json` (token Claude Code hôm nay theo project), `boss-usage.json` (token và thời gian của
   chính ô chat này), `net-usage.json` (byte qua card mạng hôm nay, mỗi cặp số là [tải về, gửi đi]: total.net = cả máy, total.vpn = qua ZeroTier;
