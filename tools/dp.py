@@ -1726,7 +1726,11 @@ def _asks():
         return {}
 
 
-def ask_owner(question, options, by='CEO'):
+POWER_VI = {'shutdown': 'tắt máy', 'restart': 'khởi động lại', 'sleep': 'cho máy ngủ', 'cancel': 'huỷ lệnh tắt'}
+POWER_CLI = {'tat': 'shutdown', 'khoidong': 'restart', 'ngu': 'sleep', 'huy': 'cancel'}
+
+
+def ask_owner(question, options, by='CEO', act=None):
     """A question with buttons on a chat bubble. The owner's tap comes back as his message, so the manager
     answers it in a normal turn."""
     asks = _asks()
@@ -1735,6 +1739,8 @@ def ask_owner(question, options, by='CEO'):
     opts = [o.strip()[:40] for o in options if o.strip()][:4] or ['Đồng ý', 'Không']
     asks[hid] = {'q': one_line(question, 600), 'options': opts, 'by': by, 'status': 'open',
                  'when': datetime.datetime.now().strftime('%Y-%m-%d %H:%M')}
+    if act:
+        asks[hid]['power'] = act
     ASKS.write_text(json.dumps(asks, ensure_ascii=False, indent=1), encoding='utf-8')
     chat_log('boss', asks[hid]['q'], {'ask': hid})
     return hid
@@ -1749,6 +1755,14 @@ def answer_ask(hid, choice):
         raise ValueError('lựa chọn không có trong câu hỏi')
     a.update(status='answered', choice=choice, at=datetime.datetime.now().strftime('%Y-%m-%d %H:%M'))
     ASKS.write_text(json.dumps(asks, ensure_ascii=False, indent=1), encoding='utf-8')
+    if a.get('power'):                            # a power question: the tap itself acts; nothing goes to the CEO
+        if choice == a['options'][0]:
+            r = power(a['power'])
+            chat_log('boss', {'shutdown': 'PC tắt sau 60 giây.', 'restart': 'PC khởi động lại sau 60 giây.', 'sleep': 'PC ngủ sau 3 giây.'}.get(a['power'], r) +
+                     ('' if a['power'] == 'sleep' else ' Đổi ý thì vào tab Trình chiếu, mục Nguồn máy, bấm Huỷ tắt.'))
+            return {'ok': True, 'result': r}
+        chat_log('boss', 'Dạ, không %s.' % POWER_VI.get(a['power'], 'làm'))
+        return {'ok': True, 'result': 'không làm'}
     return chat_send('%s (anh chọn ở câu hỏi %s: %s)' % (choice, hid, a['q']))
 
 
@@ -2287,6 +2301,10 @@ def main(argv=None):
     x.set_defaults(fn=cmd_xoa)
     mh = sub.add_parser('manhinh', help='chụp màn hình PC vào out/board/man-hinh.jpg (CEO đọc ảnh này để xem PC)')
     mh.set_defaults(fn=lambda a: (lambda j: ((HUB / 'out' / 'board').mkdir(parents=True, exist_ok=True), (HUB / 'out' / 'board' / 'man-hinh.jpg').write_bytes(j or b''), print(str(HUB / 'out' / 'board' / 'man-hinh.jpg') if j else 'chưa chụp được (đang cài Pillow?)'))[-1])(_board().screen_jpeg(1600)) or 0)
+    pw = sub.add_parser('tat', help='tắt máy, khởi động lại, cho ngủ (anh bấm xác nhận) hoặc huỷ')
+    pw.add_argument('action', nargs='?', default='tat', choices=['tat', 'khoidong', 'ngu', 'huy'])
+    pw.set_defaults(fn=lambda a: print(power('cancel') if a.action == 'huy' else 'đã hỏi anh %s: %s' % (POWER_VI[POWER_CLI[a.action]], ask_owner(
+        'CEO đề nghị %s PC. Anh xác nhận?' % POWER_VI[POWER_CLI[a.action]], [POWER_VI[POWER_CLI[a.action]].capitalize(), 'Không'], 'CEO', POWER_CLI[a.action]))) or 0)
     gv = sub.add_parser('gui', help='giao tệp cho anh Vinh qua ô chat (anh bấm để mở hay tải)')
     gv.add_argument('paths', nargs='+')
     gv.add_argument('--loi', nargs='*', help='một câu kèm theo')

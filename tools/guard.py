@@ -26,6 +26,9 @@ DELETE = [
 ]
 
 
+# turning the PC off, restarting or sleeping it: only through dp.py tat, which asks the owner first
+POWER = [r'(?<![\w-])shutdown(\.exe)?\s+[/-]', r'stop-computer', r'restart-computer', r'powrprof', r'setsuspendstate', r'(?<![\w-])logoff(?![\w-])', r'psshutdown']
+
 def _norm(text):
     return str(text or '').replace('\\', '/').lower()
 
@@ -75,6 +78,9 @@ def verdict(event, rules):
         return None                               # the hub's own tool: it does its own checks
     if rules.get('toan_quyen') is not True:
         return 'Chưa được cấp toàn quyền (quyen-tong-quan.json): chỉ chạy được python tools/dp.py.'
+    for pat in POWER:
+        if re.search(pat, low):
+            return 'Tắt máy, khởi động lại hay cho máy ngủ thì dùng python D:/dieuphoi/tools/dp.py tat [tat|khoidong|ngu|huy]: anh bấm xác nhận trên bong bóng chat.'
     for pat in DELETE + [str(x) for x in rules.get('cam_them') or []]:
         try:
             if re.search(pat, low):

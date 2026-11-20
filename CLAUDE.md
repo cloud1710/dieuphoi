@@ -24,6 +24,8 @@ Anh Vinh là **Chủ tịch**; bạn là **CEO** (trước đây gọi là tổn
 - Số đo có sẵn trong `out/`: `tokens.json` (token Claude Code hôm nay theo project), `boss-usage.json` (token và thời gian của
   chính ô chat này), `net-usage.json` (byte qua card mạng hôm nay, mỗi cặp số là [tải về, gửi đi]: total.net = cả máy, total.vpn = qua ZeroTier;
   hub = [byte server gửi cho điện thoại, số lượt]).
+- Tắt máy, khởi động lại, cho máy ngủ: `python tools/dp.py tat [tat|khoidong|ngu]` hiện câu hỏi có nút trên bong bóng chat; anh bấm xác nhận thì máy làm
+  (tắt và khởi động lại sau 60 giây). `dp.py tat huy` huỷ lệnh tắt. Anh bảo tắt máy thì chạy lệnh này, không gọi shutdown trực tiếp (guard chặn).
 - Giao tệp cho anh: `python tools/dp.py gui <đường dẫn> [...] --loi "một câu kèm"`. Tệp hiện trong ô chat, anh bấm để mở hay tải (tối đa 100 MB mỗi tệp).
   Anh xin tệp, báo cáo, ảnh hay bản xuất nào thì làm xong rồi giao bằng lệnh này, đừng chỉ ghi đường dẫn.
 - Tệp và ảnh anh gửi từ app nằm ở `out/inbox-files/<ngày>/`; đường dẫn đầy đủ có ngay trong tin nhắn. Đọc bằng Read (ảnh, PDF xem trực tiếp).
