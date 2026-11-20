@@ -298,6 +298,7 @@ class Handler(SimpleHTTPRequestHandler):
     extensions_map = {**SimpleHTTPRequestHandler.extensions_map, '.js': 'text/javascript', '.html': 'text/html; charset=utf-8',
                       '.webmanifest': 'application/manifest+json'}
     key = ''
+    seen = set()
 
     def given(self):
         return self.headers.get('X-DP-Key') or parse_qs(urlsplit(self.path).query).get('k', [''])[0]
@@ -398,6 +399,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split('?')[0]
+        if not self.local():
+            Handler.seen.add(self.client_address[0])
         if path.startswith('/api/') and not self.local() and not pass_ok(self.given(), self.client_address[0]):
             return self.reply(401, {'error': 'key'})
         if path == '/api/activity':
@@ -763,6 +766,16 @@ def net_diag():
         if name == 'zerotier' and r.returncode == 0:
             leaf = [ln for ln in text.splitlines() if ' LEAF' in ln.upper()]
             out[name].update(direct=sum('DIRECT' in ln.upper() for ln in leaf), relay=sum('RELAY' in ln.upper() for ln in leaf))
+    pings = {}
+    for ip in sorted(Handler.seen)[:4]:               # round trip to the phones that used the app lately
+        try:
+            r = subprocess.run(['ping', '-n' if os.name == 'nt' else '-c', '4', ip], capture_output=True, timeout=30, creationflags=flags)
+            text = r.stdout.decode('utf-8', 'replace')
+            times = [float(x) for x in re.findall(r'[=<]\s*(\d+(?:\.\d+)?)\s*ms', text)]
+            pings[ip] = {'replies': len(times), 'ms': times[:4]} if r.returncode == 0 and times else {'replies': 0, 'ms': []}
+        except (OSError, subprocess.SubprocessError):
+            pings[ip] = {'replies': 0, 'ms': []}
+    out['ping'] = pings
     for name in ('zerotier', 'tailscale'):
         out.setdefault(name, {'ok': False, 'text': 'not installed or not on the PATH'})
     try:
@@ -906,7 +919,8 @@ def cmd_serve(args):
     threading.Thread(target=auto_publish, daemon=True).start()
     if args.reload:
         threading.Thread(target=reload_on_change, daemon=True).start()
-    threading.Timer(25, lambda: net_diag()).start()          # leaves out/net.txt for whoever looks after this PC
+    threading.Timer(25, lambda: net_diag()).start()
+    threading.Timer(240, lambda: net_diag()).start()         # again once a phone has had time to connect          # leaves out/net.txt for whoever looks after this PC
     links = ['http://%s:%d/m.html#k=%s' % (h, args.port, Handler.key) for h in hosts]
     (HUB / 'out' / 'phone-link.txt').write_text('\n'.join(links) + '\n', encoding='ascii')     # a hidden server has no console
     for h, link in zip(hosts, links):
