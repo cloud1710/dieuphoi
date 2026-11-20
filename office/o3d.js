@@ -396,7 +396,9 @@ function weather(t, dt) { const s = skyNow(), w = s.w, key = s.k + w.kind + Math
 // women's days, Pi Day, Programmers' Day). The weather box on the map can force one (localStorage dp-season).
 const TET = {2026:'02-17', 2027:'02-06', 2028:'01-26', 2029:'02-13', 2030:'02-03', 2031:'01-23', 2032:'02-11', 2033:'01-31', 2034:'02-19', 2035:'02-08'};
 const MOON = {2026:'09-25', 2027:'09-15', 2028:'10-03', 2029:'09-22', 2030:'09-12', 2031:'10-01', 2032:'09-19', 2033:'09-08', 2034:'09-27', 2035:'09-16'};
-function seasonOf(d) { try { const o = localStorage.getItem('dp-season'); if (o) return o; } catch (e) {}
+function seasonOf(d) { try { const o = localStorage.getItem('dp-season'); if (o) return o; } catch (e) {} const b = builtinSeason(d), a = ACT.decor;
+  if (b) return b; if (a && a.key && a.key !== 'auto' && /^(tet|newyear|christmas|moon|halloween|valentine|teacher|women|pi|dev)$/.test(a.key)) return a.key; return a && a.title ? 'auto:' + a.title : ''; }
+function builtinSeason(d) {
   const y = d.getFullYear(), md = (d.getMonth() + 1) * 100 + d.getDate(), near = (x, before, after) => { if (!x) return false; const [m, dd] = x.split('-').map(Number), t = (new Date(y, d.getMonth(), d.getDate()) - new Date(y, m - 1, dd)) / 864e5; return t >= -before && t <= after; };
   if (near(TET[y], 10, 7)) return 'tet';
   if (md >= 1231 || md <= 102) return 'newyear';
@@ -410,7 +412,7 @@ function seasonOf(d) { try { const o = localStorage.getItem('dp-season'); if (o)
   if (Math.round((new Date(y, d.getMonth(), d.getDate()) - new Date(y, 0, 0)) / 864e5) === 256) return 'dev';
   return ''; }
 const CAN = ['Giáp', 'Ất', 'Bính', 'Đinh', 'Mậu', 'Kỷ', 'Canh', 'Tân', 'Nhâm', 'Quý'], CHI = ['Tý', 'Sửu', 'Dần', 'Mão', 'Thìn', 'Tỵ', 'Ngọ', 'Mùi', 'Thân', 'Dậu', 'Tuất', 'Hợi'];
-const MTA = new THREE.MeshBasicMaterial({vertexColors:true}), MTB = new THREE.MeshBasicMaterial({vertexColors:true});
+const TRI = new THREE.ConeGeometry(.5, 1, 3), MTA = new THREE.MeshBasicMaterial({vertexColors:true}), MTB = new THREE.MeshBasicMaterial({vertexColors:true});
 let decor = null, decorKey = null, fwOn = false, fw = [], flakes = null, moonM = null, hats = [];
 function bannerMesh(top, sub, bg, fg, w) { const c = document.createElement('canvas'); c.width = 1024; c.height = 150; const x = c.getContext('2d');
   x.fillStyle = bg; x.fillRect(0, 0, 1024, 150); x.strokeStyle = fg; x.lineWidth = 6; x.strokeRect(10, 10, 1004, 130); x.fillStyle = fg; x.textAlign = 'center'; x.textBaseline = 'middle';
@@ -464,6 +466,10 @@ function setDecor(key) { if (key === decorKey || !world) return; decorKey = key;
   else if (key === 'teacher' || key === 'women') { for (const [x, z] of [lob, lob2]) bouquet(S, x, 0, z, key === 'women' ? ['#e91e63', '#f48fb1', '#ffffff'] : ['#ffeb3b', '#ff7043', '#ffffff']); for (const [x, z] of [ter, ter2]) bouquet(US, x, .05, z, ['#e91e63', '#ffeb3b', '#ffffff']);
     bouquet(US, boss.x - 1.7, 1.12, boss.z + .4, ['#e91e63', '#ffffff']); ban = key === 'teacher' ? ['NGÀY NHÀ GIÁO VIỆT NAM', '20/11 · Tri ân thầy cô'] : ['NGÀY PHỤ NỮ', 'Chúc mừng một nửa thế giới']; banCol = ['#880e4f', '#ffffff']; }
   else if (key === 'pi') { ban = ['π = 3,14159 26535…', 'Pi Day 14/3 · có bánh pie trên bàn CEO']; banCol = ['#0d47a1', '#ffffff']; US.add(CYL, '#d7a447', boss.x + .2, 1.16, boss.z - .05, 0, .5, .08, .5); US.add(CONE, '#b5563c', boss.x + .2, 1.2, boss.z - .05, 0, .5, .04, .5); }
+  else if (key.startsWith('auto:')) { const a = ACT.decor || {}, C = ['#e53935', '#fdd835', '#1e88e5', '#43a047', '#ff7043', '#ab47bc'];
+    for (const [x0, x1] of strings) for (let k = 0; k <= 14; k++) { const u2 = k / 14; US.add(TRI, C[k % 6], x0 + (x1 - x0) * u2, 2.6 - Math.sin(Math.PI * u2) * .7, T.z1 - 1.1, 0, .32, .45, .05, Math.PI); }
+    for (const [x, z, bk] of [[...lob, S], [...lob2, S], [...ter, US], [...ter2, US]]) for (let i = 0; i < 3; i++) { bk.add(SPH, C[(i + Math.round(x)) % 6], x + (i - 1) * .55, 2.4 + i * .3, z, 0, .5, .6, .5); bk.box(.015, 2.3 + i * .3, .015, '#dddddd', x + (i - 1) * .55, 0, z); }
+    ban = [a.title || '', a.sub || '']; banCol = [/^#[0-9a-f]{6}$/i.test(a.bg) ? a.bg : '#0d47a1', /^#[0-9a-f]{6}$/i.test(a.fg) ? a.fg : '#ffffff']; }
   else if (key === 'dev') { ban = ['Hello, World!', 'Ngày Lập trình viên · ngày thứ 256 của năm']; banCol = ['#0b0f14', '#3ddc84']; }
   if (ban) { const bw = ex - 1.4 - (T.x0 + .8), m = bannerMesh(ban[0], ban[1], banCol[0], banCol[1], bw); m.position.set(T.x0 + .8 + bw / 2, TOP - 2.6, T.z1 + .3); g.add(m); }
   for (const [bk, mat, grp] of [[S, MSOLID, g], [A, MTA, g], [B, MTB, g], [US, MSOLID, u], [UA, MTA, u], [UB, MTB, u]]) { const m = bk.mesh(mat); if (mat === MSOLID) m.castShadow = true; grp.add(m); } }

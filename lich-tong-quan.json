@@ -1,7 +1,17 @@
 {
  "note": "Daily jobs of the manager. at = HH:MM; a job missed while the PC was off runs once when it is back (up to 4 hours late). model = haiku | sonnet | opus.",
  "jobs": [
-  {"id": "sang", "at": "07:30", "model": "haiku",
-   "prompt": "Bản tin buổi sáng cho anh Vinh, tối đa 5 dòng: việc nào đang chờ anh (out/INBOX.md, out/state.json), project nào đang chạy hay kẹt (out/act.json), phần cứng có gì bất thường (out/hw.json, out/nvidia-writes.json), token hôm qua (out/tokens.json). Không có gì đáng báo thì nói một câu."}
+  {
+   "id": "trangtri",
+   "at": "06:40",
+   "model": "haiku",
+   "prompt": "Chọn trang trí hôm nay cho văn phòng 3D, theo hiểu biết của em, không cần tra web. Nếu hôm nay là một ngày đáng nhớ (lễ Việt Nam, ngày quốc tế, ngày khoa học, y học, giải phẫu bệnh, công nghệ, hay một ngày thú vị) thì ghi tệp out/decor.json dạng {\"date\": \"YYYY-MM-DD\", \"key\": \"auto\", \"title\": \"tiêu đề băng rôn, tối đa 28 ký tự\", \"sub\": \"một dòng giải thích, tối đa 50 ký tự\", \"bg\": \"#màu nền\", \"fg\": \"#màu chữ\"}; key dùng tet, newyear, christmas, moon, halloween, valentine, teacher, women, pi hoặc dev nếu đúng dịp đó. Không có gì thì ghi {\"date\": \"YYYY-MM-DD\", \"key\": \"\"}. Chỉ trả lời một câu: hôm nay trang trí gì."
+  },
+  {
+   "id": "sang",
+   "at": "07:30",
+   "model": "haiku",
+   "prompt": "Bản tin buổi sáng cho anh Vinh, tối đa 5 dòng: việc nào đang chờ anh (out/INBOX.md, out/state.json), project nào đang chạy hay kẹt (out/act.json), phần cứng có gì bất thường (out/hw.json, out/nvidia-writes.json), token hôm qua (out/tokens.json). Không có gì đáng báo thì nói một câu."
+  }
  ]
 }

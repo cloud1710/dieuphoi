@@ -752,6 +752,17 @@ def cmd_mo(args):
     return 0 if out['ok'] else 1
 
 
+def decor_today():
+    """Today's decoration chosen by the CEO's daily job (out/decor.json), or None when it is not for today."""
+    try:
+        d = json.loads((HUB / 'out' / 'decor.json').read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return None
+    if not isinstance(d, dict) or d.get('date') != datetime.date.today().isoformat():
+        return None
+    return {k: one_line(str(d.get(k) or ''), 60) for k in ('date', 'key', 'title', 'sub', 'bg', 'fg')}
+
+
 def answer(p, qid, text, sender):
     """Close an open question of a plan with the owner's answer. Other kinds get it as a message in the hub."""
     if p['kind'] != 'plan':
@@ -1344,7 +1355,7 @@ def activity():
     claude = hw.claude_activity(pairs)
     return {'claude': claude, 'stuck': stuck_sessions(claude, pairs), 'programs': hw.project_programs(pairs), 'game': game_state(), 'tokens': hw._TOK['out'],
             'boss': {k: v for k, v in chat_state().items() if k != 'messages'}, 'boss_usage': boss_usage(), 'net': hw.net_today(),
-            'todo_url': 'https://%s.pages.dev/' % name if name else None, 'tunnel': _tunnel_status(),
+            'todo_url': 'https://%s.pages.dev/' % name if name else None, 'tunnel': _tunnel_status(), 'decor': decor_today(),
             'passphrase': (HUB / 'out' / 'pass.hash').is_file() and (HUB / 'out' / 'pass.hash').stat().st_size > 0}
 
 
