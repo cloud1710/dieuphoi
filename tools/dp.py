@@ -682,9 +682,48 @@ def todo_publish():
     return ok, ('%d tasks published to https://%s.pages.dev' % (n, name)) if ok else one_line(out, 400)
 
 
+def nvidia_scan():
+    """Find where the NVIDIA app keeps its list of games on this PC and leave a short report in out/nvidia-scan.json."""
+    roots = [Path(os.environ.get(v, '')) / n for v in ('LOCALAPPDATA', 'PROGRAMDATA') for n in ('NVIDIA', 'NVIDIA Corporation') if os.environ.get(v)]
+    words = ('journal', 'game', 'application', 'ontology', 'library', 'fingerprint', 'titles')
+    files = []
+    for root in roots:
+        if not root.is_dir():
+            continue
+        base = len(root.parts)
+        for folder, dirs, names in os.walk(root):
+            if len(Path(folder).parts) - base >= 6:
+                dirs[:] = []
+            for n in names:
+                low = n.lower()
+                if low.endswith(('.xml', '.json', '.db', '.sqlite', '.dat')) and any(w in low or w in folder.lower() for w in words):
+                    f = Path(folder) / n
+                    try:
+                        st = f.stat()
+                    except OSError:
+                        continue
+                    if st.st_size < 40 * 2 ** 20:
+                        files.append({'path': str(f), 'size': st.st_size, 'day': time.strftime('%Y-%m-%d', time.localtime(st.st_mtime))})
+            if len(files) > 400:
+                break
+    out = {'time': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), 'roots': [str(r) for r in roots if r.is_dir()], 'files': files[:400], 'samples': {}}
+    for f in sorted(files, key=lambda x: -x['size']):
+        if f['path'].lower().endswith(('.xml', '.json')) and len(out['samples']) < 6:
+            try:
+                with open(f['path'], 'rb') as fh:
+                    out['samples'][f['path']] = fh.read(2500).decode('utf-8', 'replace')
+            except OSError:
+                pass
+    (HUB / 'out' / 'nvidia-scan.json').write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding='utf-8')
+
+
 def bootstrap():
     """Things a hidden server can settle by itself, tried at most once a day and logged in out/setup.log:
     install psutil when it is missing, and make the first Cloudflare Pages deploy of the to-do page."""
+    try:
+        nvidia_games()
+    except Exception:
+        pass
     time.sleep(40)
     log, mark = HUB / 'out' / 'setup.log', HUB / 'out' / 'setup.json'
     today = datetime.date.today().isoformat()
@@ -880,6 +919,35 @@ def game_set(on, by):
     return game_state()
 
 
+_NV = [0.0, []]
+
+
+def nvidia_games():
+    """Games the NVIDIA app has found on this PC: [{name, exes}], from its ApplicationStorage.json.
+    Creative apps (Discord, editors, ...) are left out. Re-read at most every 5 minutes."""
+    if time.time() - _NV[0] < 300:
+        return _NV[1]
+    f = Path(os.environ.get('LOCALAPPDATA', '')) / 'NVIDIA Corporation' / 'NVIDIA app' / 'NvBackend' / 'ApplicationStorage.json'
+    games = []
+    try:
+        for row in json.loads(f.read_text(encoding='utf-8-sig')).get('Applications', []):
+            app = row.get('Application') or {}
+            if app.get('IsCreativeApplication'):
+                continue
+            exes = sorted({Path(str(x).replace('\\', '/')).name for x in (app.get('ImageFiles') or []) + (app.get('DetectedFiles') or [])
+                           if str(x).lower().endswith('.exe') and not re.search(r'helper|launcher|crash|unins|setup|update', str(x).lower().rsplit('\\', 1)[-1])})
+            if exes:
+                games.append({'name': app.get('DisplayName') or app.get('ShortName'), 'exes': exes, 'last': str(app.get('LastLaunchTimeISO') or '')[:10]})
+    except (OSError, ValueError):
+        pass
+    _NV[:] = [time.time(), games]
+    try:
+        (HUB / 'out' / 'nvidia-games.json').write_text(json.dumps(games, ensure_ascii=False, indent=1), encoding='utf-8')
+    except OSError:
+        pass
+    return games
+
+
 def running_games(names):
     """Which of the listed game programs are running now (process names, case ignored)."""
     want = {n.lower() for n in names}
@@ -918,7 +986,10 @@ def game_watch():
             cfg = registry().get('games') or {}
             if not cfg.get('auto'):
                 continue
-            playing = running_games(cfg.get('processes') or [])
+            names = list(cfg.get('processes') or [])
+            if cfg.get('nvidia') is True:               # opt in only: that list also holds background software
+                names += [x for g in nvidia_games() for x in g['exes']]
+            playing = running_games(names)
             if playing and not GAME['on']:
                 game_set(True, 'auto: ' + playing[0])
             elif GAME['on'] and str(GAME['by']).startswith('auto'):

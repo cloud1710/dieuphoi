@@ -10,8 +10,9 @@ hub: {id: dieuphoi, name: Điều phối, path: 'D:/dieuphoi'}
 # publish: trang việc chờ anh Vinh trên Cloudflare Pages (nội dung được mã hoá bằng khoá trong out/token.txt).
 publish: {pages_project: projectorchestra, auto: true}
 # games: khi một trong các chương trình này chạy, hub tự bật chế độ chơi game (tạm dừng agents); tắt game thì chạy lại.
-# Tên đúng như trong Task Manager, tab Details.
-games: {auto: true, processes: ['League of Legends.exe', 'VALORANT-Win64-Shipping.exe', 'GenshinImpact.exe', 'cs2.exe', 'dota2.exe', 'eldenring.exe', 'FortniteClient-Win64-Shipping.exe']}
+# processes: chỉ những tên ở đây mới tự bật chế độ chơi game (đúng như Task Manager). Danh sách NVIDIA app quét được nằm ở
+# out/nvidia-games.json để tham khảo; không tự lấy vì nó lẫn cả phần mềm chạy nền như Logitech G Hub (nvidia: false).
+games: {auto: true, nvidia: false, processes: ['League of Legends.exe', 'PBZ.exe']}
 groups:
   - {id: luan-van, name: Luận văn SEAL}
   - {id: benh-vien, name: Sản phẩm giải phẫu bệnh và bệnh viện}
