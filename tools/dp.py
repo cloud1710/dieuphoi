@@ -578,7 +578,7 @@ def open_item(p, item, reg):
     if pp:
         env['PYTHONPATH'] = str(real(pp['path']) / 'src') + os.pathsep + env.get('PYTHONPATH', '')
     cmd = [os.environ.get('PP_PYTHON') or sys.executable, '-m', 'projectplaner'] + (['open', item] if item else ['next'])
-    r = subprocess.run(cmd, cwd=str(real(p['path'])), env=env, capture_output=True, text=True, timeout=90,
+    r = subprocess.run(cmd, cwd=str(real(p['path'])), env=env, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=90,
                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     return {'ok': r.returncode == 0, 'output': one_line((r.stdout or '') + ' ' + (r.stderr or ''), 600)}
 
@@ -676,7 +676,7 @@ def todo_publish():
     npx = ['cmd', '/c', 'npx'] if os.name == 'nt' else ['npx']
     try:
         r = subprocess.run(npx + ['--yes', 'wrangler', 'pages', 'deploy', str(site), '--project-name', name, '--branch', 'main',
-                                  '--commit-dirty=true'], capture_output=True, text=True, timeout=420, stdin=subprocess.DEVNULL,
+                                  '--commit-dirty=true'], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=420, stdin=subprocess.DEVNULL,
                            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
         ok, out = r.returncode == 0, (r.stdout or '') + (r.stderr or '')
     except (OSError, subprocess.SubprocessError) as e:
@@ -750,7 +750,7 @@ def bootstrap():
         mark.write_text(json.dumps(done), encoding='ascii')
         try:
             r = subprocess.run([sys.executable, '-m', 'pip', 'install', '--disable-pip-version-check', 'psutil'],
-                               capture_output=True, text=True, timeout=600, creationflags=flags)
+                               capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=600, creationflags=flags)
             note('pip install psutil: %s %s' % ('OK' if r.returncode == 0 else 'FAILED', one_line((r.stdout or '')[-200:] + ' ' + (r.stderr or '')[-300:], 400)))
             if r.returncode == 0:
                 os._exit(3)                          # the start script runs the server again, now with psutil
@@ -763,7 +763,7 @@ def bootstrap():
         npx = ['cmd', '/c', 'npx'] if os.name == 'nt' else ['npx']
         try:
             r = subprocess.run(npx + ['--yes', 'wrangler', 'pages', 'project', 'create', name, '--production-branch', 'main'],
-                               capture_output=True, text=True, timeout=300, creationflags=flags, stdin=subprocess.DEVNULL)
+                               capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=300, creationflags=flags, stdin=subprocess.DEVNULL)
             note('wrangler project create: %s %s' % (r.returncode, one_line((r.stdout or '')[-200:] + ' ' + (r.stderr or '')[-300:], 400)))
         except (OSError, subprocess.SubprocessError) as e:
             note('wrangler project create: FAILED %s' % e)
@@ -835,7 +835,7 @@ def power(action):
     if action == 'sleep':                          # answer first: the PC is asleep before a reply could leave
         threading.Timer(3, lambda: subprocess.run(POWER['sleep'], creationflags=subprocess.CREATE_NO_WINDOW)).start()
         return 'sleep in 3 seconds'
-    r = subprocess.run(POWER[action], capture_output=True, text=True, timeout=20, creationflags=subprocess.CREATE_NO_WINDOW)
+    r = subprocess.run(POWER[action], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=20, creationflags=subprocess.CREATE_NO_WINDOW)
     if r.returncode:
         raise ValueError(one_line((r.stdout or '') + (r.stderr or ''), 200) or 'command failed')
     return {'shutdown': 'shutdown in 60 seconds', 'restart': 'restart in 60 seconds', 'cancel': 'cancelled'}[action]
@@ -1101,7 +1101,7 @@ def game_watch():
     quiet = 0
     try:
         c = claude_cmd()
-        v = subprocess.run(c + ['--version'], capture_output=True, text=True, timeout=60, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)).stdout.strip() if c else 'not found'
+        v = subprocess.run(c + ['--version'], capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=60, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0)).stdout.strip() if c else 'not found'
         (HUB / 'out' / 'claude-check.txt').write_text('%s | %s' % (' '.join(c or []), v), encoding='utf-8')
     except Exception as e:
         (HUB / 'out' / 'claude-check.txt').write_text('error: %s' % e, encoding='utf-8')
