@@ -128,6 +128,35 @@ def _last_change(root):
     return best
 
 
+def project_processes(projects):
+    """(process, project id) for every watched program running inside a registered project. Needs psutil.
+    This script, the hub server and their parents are never returned."""
+    if not psutil:
+        return []
+    roots = sorted(((_norm(root), pid) for pid, root in projects), key=lambda r: -len(r[0]))
+    mine = {os.getpid()}
+    try:
+        mine |= {p.pid for p in psutil.Process().parents()}
+    except psutil.Error:
+        pass
+    found = []
+    for pr in psutil.process_iter(['name']):
+        name = (pr.info['name'] or '').lower()
+        if pr.pid in mine or not name.startswith(WATCH):
+            continue
+        try:
+            args = pr.cmdline()
+            if any('dp.py' in a or 'serve-hidden' in a for a in args):
+                continue
+            places = [_norm(pr.cwd())] + [_norm(a) for a in args[1:] if ':' in a or a.startswith('/')]
+        except (psutil.Error, OSError):
+            continue
+        owner = next((pid for place in places for root, pid in roots if place.startswith(root)), None)
+        if owner:
+            found.append((pr, owner))
+    return found
+
+
 TOOL_VI = {'Bash': 'đang chạy lệnh', 'Read': 'đang đọc tệp', 'Edit': 'đang sửa tệp', 'MultiEdit': 'đang sửa tệp',
            'Write': 'đang viết tệp', 'Grep': 'đang tìm trong mã', 'Glob': 'đang tìm tệp', 'WebSearch': 'đang tra web',
            'WebFetch': 'đang đọc trang web', 'Task': 'đang giao việc cho nhân viên', 'Agent': 'đang giao việc cho nhân viên',

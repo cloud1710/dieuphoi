@@ -328,6 +328,8 @@ class Handler(SimpleHTTPRequestHandler):
             if not 0 < n <= 16384:
                 raise ValueError('body size')
             data = json.loads(self.rfile.read(n).decode('utf-8'))
+            if path == '/api/game':
+                return self.reply(200, {'ok': True, 'result': game_set(bool(data.get('on')), 'manual: app')})
             if path == '/api/power':
                 return self.reply(200, {'ok': True, 'result': power(str(data.get('action')))})
             reg = registry()
@@ -350,6 +352,8 @@ class Handler(SimpleHTTPRequestHandler):
                     raise ValueError('need item')
                 out = {'ok': True, 'result': mark_done(p, data['item'], sender)}
             elif path == '/api/open':
+                if GAME['on']:
+                    raise ValueError('đang ở chế độ chơi game: không mở phiên mới')
                 out = open_item(p, data.get('item') or None, reg)
             else:
                 return self.reply(404, {'error': 'no such action'})
@@ -695,7 +699,7 @@ def auto_publish():
         time.sleep(wait)
         try:
             mark = HUB / 'out' / 'todo.hash'
-            if not (registry().get('publish') or {}).get('auto') or not mark.is_file():
+            if GAME['on'] or not (registry().get('publish') or {}).get('auto') or not mark.is_file():
                 continue
             if todo_payload()[1] != mark.read_text(encoding='ascii').strip():
                 wait = 300 if todo_publish()[0] else 3600          # a failing deploy is retried hourly, not every 5 minutes
@@ -739,7 +743,7 @@ def activity():
     import hw
     reg = registry()
     name = (reg.get('publish') or {}).get('pages_project')
-    return {'claude': hw.claude_activity([(p['id'], real(p['path'])) for p in reg['projects']]),
+    return {'claude': hw.claude_activity([(p['id'], real(p['path'])) for p in reg['projects']]), 'game': game_state(),
             'todo_url': 'https://%s.pages.dev/' % name if name else None,
             'passphrase': (HUB / 'out' / 'pass.hash').is_file() and (HUB / 'out' / 'pass.hash').stat().st_size > 0}
 
@@ -783,6 +787,105 @@ def net_diag():
     except OSError:
         pass
     return out
+
+
+# ---- game mode: the owner plays, the agents wait
+GAME = {'on': False, 'by': None, 'since': None, 'suspended': []}
+
+
+def game_state():
+    return {'on': GAME['on'], 'by': GAME['by'], 'since': GAME['since'], 'suspended': len(GAME['suspended']),
+            'can_suspend': _psutil() is not None}
+
+
+def _psutil():
+    try:
+        import psutil
+        return psutil
+    except ImportError:
+        return None
+
+
+def game_set(on, by):
+    """Turn game mode on or off. On: no new session is opened from the hub and, when psutil is installed, every
+    program running inside a registered project is suspended (not killed). Off: they are resumed."""
+    ps = _psutil()
+    if on and not GAME['on']:
+        held = []
+        if ps:
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            import hw
+            for pr, owner in hw.project_processes([(p['id'], real(p['path'])) for p in registry()['projects']]):
+                try:
+                    pr.suspend()
+                    held.append([pr.pid, pr.create_time(), owner])
+                except ps.Error:
+                    pass
+        GAME.update(on=True, by=by, since=datetime.datetime.now().strftime('%H:%M'), suspended=held)
+    elif not on and GAME['on']:
+        for pid, born, _ in GAME['suspended']:
+            try:
+                pr = ps.Process(pid)
+                if abs(pr.create_time() - born) < 1:
+                    pr.resume()
+            except Exception:
+                pass
+        GAME.update(on=False, by=by, since=None, suspended=[])
+    try:
+        (HUB / 'out' / 'game-mode.json').write_text(json.dumps({'on': GAME['on'], 'by': GAME['by'], 'suspended': GAME['suspended']}), encoding='ascii')
+    except OSError:
+        pass
+    return game_state()
+
+
+def running_games(names):
+    """Which of the listed game programs are running now (process names, case ignored)."""
+    want = {n.lower() for n in names}
+    try:
+        if os.name == 'nt':
+            out = subprocess.run(['tasklist', '/fo', 'csv', '/nh'], capture_output=True, timeout=20,
+                                 creationflags=subprocess.CREATE_NO_WINDOW).stdout.decode('utf-8', 'replace')
+            seen = {ln.split('","')[0].strip('"').lower() for ln in out.splitlines() if ln}
+        else:
+            out = subprocess.run(['ps', '-eo', 'comm'], capture_output=True, timeout=20).stdout.decode('utf-8', 'replace')
+            seen = {ln.strip().lower() for ln in out.splitlines()}
+    except (OSError, subprocess.SubprocessError):
+        return []
+    return sorted(want & seen)
+
+
+def game_watch():
+    """Every 30 seconds: follow out/game-mode.json when someone edits it, and the list of games in registry.yaml."""
+    f = HUB / 'out' / 'game-mode.json'
+    try:                                             # a server that died in game mode must not leave programs frozen
+        old = json.loads(f.read_text(encoding='ascii'))
+        if old.get('on'):
+            GAME.update(on=True, by=old.get('by'), suspended=old.get('suspended') or [])
+            if not str(old.get('by', '')).startswith('manual'):
+                game_set(False, 'restart')
+    except (OSError, ValueError):
+        pass
+    quiet = 0
+    while True:
+        time.sleep(30)
+        try:
+            want = json.loads(f.read_text(encoding='ascii')) if f.is_file() else {}
+            if 'on' in want and bool(want['on']) != GAME['on']:
+                game_set(bool(want['on']), want.get('by') or 'manual: file')
+                continue
+            cfg = registry().get('games') or {}
+            if not cfg.get('auto'):
+                continue
+            playing = running_games(cfg.get('processes') or [])
+            if playing and not GAME['on']:
+                game_set(True, 'auto: ' + playing[0])
+            elif GAME['on'] and str(GAME['by']).startswith('auto'):
+                quiet = 0 if playing else quiet + 1
+                if quiet >= 2:                       # the game has been closed for a minute
+                    quiet = 0
+                    game_set(False, 'auto: game closed')
+        except Exception:
+            pass
 
 
 def hw_state():
@@ -919,6 +1022,7 @@ def cmd_serve(args):
     threading.Thread(target=auto_publish, daemon=True).start()
     if args.reload:
         threading.Thread(target=reload_on_change, daemon=True).start()
+    threading.Thread(target=game_watch, daemon=True).start()
     threading.Timer(25, lambda: net_diag()).start()
     threading.Timer(240, lambda: net_diag()).start()         # again once a phone has had time to connect          # leaves out/net.txt for whoever looks after this PC
     links = ['http://%s:%d/m.html#k=%s' % (h, args.port, Handler.key) for h in hosts]

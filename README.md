@@ -46,7 +46,8 @@ Bốn tab:
 
 - **Văn phòng**: sơ đồ 2D, mỗi orchestra một bàn; robot đi lại theo trạng thái thật (báo cáo việc đang làm, mang câu hỏi
   tới cửa "Anh Vinh", đưa thư, project con sang báo project cha). Kéo để di chuyển, chụm để phóng, chạm một bàn để
-  phóng vào project đó. Cột bên dưới ghi ai đang làm gì và những gì vừa thay đổi, bằng tiếng Việt. Dòng "phiên chính/nhân viên đang chạy
+  phóng vào project đó. Màn chiếu ở đầu phòng lần lượt trình bày việc của từng agent đang chạy (chạm vào để phóng tới
+  project đó). Cột bên dưới ghi ai đang làm gì và những gì vừa thay đổi, bằng tiếng Việt. Dòng "phiên chính/nhân viên đang chạy
   lệnh, đang đọc tệp..." lấy từ bản ghi phiên Claude Code trên PC (`~/.claude/projects`); chỉ loại bước được hiện,
   không hiện tên tệp hay nội dung. Nút bánh răng mở cài đặt kết nối (ghép lại, quên máy, liên kết sang trang việc).
 - **Việc**: việc chờ anh (trả lời câu hỏi ngay trên app), nhân viên đang làm, từng trưởng phòng; nút "Mở phiên" chạy
@@ -87,6 +88,18 @@ hoạch (ví dụ gắn nhãn). Việc biến mất khỏi trang khi đã xong t
 - Sau lần đầu, server tự đăng lại trong vòng 5 phút mỗi khi danh sách việc đổi (`publish.auto`); nhật ký ở
   `out/publish.log`.
 - Báo xong một việc của mình: nút "Báo đã xong" trong app điện thoại, hoặc nhắn tổng quản.
+
+## Chế độ chơi game
+
+Khi bật, hub không mở phiên mới và (nếu PC có `psutil`) tạm dừng mọi chương trình đang chạy trong thư mục các project
+đã đăng ký; tắt thì chúng chạy tiếp. Tạm dừng không trả lại VRAM mà chương trình đang giữ. Ba cách bật:
+
+- nút ở tab Máy của app;
+- tự động khi PC mở một chương trình có tên trong `games.processes` của `registry.yaml` (tắt game khoảng một phút thì
+  tự chạy lại);
+- sửa `out/game-mode.json` thành `{"on": true}` (tổng quản làm việc này khi anh nhắn "mình chơi game").
+
+Hub không tạm dừng chính nó, và không đụng tới chương trình nằm ngoài thư mục các project.
 
 ## Phần cứng
 
