@@ -27,7 +27,9 @@ Trên Windows: bấm đúp `office.cmd`.
 ## Văn phòng agents
 
 `office/index.html` là cảnh 3D (three.js r187, đóng gói sẵn trong `office/vendor/`, giấy phép MIT, chạy không cần mạng).
-Kéo để xoay, cuộn để phóng, bấm biển tên để xem việc của phòng. `office/flat.html` là bản phẳng cho máy không có WebGL.
+Cảnh là một diorama ba khu: phòng trưởng phòng (mỗi orchestra một bàn, điều phối đứng trước bảng), văn phòng lớn
+(mỗi việc đang làm hoặc sắp làm là một nhân viên, cờ trên bàn cùng màu với nhóm), và kho (bản lưu và project đã xong
+chỉ còn hộp). Kéo để xoay, cuộn để phóng, bấm biển tên để xem việc. `office/flat.html` là bản phẳng cho máy không có WebGL.
 
 Trang chỉ vẽ lại khi có thay đổi: robot chuyển động 10 khung hình mỗi giây (2 khi cửa sổ nằm nền), dừng hẳn khi tab ẩn;
 bóng đổ tính một lần; server chỉ đọc lại kế hoạch nào có tệp đổi.

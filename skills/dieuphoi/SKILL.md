@@ -69,8 +69,9 @@ A message without @ is for the hub itself.
 
 ## Agents office
 
-`python tools/dp.py serve` (Windows: `office.cmd`) serves the page at http://127.0.0.1:8765. Each room is a project;
-a working agent is an item in `doing`, a red agent is an open question. The page is read-only.
+`python tools/dp.py serve` (Windows: `office.cmd`) serves the page at http://127.0.0.1:8765. It is one diorama:
+the heads' room has one desk per orchestra (red = an open question), the big office has one sub agent per item being
+worked or next in line, and the store holds archives and finished projects as boxes. The page is read-only.
 
 ## Never
 

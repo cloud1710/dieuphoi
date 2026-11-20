@@ -14,11 +14,11 @@ body{background:linear-gradient(160deg,var(--sky1),var(--sky2));color:var(--ink)
 canvas{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
 #labels{position:fixed;inset:0;pointer-events:none;overflow:hidden}
 .lb{position:absolute;left:0;top:0;transform-origin:50% 100%;transform:translate(-50%,-100%);white-space:nowrap;will-change:transform}
-.plate{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:3px 9px;font-weight:650;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,.12);pointer-events:auto;cursor:pointer}
+.plate{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:1px 7px;font-weight:650;font-size:11px;box-shadow:0 2px 6px rgba(0,0,0,.12);pointer-events:auto;cursor:pointer}
 .plate.dim{opacity:.6;font-weight:500}
 .plate em{font-style:normal;color:var(--ask);margin-left:6px}
 .wing{transform-origin:0 50%;font-size:11.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);font-weight:700;transform:translate(0,-50%)}
-.tagl{font-size:10.5px;color:var(--mute);background:var(--card);border-radius:6px;padding:0 5px}
+.tagl{font-size:10.5px;color:var(--mute);background:var(--card);border-radius:6px;padding:0 5px;cursor:pointer}
 header{position:fixed;left:12px;top:10px;right:12px;display:flex;gap:10px;align-items:flex-start;justify-content:space-between;pointer-events:none}
 .box{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:9px 13px;box-shadow:0 4px 14px rgba(0,0,0,.1);pointer-events:auto;backdrop-filter:blur(6px)}
 h1{font-size:17px;margin:0}
@@ -52,7 +52,7 @@ button b{color:var(--ask)}
 <div id="legend" class="box">
   <span><i style="background:#3f9d74"></i>đang làm</span><span><i style="background:#3f73a8"></i>sẵn sàng</span>
   <span><i style="background:#d2553d"></i>câu hỏi chờ anh</span><span><i style="background:#d39a2f"></i>bị chặn</span>
-  <span><i style="background:#98a0ae"></i>nghỉ</span><span class="h">Kéo để xoay · cuộn để phóng · bấm biển tên để xem phòng</span>
+  <span><i style="background:#98a0ae"></i>nghỉ</span><span class="h">Phóng gần để thấy thẻ việc của nhân viên</span><span class="h">Kéo để xoay · cuộn để phóng · bấm biển tên để xem việc</span>
   <a href="flat.html">Bản phẳng</a>
 </div>
 <script type="module">
@@ -118,145 +118,170 @@ function bot(kind, parent, x, z, phase) {
   if (BUB[kind] !== undefined || ['ask','sleep','wait'].includes(kind)) { const b = bub(kind); b.position.y = 1.85; g.add(b); g.userData.bub = b; }
   bots.push({g, head, kind, phase});
   return g; }
-function desk(parent, x, z, on) {
-  part(G.box, mat(C.desk), 1.25, .07, .62, x, .62, z, parent);
-  for (const dx of [-.55, .55]) part(G.box, mat(C.desk), .06, .6, .5, x + dx, .3, z, parent);
-  part(G.box, mat(C.dark), .5, .34, .04, x, .9, z - .12, parent);
-  const s = part(G.box, mat(on?0x9fe3c0:0x59606e, on?{emissive:0x6fd6a6, emissiveIntensity:.9}:{}), .44, .28, .02, x, .9, z - .095, parent, false);
-  if (on) { s.material = s.material.clone(); screens.push(s); }
-  part(G.box, mat(C.dark), .08, .12, .08, x, .7, z - .12, parent);
-  part(G.box, mat(0xe8e4da), .34, .02, .13, x, .665, z + .12, parent, false); }
-function plant(parent, x, z) {
-  part(G.cyl, mat(C.pot), .3, .3, .3, x, .15, z, parent);
-  part(G.cone, mat(C.leaf), .5, .7, .5, x, .65, z, parent); part(G.sph, mat(C.leaf), .42, .42, .42, x, .45, z, parent); }
 function label(html, cls, pos, onclick) {
   const el = document.createElement('div'); el.className = 'lb ' + cls; el.append(...html);
-  if (onclick) el.onclick = onclick; document.getElementById('labels').append(el); labels.push({el, pos}); }
-const T = (tag, text, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; e.textContent = text; return e; };
+  if (onclick) el.onclick = onclick; document.getElementById('labels').append(el); const rec = {el, pos, min:0}; labels.push(rec); return rec; }
+const T_ = (tag, text, cls) => { const e = document.createElement(tag); if (cls) e.className = cls; e.textContent = text; return e; };
 
-const RW = 5.4, RD = 4.6, GAP = 1.3, ROW = RD + 3.2;
-function room(p, gi, x, z, state) {
-  const g = new THREE.Group(); g.position.set(x, 0, z); world.add(g);
-  const live = p.kind === 'plan' || p.kind === 'seal', dim = !live;
-  part(G.box, mat(dim?C.slab:C.floor[gi % C.floor.length]), RW, .12, RD, 0, .06, 0, g, false);
-  const w = mat(C.wall), H = dim?.7:1.25, t = .12;
-  part(G.box, w, RW, H, t, 0, H/2, -RD/2 + t/2, g);
-  part(G.box, w, t, H, RD, -RW/2 + t/2, H/2, 0, g);
-  part(G.box, w, t, H*.45, RD, RW/2 - t/2, H*.22, 0, g);
-  part(G.box, w, RW*.36, H*.45, t, -RW*.32, H*.22, RD/2 - t/2, g);
-  part(G.box, w, RW*.36, H*.45, t, RW*.32, H*.22, RD/2 - t/2, g);
-  if (live) { part(G.box, mat(0x9cc7e6, {emissive:0x9cc7e6, emissiveIntensity:.25}), 1.1, .5, .03, -1.2, .8, -RD/2 + t + .01, g, false);
-    part(G.box, mat(0x9cc7e6, {emissive:0x9cc7e6, emissiveIntensity:.25}), 1.1, .5, .03, 1.2, .8, -RD/2 + t + .01, g, false); }
-  const seats = [];
-  if (!p.exists || p.error) seats.push(['sleep', false]);
-  else if (live) {
-    (p.working || []).forEach(() => seats.push(['work', true]));
-    for (let n = (p.working || []).length; n < (p.sessions || 0); n++) seats.push(['work', true]);
-    if (!(p.working || []).length && (p.ready || []).length) seats.push(['ready', true]);
-    (p.questions || []).slice(0, 3).forEach(() => seats.push(['ask', false]));
-    if (p.waiting) seats.push(['wait', false]);
-    if (!seats.length) seats.push(['sleep', true]);
-  }
-  if (live) {
-    const desks = seats.filter(s => s[1]).slice(0, 4), others = seats.filter(s => !s[1]).slice(0, 4);
-    desks.forEach((s, i) => { const dx = -RW/2 + 1.25 + (i % 2) * 2.1, dz = -RD/2 + 1.0 + Math.floor(i / 2) * 1.6;
-      desk(g, dx, dz, s[0] === 'work'); bot(s[0], g, dx, dz + .62, i * 1.7 + x).rotation.y = Math.PI; });
-    others.forEach((s, i) => bot(s[0], g, RW/2 - .9 - (i % 2) * .95, RD/2 - .8 - Math.floor(i / 2) * 1.0, i * 2.3 + z).rotation.y = -.5 + i * .25);
-    plant(g, -RW/2 + .5, RD/2 - .55);
-    const done = ((p.counts || {}).done || 0) + ((p.counts || {}).dropped || 0), f = p.total ? done / p.total : 0;
-    part(G.box, mat(C.dark), RW, .1, .16, 0, .05, RD/2 + .2, g, false);
-    if (f > 0) part(G.box, mat(C.work, {emissive:C.work, emissiveIntensity:.5}), RW * f, .12, .18, -RW/2 + RW * f / 2, .06, RD/2 + .2, g, false);
-  } else {
-    for (const [bx, bz, s, h] of [[-1.2,-.8,.9,0],[-.3,-.9,.8,0],[-1.1,-.7,.7,.9],[.9,-.6,1,0],[1.6,.5,.7,0]])
-      part(G.box, mat(C.box), s, s*.8, s, bx, .12 + s*.4 + h*.8, bz, g).rotation.y = bx;
-    if (p.kind === 'tool') { part(G.cyl, mat(0x8a94a6, {metalness:.5, roughness:.4}), .9, .25, .9, .2, .9, .9, g).rotation.x = Math.PI/2; }
-    else bot('sleep', g, .3, 1.0, x);
-  }
-  const nq = (p.questions || []).length, bits = [T('span', p.name)];
-  if (nq) bits.push(T('em', nq + ' ?'));
-  if (p.mail) bits.push(T('em', '✉ ' + p.mail));
-  if (p.error === 'no plan') bits.push(T('em', 'chưa có orchestra'));
-  label(bits, 'plate' + (dim ? ' dim' : ''), new THREE.Vector3(x, H + .55, z - RD/2), () => showRoom(p, state));
-  return {x, z}; }
+const GC = [0xd9b98a, 0xa9c7a4, 0xa7bfd8, 0xe0b3a8, 0xc5b7dc, 0xd8d3a0];      // one colour per group
+const P = dark ? {base:0x3b2d24, wall:0x565b68, wood:0x5b4a3c, carpet:0x3d4552, concrete:0x4a4c50, trim:0x2b2f38}
+               : {base:0x7a553b, wall:0xfbf5e9, wood:0xd8bd95, carpet:0xcfd8de, concrete:0xc9c6bf, trim:0xe9dfcc};
+function stateOf(p) { return (p.questions || []).length ? 'ask' : (p.working || []).length || p.sessions ? 'work'
+  : (p.ready || []).length ? 'ready' : p.waiting ? 'wait' : 'sleep'; }
+const finished = p => p.kind === 'archive' || (p.total > 0 && !(p.working || []).length && !(p.ready || []).length && !p.waiting && !(p.questions || []).length);
 
-function pipe(a, b, color) {
-  const d = new THREE.Vector3(b.x - a.x, 0, b.z - a.z), len = d.length();
-  const m = part(G.box, mat(color, {emissive:color, emissiveIntensity:.35}), .14, .05, len, (a.x + b.x)/2, .075, (a.z + b.z)/2, world, false);
-  m.rotation.y = Math.atan2(d.x, d.z); }
+// a desk with its robot behind it, facing the viewer
+function seat(parent, x, z, kind, tint, big) {
+  const w = big ? 1.7 : 1.35;
+  part(G.box, mat(tint), w + .5, .03, 1.9, x, .135, z - .15, parent, false);                     // mat in the group colour
+  part(G.box, mat(C.desk), w, .07, .7, x, .74, z + .2, parent);
+  for (const dx of [-w/2 + .08, w/2 - .08]) part(G.box, mat(C.desk), .07, .6, .6, x + dx, .42, z + .2, parent);
+  part(G.box, mat(C.dark), .52, .34, .05, x, 1.0, z + .32, parent);
+  part(G.box, mat(C.dark), .08, .1, .08, x, .81, z + .32, parent, false);
+  if (kind === 'work') { const sc = part(G.box, mat(0x9fe3c0, {emissive:0x6fd6a6, emissiveIntensity:.9}), .2, .05, .02, x, 1.0, z + .35, parent, false);
+    sc.material = sc.material.clone(); screens.push(sc); }
+  if (big) part(G.box, mat(0xf4f0e6), .5, .12, .04, x - w/2 + .35, .84, z + .5, parent, false);     // name card
+  return kind ? bot(kind, parent, x, z - .5, x * 1.3 + z) : null; }
+function plant(parent, x, z, k = 1) {
+  part(G.cyl, mat(C.pot), .34 * k, .34 * k, .34 * k, x, .12 + .17 * k, z, parent);
+  part(G.sph, mat(C.leaf), .5 * k, .5 * k, .5 * k, x, .12 + .55 * k, z, parent); part(G.cone, mat(C.leaf), .5 * k, .8 * k, .5 * k, x, .12 + .9 * k, z, parent); }
+function crate(parent, x, y, z, sz, rot = 0) { const m = part(G.box, mat(C.box), sz, sz * .75, sz, x, y + sz * .375, z, parent); m.rotation.y = rot;
+  part(G.box, mat(0xe9dcc0), sz * 1.01, sz * .12, sz * .3, x, y + sz * .7, z, parent, false).rotation.y = rot; return m; }
+function plaque(text, w, h) {
+  const cv = document.createElement('canvas'); cv.width = 1024; cv.height = Math.round(1024 * h / w); const g = cv.getContext('2d');
+  g.fillStyle = '#d8b24a'; g.fillRect(0, 0, cv.width, cv.height); g.strokeStyle = '#7a5a1c'; g.lineWidth = 10; g.strokeRect(10, 10, cv.width - 20, cv.height - 20);
+  g.fillStyle = '#3a2a12'; g.font = '600 ' + Math.round(cv.height * .46) + 'px system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText(text, cv.width / 2, cv.height / 2 + 4);
+  const t = new THREE.CanvasTexture(cv); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshStandardMaterial({map:t, roughness:.5, metalness:.3})); m.receiveShadow = true; return m; }
 
 function build(s) {
   if (world) { scene.remove(world); screens.forEach(x => x.material.dispose()); }
   world = new THREE.Group(); scene.add(world); labels = []; bots = []; screens = [];
   document.getElementById('labels').textContent = '';
-  const SX = RW + GAP, SZ = RD + 2.6, PAD = 1.1, MAXC = innerWidth / innerHeight < .8 ? 3 : 6;
-  // each wing is a block of rooms (at most 3 per row); blocks are packed on shelves
-  const wings = s.groups.map(g => ({g, ps:s.projects.filter(p => p.group === g.id).sort((a, b) => (a.parent?1:0) - (b.parent?1:0))})).filter(w => w.ps.length);
-  let shelf = [], shelves = [shelf], used = 0;
-  wings.forEach((w, i) => { w.i = i; w.rows = Math.ceil(w.ps.length / 3); w.cols = Math.ceil(w.ps.length / w.rows);
-    if (used + w.cols > MAXC && shelf.length) { shelf = []; shelves.push(shelf); used = 0; }
-    shelf.push(w); used += w.cols; });
-  const widthOf = sh => sh.reduce((n, w) => n + w.cols * SX + PAD * 2, 0) + (sh.length - 1) * 1.6;
-  const W = Math.max(...shelves.map(widthOf)), depths = shelves.map(sh => Math.max(...sh.map(w => w.rows)) * SZ + PAD * 2);
-  const D = depths.reduce((a, b) => a + b, 0) + (shelves.length - 1) * 2.2, hz = D / 2 + 4.2, at = {};
-  const hub = new THREE.Group(); hub.position.set(0, 0, hz); world.add(hub);
-  part(G.cyl, mat(C.slab), 3.6, .25, 3.6, 0, .125, 0, hub); part(G.cyl, mat(0xd8b24a, {metalness:.3, roughness:.5}), 1.5, .3, 1.5, 0, .4, 0, hub);
-  const boss = bot('ready', hub, 0, 0, 0); boss.position.y = .55; boss.scale.setScalar(1.3);
-  part(G.cyl, mat(0xf4f0e6), .03, .7, .03, .5, 1.25, .25, boss, false).rotation.z = -.9;     // baton
-  label([T('span', 'Điều phối · nhóm trưởng')], 'plate', new THREE.Vector3(0, 2.7, hz), () => showInbox(s));
-  let z0 = -D / 2;
-  shelves.forEach((sh, si) => {
-    let x0 = -widthOf(sh) / 2;
-    sh.forEach(w => { const bw = w.cols * SX + PAD * 2, bd = w.rows * SZ + PAD * 2, cx = x0 + bw / 2, cz = z0 + bd / 2;
-      part(G.box, mat(C.slab), bw, .1, bd, cx, .0, cz, world, false);
-      label([T('span', w.g.name)], 'wing', new THREE.Vector3(x0 + .3, .25, z0 + bd + .1));
-      pipe({x:0, z:hz - 1.9}, {x:cx, z:z0 + bd}, 0x6f93b8);
-      w.ps.forEach((p, i) => { at[p.id] = room(p, w.i, x0 + PAD + SX / 2 + (i % w.cols) * SX, z0 + PAD + (RD + 1.2) / 2 + Math.floor(i / w.cols) * SZ + .6, s); });
-      x0 += bw + 1.6; });
-    z0 += depths[si] + 2.2; });
-  s.projects.forEach(p => { if (p.parent && at[p.id] && at[p.parent]) {
-    const a = at[p.parent], b = at[p.id], za = a.z - RD/2 - .4, zb = b.z - RD/2 - .4;
-    pipe({x:a.x, z:a.z - RD/2}, {x:a.x - RW/2 - GAP/2, z:za}, 0xd39a2f); pipe({x:a.x - RW/2 - GAP/2, z:za}, {x:a.x - RW/2 - GAP/2, z:zb}, 0xd39a2f);
-    pipe({x:a.x - RW/2 - GAP/2, z:zb}, {x:b.x, z:zb}, 0xd39a2f); pipe({x:b.x, z:zb}, {x:b.x, z:b.z - RD/2}, 0xd39a2f); } });
-  part(G.box, mat(C.ground), W + 7, .3, D + 13, 0, -.2, 2.2, world, false);
-  const R = Math.hypot(W + 7, D + 13) / 2;
-  sun.position.set(-R * .55, R * 1.1, R * .75); sun.target.position.set(0, 0, 2);
-  Object.assign(sun.shadow.camera, {left:-R, right:R, top:R, bottom:-R, near:1, far:R * 4}); sun.shadow.camera.updateProjectionMatrix();
+  const gi = Object.fromEntries(s.groups.map((g, i) => [g.id, i])), tint = p => GC[gi[p.group] % GC.length];
+  const byId = Object.fromEntries(s.projects.map(p => [p.id, p]));
+  const stored = s.projects.filter(p => finished(p) || p.kind === 'tool');
+  // heads: one per orchestra, a parent followed by its children, groups kept together
+  const heads = s.projects.filter(p => !stored.includes(p)).sort((a, b) => gi[a.group] - gi[b.group] ||
+    (a.parent || a.id).localeCompare(b.parent || b.id) || (a.parent ? 1 : 0) - (b.parent ? 1 : 0));
+  // staff: one robot per item being worked, per extra open session, and per next ready item
+  const staff = [];
+  heads.forEach(p => { (p.working || []).forEach(i => staff.push({p, kind:'work', tag:i.id, tip:i.title}));
+    for (let n = (p.working || []).length; n < (p.sessions || 0); n++) staff.push({p, kind:'work', tag:'phiên', tip:'Phiên Claude Code đang mở'});
+    if (!(p.working || []).length && (p.ready || []).length) staff.push({p, kind:'ready', tag:p.ready[0].id, tip:p.ready[0].title}); });
+  staff.sort((a, b) => (a.kind === 'work' ? 0 : 1) - (b.kind === 'work' ? 0 : 1));
+
+  const tall = innerWidth / innerHeight < .8, MX = 3.0, MZ = 2.7, SX = 2.1, SZ = 2.5;
+  const mc = tall ? 3 : heads.length <= 8 ? 4 : heads.length <= 15 ? 5 : 6, mr = Math.max(1, Math.ceil(heads.length / mc));
+  const sc = tall ? 4 : 6, sr = Math.max(tall ? 4 : 3, Math.ceil(staff.length / sc));
+  const Z = {store:{w:tall ? 0 : 7.5, d:tall ? 6.5 : 0}, heads:{w:mc * MX + 1.8, d:mr * MZ + 4.6}, staff:{w:sc * SX + 2, d:sr * SZ + 2.4}};
+  let W, D;
+  if (tall) { W = Math.max(Z.heads.w, Z.staff.w); D = Z.store.d + Z.heads.d + Z.staff.d;
+    let z = -D / 2; for (const k of ['store', 'heads', 'staff']) { Object.assign(Z[k], {x:0, z:z + Z[k].d / 2, w:W}); z += Z[k].d; } }
+  else { D = Math.max(Z.heads.d, Z.staff.d, 9); W = Z.store.w + Z.heads.w + Z.staff.w;
+    let x = -W / 2; for (const k of ['store', 'heads', 'staff']) { Object.assign(Z[k], {x:x + Z[k].w / 2, z:0, d:D}); x += Z[k].w; } }
+
+  // the diorama: a thick base, two tall outer walls, low partitions
+  const T = .25, H = 3.0;
+  part(G.box, mat(P.base), W + 1.6, 1.3, D + 1.6, 0, -.65, 0, world);
+  part(G.box, mat(P.trim), W + .5, .12, D + .5, 0, .0, 0, world, false);
+  const pq = plaque('VĂN PHÒNG ĐIỀU PHỐI', Math.min(11, W * .5), 1.0); pq.position.set(0, -.68, D / 2 + .81); world.add(pq);
+  part(G.box, mat(P.wall), W + T * 2, H, T, 0, H / 2, -D / 2 - T / 2, world);
+  part(G.box, mat(P.wall), T, H, D + T, -W / 2 - T / 2, H / 2, -T / 2, world);
+  const glass = mat(0xa9d3ee, {emissive:0xa9d3ee, emissiveIntensity:dark ? .5 : .25});
+  for (let x = -W / 2 + 2.2; x < W / 2 - 1.5; x += 4.2) { part(G.box, glass, 2.2, 1.2, .04, x, 1.9, -D / 2 + .02, world, false);
+    part(G.box, mat(P.trim), 2.36, .08, .1, x, 1.26, -D / 2 + .04, world, false); part(G.box, mat(P.trim), .06, 1.2, .06, x, 1.9, -D / 2 + .04, world, false); }
+  for (let z = -D / 2 + 2.4; z < D / 2 - 1.5; z += 4.4) part(G.box, glass, .04, 1.2, 2.2, -W / 2 + .02, 1.9, z, world, false);
+  const wallTo = (a, b) => { const len = Math.hypot(b.x - a.x, b.z - a.z); const m = part(G.box, mat(P.wall), tall ? len : .18, 1.25, tall ? .18 : len, (a.x + b.x) / 2, .68, (a.z + b.z) / 2, world); return m; };
+  for (const k of ['store', 'heads']) { const r = Z[k];       // partition after this zone, with a door gap
+    if (tall) { const z = r.z + r.d / 2; wallTo({x:-W / 2, z}, {x:-1.2, z}); wallTo({x:1.2, z}, {x:W / 2, z}); }
+    else { const x = r.x + r.w / 2; wallTo({x, z:-D / 2}, {x, z:D / 2 - 4.2}); wallTo({x, z:D / 2 - 2}, {x, z:D / 2}); } }
+  const zone = (k, color, name) => { const r = Z[k], g = new THREE.Group(); g.position.set(r.x, 0, r.z); world.add(g);
+    part(G.box, mat(color), r.w, .1, r.d, 0, .08, 0, g, false);
+    label([T_('span', name)], 'wing', tall ? new THREE.Vector3(-W / 2 + .3, 1.6, r.z - r.d / 2 + .3) : new THREE.Vector3(r.x - r.w / 2 + .3, .1, D / 2 + .55)); return [g, r]; };
+
+  // 1. heads of department, one desk per orchestra, the coordinator in front of the board
+  { const [g, r] = zone('heads', P.wood, 'Phòng trưởng phòng · mỗi orchestra một bàn');
+    const zb = -r.d / 2;
+    part(G.box, mat(P.trim), 4.6, .22, 2.0, 0, .2, zb + 1.3, g);                                    // podium
+    part(G.box, mat(0xffffff), 3.6, 1.5, .06, 0, 1.75, zb + .08, g, false);                         // board with notes
+    [0xf2c94c, 0xeb8a7a, 0x8fc1e3, 0xa7d7a0, 0xf2c94c, 0xc5b7dc].forEach((c, i) => part(G.box, mat(c), .42, .42, .02, -1.25 + (i % 3) * 1.25, 2.1 - Math.floor(i / 3) * .62, zb + .12, g, false));
+    const boss = bot('ready', g, 0, zb + 1.4, 0); boss.position.y = .31; boss.scale.setScalar(1.3);
+    part(G.cyl, mat(0xf4f0e6), .03, .7, .03, .5, 1.25, .25, boss, false).rotation.z = -.9;          // baton
+    label([T_('span', 'Điều phối · nhóm trưởng')], 'plate', new THREE.Vector3(r.x, 2.55, r.z + zb + 1.4), () => showInbox(s));
+    plant(g, -r.w / 2 + .7, zb + .8, 1.3); plant(g, r.w / 2 - .8, zb + .8, 1.3);
+    heads.forEach((p, i) => { const c = i % mc, row = Math.floor(i / mc), x = -((mc - 1) * MX) / 2 + c * MX, z = zb + 4.2 + row * MZ;
+      seat(g, x, z, stateOf(p), tint(p), true);
+      const nq = (p.questions || []).length, bits = [T_('span', '@' + p.id)];
+      if (nq) bits.push(T_('em', nq + ' ?')); if (p.mail) bits.push(T_('em', '✉ ' + p.mail));
+      if (p.error) bits.push(T_('em', p.error === 'no plan' ? 'chưa có orchestra' : 'lỗi'));
+      label(bits, 'plate', new THREE.Vector3(r.x + x, 1.75 + (c % 2) * .5, r.z + z - .5), () => showRoom(p, s)); }); }
+
+  // 2. the big office: sub agents share benches, a flag on each desk shows whose work it is
+  { const [g, r] = zone('staff', P.carpet, 'Văn phòng lớn · nhân viên (sub agents)');
+    const zb = -r.d / 2, n = Math.max(staff.length, sc * sr);
+    for (let i = 0; i < Math.min(n, sc * Math.ceil(n / sc)); i++) { const st = staff[i], c = i % sc, row = Math.floor(i / sc);
+      const x = -((sc - 1) * SX) / 2 + c * SX, z = zb + 2.3 + row * SZ;
+      seat(g, x, z, st ? st.kind : null, st ? tint(st.p) : (dark ? 0x4a5260 : 0xdfe6ea), false);
+      if (st) { part(G.cyl, mat(C.dark), .02, .5, .02, x + .5, 1.0, z + .2, g, false); part(G.box, mat(tint(st.p)), .3, .2, .02, x + .66, 1.15, z + .2, g, false);
+        const l = label([T_('span', st.p.id + ' · ' + st.tag)], 'tagl', new THREE.Vector3(r.x + x, 1.95, r.z + z - .5), () => showRoom(st.p, s)); l.min = 1.6; l.el.title = st.tip; l.el.style.pointerEvents = 'auto'; } }
+    plant(g, r.w / 2 - .7, zb + .7, 1.2);
+    part(G.cyl, mat(0xe8eef2), .5, 1.0, .5, r.w / 2 - .8, .63, r.d / 2 - .9, g); part(G.cyl, mat(0x8fc1e3, {transparent:true, opacity:.8}), .42, .5, .42, r.w / 2 - .8, 1.38, r.d / 2 - .9, g, false); }
+
+  // 3. the store: finished projects and archives are only boxes now
+  { const [g, r] = zone('store', P.concrete, 'Kho · dự án đã xong');
+    const zb = -r.d / 2, steel = mat(0x7d8794, {metalness:.5, roughness:.5});
+    const rw = Math.min(r.w - 1.2, 9);
+    for (const y of [.75, 1.55, 2.3]) part(G.box, steel, rw, .07, 1.0, 0, y, zb + .75, g);
+    for (const x of [-rw / 2, 0, rw / 2]) for (const dz of [.3, 1.2]) part(G.box, steel, .08, 2.4, .08, x, 1.2, zb + dz, g);
+    for (let i = 0; i < Math.floor(rw / 1.05); i++) for (const y of [.79, 1.59]) if ((i * 7 + y * 10 | 0) % 5) crate(g, -rw / 2 + .65 + i * 1.02, y, zb + .75, .62 + (i % 3) * .08, (i % 4) * .12);
+    stored.forEach((p, i) => { const cols = Math.max(1, Math.floor((r.w - 1) / 3)), x = -r.w / 2 + 1.9 + (i % cols) * 3, z = zb + 3.6 + Math.floor(i / cols) * 2.9;
+      part(G.box, mat(0xb08a5a), 2.2, .14, 1.8, x, .2, z, g);                                       // pallet
+      if (p.kind === 'tool') { part(G.box, mat(0xc0483a), 1.3, 1.1, .8, x, .82, z, g); for (const y of [.55, .85, 1.15]) part(G.box, mat(0x8f2f26), 1.2, .04, .04, x, y, z + .41, g, false); }
+      else { crate(g, x - .5, .27, z - .2, .9, .1); crate(g, x + .5, .27, z + .1, .8, -.2); crate(g, x - .1, .27 + .68, z - .1, .7, .4); }
+      const l = label([T_('span', (p.kind === 'tool' ? '🧰 ' : '📦 ') + p.name)], 'plate dim', new THREE.Vector3(r.x + x, 1.95, r.z + z), () => showRoom(p, s)); }); }
+
+  const R = Math.hypot(W + 2, D + 2) / 2 + 2;
+  const sh = new THREE.Mesh(new THREE.PlaneGeometry(R * 5, R * 5), new THREE.ShadowMaterial({opacity:dark ? .45 : .22})); sh.rotation.x = -Math.PI / 2; sh.position.y = -1.3; sh.receiveShadow = true; world.add(sh);
+  sun.position.set(-R * .5, R * 1.15, R * .8); sun.target.position.set(0, 0, 0);
+  Object.assign(sun.shadow.camera, {left:-R * 1.3, right:R * 1.3, top:R * 1.3, bottom:-R * 1.3, near:1, far:R * 5}); sun.shadow.camera.updateProjectionMatrix();
   world.traverse(o => { o.updateMatrix(); o.matrixAutoUpdate = false; });          // static parts keep their matrix
   for (const b of bots) { b.g.matrixAutoUpdate = b.head.matrixAutoUpdate = true; if (b.g.userData.bub) b.g.userData.bub.matrixAutoUpdate = true; }
   renderer.shadowMap.needsUpdate = true; need = true;
-  if (!build.fit) { build.fit = true; build.W = W + 5; build.D = D + 11; ctl.target.set(0, 0, 2.2); cam.position.set(R * .55, R * 1.05, R * 1.25 + 2.2); resize(); }
+  if (!build.fit) { build.fit = true; build.W = W + 3; build.D = D + 4; build.tall = tall; ctl.target.set(0, .5, 0); cam.position.set(R * (tall ? .22 : .62), R * 1.0, R * 1.2); resize(); }
 }
 
 function resize() {
   const w = innerWidth, h = innerHeight, a = w / h, W = build.W || 40, D = build.D || 30;
   renderer.setSize(w, h, false);
-  const half = Math.max((W * .93 + D * .4) / 2 / a, (D * .62 + W * .16) / 2 + 2.5);
+  const half = build.tall ? Math.max((W * .98 + D * .2) / 2 / a, D * .33 + 3) : Math.max((W * .93 + D * .4) / 2 / a, (D * .62 + W * .16) / 2 + 2.5);
   cam.left = -half * a; cam.right = half * a; cam.top = half; cam.bottom = -half; cam.updateProjectionMatrix(); need = true; }
 addEventListener('resize', resize);
 
 const panel = document.getElementById('panel'), pbody = document.getElementById('pbody');
 document.getElementById('x').onclick = () => panel.classList.remove('on');
-function list(title, rows) { if (!rows.length) return []; const ul = document.createElement('ul'); rows.forEach(r => ul.append(T('li', r))); return [T('h3', title), ul]; }
+function list(title, rows) { if (!rows.length) return []; const ul = document.createElement('ul'); rows.forEach(r => ul.append(T_('li', r))); return [T_('h3', title), ul]; }
 function showRoom(p, s) {
   const kind = {plan:'orchestra projectplaner', seal:'orchestra SEAL, chỉ đọc', tool:'công cụ', archive:'bản lưu, không sửa'}[p.kind];
   const parent = s.projects.find(x => x.id === p.parent);
-  pbody.textContent = ''; pbody.append(T('h2', p.name), T('div', kind + (parent ? ' · thuộc ' + parent.name : '') + ' · ' + p.path, 'meta'));
-  if (p.error) pbody.append(T('p', p.error === 'no plan' ? 'Chưa có orchestra.' : p.error));
-  if (p.total) { const c = p.counts || {}, done = (c.done || 0) + (c.dropped || 0); const b = T('div', '', 'bar'), sp = document.createElement('span');
-    sp.style.width = Math.round(100 * done / p.total) + '%'; b.append(sp); pbody.append(b, T('div', done + '/' + p.total + ' mục xong · cập nhật ' + p.updated, 'meta')); }
+  pbody.textContent = ''; pbody.append(T_('h2', p.name), T_('div', kind + (parent ? ' · thuộc ' + parent.name : '') + ' · ' + p.path, 'meta'));
+  if (p.error) pbody.append(T_('p', p.error === 'no plan' ? 'Chưa có orchestra.' : p.error));
+  if (p.total) { const c = p.counts || {}, done = (c.done || 0) + (c.dropped || 0); const b = T_('div', '', 'bar'), sp = document.createElement('span');
+    sp.style.width = Math.round(100 * done / p.total) + '%'; b.append(sp); pbody.append(b, T_('div', done + '/' + p.total + ' mục xong · cập nhật ' + p.updated, 'meta')); }
   pbody.append(...list('Đang làm', (p.working || []).map(i => i.id + ': ' + i.title)),
     ...list('Kế tiếp', (p.ready || []).map(i => i.id + ': ' + i.title)),
     ...list('Câu hỏi chờ anh', (p.questions || []).map(q => q.id + ': ' + q.text)),
     ...list('Việc của người', (p.person || []).map(i => i.id + ' (' + i.owner + '): ' + i.title)));
-  if (p.waiting) pbody.append(T('p', p.waiting + ' mục đang bị chặn.', 'meta'));
-  if (p.mail) pbody.append(T('p', p.mail + ' thư mới trong hộp thư, chưa phiên nào đọc.', 'meta'));
-  pbody.append(T('p', 'Nhắn orchestra này: @' + p.id, 'meta'));
+  if (p.waiting) pbody.append(T_('p', p.waiting + ' mục đang bị chặn.', 'meta'));
+  if (p.mail) pbody.append(T_('p', p.mail + ' thư mới trong hộp thư, chưa phiên nào đọc.', 'meta'));
+  pbody.append(T_('p', 'Nhắn orchestra này: @' + p.id, 'meta'));
   panel.classList.add('on'); }
 function showInbox(s) {
-  pbody.textContent = ''; pbody.append(T('h2', 'Việc chờ anh Vinh'));
+  pbody.textContent = ''; pbody.append(T_('h2', 'Việc chờ anh Vinh'));
   let n = 0; s.projects.forEach(p => { const rows = [...(p.questions || []).map(q => q.id + ': ' + q.text), ...(p.person || []).map(i => i.id + ' (' + i.owner + '): ' + i.title)];
     if (rows.length) { n++; pbody.append(...list(p.name, rows)); } });
-  if (!n) pbody.append(T('p', 'Không có việc nào chờ.', 'meta'));
+  if (!n) pbody.append(T_('p', 'Không có việc nào chờ.', 'meta'));
   panel.classList.add('on'); }
 
 let last = '', state = null, src = 0;
@@ -267,7 +292,7 @@ async function tick() {
     if ((!r || !r.ok) && src === 0) { src = 1; r = await fetch(SRC[1], {cache:'no-cache'}); }
     const s = await r.json();
     if (s.error) throw new Error(s.error);
-    document.getElementById('meta').textContent = (src ? 'Bản chụp ' : 'Cập nhật ') + s.generated + ' · ' + s.projects.length + ' phòng';
+    document.getElementById('meta').textContent = (src ? 'Bản chụp ' : 'Cập nhật ') + s.generated + ' · ' + s.projects.length + ' project';
     document.getElementById('n').textContent = s.inbox.questions + s.inbox.person;
     const key = JSON.stringify([s.groups, s.projects]); state = s;
     if (key !== last) { last = key; build(s); }
@@ -296,8 +321,8 @@ function frame(ms) {
   renderer.render(scene, cam);
   if (!moved && frame.done) return;                       // labels move only with the camera
   frame.done = true;
-  const w = innerWidth, h = innerHeight, k = Math.min(1, Math.max(.5, h / (cam.top - cam.bottom) * cam.zoom / 20));
-  for (const l of labels) { v.copy(l.pos).project(cam); const wing = l.el.classList.contains('wing');
+  const w = innerWidth, h = innerHeight, kr = h / (cam.top - cam.bottom) * cam.zoom / 20, k = Math.min(1, Math.max(.55, kr));
+  for (const l of labels) { l.el.style.display = kr < l.min ? 'none' : ''; if (kr < l.min) continue; v.copy(l.pos).project(cam); const wing = l.el.classList.contains('wing');
     l.el.style.transform = `translate(${((v.x + 1) / 2 * w).toFixed(1)}px,${((1 - v.y) / 2 * h).toFixed(1)}px) translate(${wing ? '0,-50%' : '-50%,-100%'}) scale(${k.toFixed(2)})`; }
 }
 requestAnimationFrame(frame);
