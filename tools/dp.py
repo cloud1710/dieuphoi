@@ -101,6 +101,21 @@ def mail_new(path):
     return len(re.findall(r'^- status: new', path.read_text(encoding='utf-8-sig'), flags=re.M)) if path.is_file() else 0
 
 
+def mail_talk(path, n=3):
+    """The last few letters of a mailbox and what the project wrote back: what the office shows as a conversation."""
+    if not path.is_file():
+        return []
+    out = []
+    for m in re.finditer(r'^## (M-\d+) · ([^·\n]*)·([^\n]*)\n(.*?)(?=^## M-|\Z)', path.read_text(encoding='utf-8-sig'), flags=re.M | re.S):
+        body = m.group(4)
+        st = re.search(r'^- status:\s*(\S+)', body, flags=re.M)
+        res = re.search(r'^- result:\s*(.+)$', body, flags=re.M)
+        text = '\n'.join(ln for ln in body.strip().split('\n') if not ln.startswith('- ')).strip()
+        out.append({'id': m.group(1), 't': m.group(2).strip(), 'text': short(one_line(text, 400), 400),
+                    'status': st.group(1) if st else '', 'result': short(res.group(1).strip(), 400) if res else ''})
+    return out[-n:]
+
+
 def scan_project(p):
     root = real(p['path'])
     out = {k: p.get(k) for k in ('id', 'name', 'group', 'parent', 'kind', 'path', 'mailbox')}
@@ -151,6 +166,7 @@ def scan_project(p):
                        'unblocks': q.get('unblocks')} for q in qs if q.get('status') == 'open'],
         'updated': datetime.datetime.fromtimestamp(sfile.stat().st_mtime).strftime('%Y-%m-%d %H:%M'),
         'mail': mail_new(root / p['mailbox']) if p.get('mailbox') else mail_new(root / 'plan' / 'INBOX.md') if p['kind'] == 'plan' else mail_new(HUB / 'out' / 'mail' / (p['id'] + '.md')),
+        'talk': mail_talk(root / 'plan' / 'INBOX.md') if p['kind'] == 'plan' and not p.get('mailbox') else [],
     })
     return out
 

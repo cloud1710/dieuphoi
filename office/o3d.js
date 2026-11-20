@@ -48,8 +48,8 @@ const SIGNS = {}; function sign(glyph, color) { const k = glyph + color; if (!SI
   const s = new THREE.Sprite(SIGNS[k]); s.scale.set(.75, .75, 1); s.renderOrder = 5; return s; }
 
 // ---- the world, rebuilt when the list of projects changes
-const TW = 8, TD = 6.2, G = 1.4, HALL = 7.5;
-let world = null, rooms = [], byId = {}, crates = [], walkers = [], fly = [], W = 0, D = 0, cols = 4, isle = null, boss = null, door = null, screen = null, labels = [], sig = '', lamps = [], pools = [], clouds = [], rain = null, pond = null;
+const TW = 8, TD = 6.2, G = 1.4, HALL = 9.5;
+let off = null, visit = null, world = null, rooms = [], byId = {}, crates = [], walkers = [], fly = [], W = 0, D = 0, cols = 4, isle = null, boss = null, door = null, screen = null, labels = [], sig = '', lamps = [], pools = [], clouds = [], rain = null, pond = null;
 const STMAT = Object.fromEntries(Object.entries(COL).map(([k, c]) => [k, new THREE.MeshBasicMaterial({color:c})]));
 function build(s) {
   const heads = s.projects.filter(p => !stored(p)), gi = Object.fromEntries(s.groups.map((x, i) => [x.id, i])); cols = stage.clientWidth > 700 ? 6 : 4;
@@ -70,13 +70,11 @@ function build(s) {
   S.box(W + .6, .3, D + .6, '#cdbb98', W / 2, 0, D / 2); S.box(W, .06, D, '#e9d6b1', W / 2, .3, D / 2);
   for (let z = .9; z < D; z += 1.8) S.box(W, .005, .05, '#d8c29a', W / 2, .36, z);
   S.box(W, 2.6, .3, '#efe6d4', W / 2, .3, G - .15); S.box(.3, 2.6, HALL + G, '#e7dcc6', .15, .3, (HALL + G) / 2); S.box(W, .16, .34, '#c9b48d', W / 2, 2.9, G - .15);
-  const HZ = G + HALL; door = {x:3.2, z:G + .9}; boss = {x:W - 6, z:G + 4.1};
+  const HZ = G + HALL; door = {x:3.2, z:G + .9}; managerOffice(S, L);
   S.box(1.6, 2.2, .14, '#6e4b33', door.x, .3, G + .05); S.box(1.3, 1.9, .06, '#8a6244', door.x, .45, G + .14); S.add(SPH, '#f2c94c', door.x + .45, 1.45, G + .2, 0, .14, .14, .14); S.box(1.9, .03, 1, '#b5563c', door.x, .33, G + .7);
-  for (const wx of [7.5, W - 9]) { L.box(2.2, 1.1, .04, '#ffffff', wx, 1.3, G + .02); S.box(2.4, .12, .2, '#d9cdb5', wx, 1.22, G + .05); S.box(.08, 1.1, .06, '#d9cdb5', wx, 1.3, G + .05); lamps.push({x:wx, z:G + 1.5, r:2.2}); }
-  S.add(CYL, '#d8b24a', boss.x, .36, boss.z + .7, 0, 4.2, .03, 2.6); deskAt(S, L, boss.x, boss.z, '#7d5b3d');
-  screen = mkScreen(); screen.position.set(W / 2 - 1.5, 1.85, G + .2); world.add(screen); S.box(7.4, .12, .12, '#7d8794', W / 2 - 1.5, 3.05, G + .15);
-  plantAt(S, door.x + 2.4, G + 1, 1.1); plantAt(S, W - 1.4, G + 1, 1.2);
-  addLabel('door', 'Anh Vinh', door.x, 2.9, G + .2, 'tag'); callL = addLabel('call', '', boss.x, 3.3, boss.z - .9, 'tag'); addLabel('boss', 'Tổng quản', boss.x, .4, boss.z + 1.9, 'tag');
+  const sx = (6 + off.x0) / 2; screen = mkScreen(); screen.position.set(sx, 1.85, G + .2); world.add(screen); S.box(7.4, .12, .12, '#7d8794', sx, 3.05, G + .15);
+  plantAt(S, door.x + 2.4, G + 1, 1.1); plantAt(S, off.x0 - 1.2, G + 1, 1.1); S.add(CYL, '#d8b24a', sx, .36, G + 4.4, 0, 6, .03, 3);
+  addLabel('door', 'Anh Vinh', door.x, 2.9, G + .2, 'tag'); callL = addLabel('call', '', boss.x, 3.3, boss.z - .9, 'tag'); addLabel('boss', 'Phòng tổng quản', (off.x0 + off.x1) / 2, 3, off.z1, 'tag');
   // rooms
   rooms = []; byId = {};
   heads.forEach((p, i) => { const c = i % cols, rr = Math.floor(i / cols), x0 = G + c * (TW + G), z0 = HZ + G + rr * (TD + G), seed = hsh(p.id), tint = GC[gi[p.group] % GC.length];
@@ -113,12 +111,55 @@ function build(s) {
   rain.geometry.setAttribute('position', new THREE.BufferAttribute(rp, 3)); rain.userData.d = Array.from({length:N}, () => ({x:isle.x0 + Math.random() * iw, z:isle.z0 + Math.random() * id, y:Math.random() * 16})); rain.frustumCulled = false; world.add(rain);
   // shadows cover the island
   const sc = sun.shadow.camera, half = Math.max(iw, id) * .62; sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.near = 1; sc.far = 160; sc.updateProjectionMatrix();
-  walkers.forEach(w => world.remove(w.m)); walkers = []; callQ = []; call = null; arc = null; return true; }
+  walkers.forEach(w => world.remove(w.m)); walkers = []; callQ = []; call = null; arc = null; meetQ = []; meet = null; return true; }
 let PT = null; function poolTex() { if (PT) return PT; const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), g = x.createRadialGradient(64, 64, 2, 64, 64, 63); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.45, 'rgba(255,255,255,.45)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); return PT = new THREE.CanvasTexture(c); }
 function shade(c, k) { const x = C(c); x.multiplyScalar(k); return '#' + x.getHexString(); }
 function deskAt(S, L, x, z, wood) { S.box(2.6, .1, 1.1, wood, x, .98, z); S.box(.12, .64, 1, shade(wood, .8), x - 1.2, .34, z); S.box(.12, .64, 1, shade(wood, .8), x + 1.2, .34, z); S.box(2.3, .4, .06, shade(wood, .85), x, .58, z - .4);
   S.box(1.05, .05, .7, '#3a3f4a', x, 1.08, z + .1); S.box(1.05, .68, .05, '#2b2f38', x, 1.1, z - .25, 0); L.box(.95, .58, .01, '#bfe3ff', x, 1.15, z - .28); S.add(CYL, '#f4f0e6', x + .85, 1.08, z + .2, 0, .18, .2, .18);
   S.box(.7, .1, .7, '#4a4f5c', x, .58, z - 1.05); S.box(.7, .8, .1, '#4a4f5c', x, .6, z - 1.4); }
+// ---- the manager's office: walnut floor, a navy feature wall with a window, a dashboard and a clock, bookshelves,
+// a big desk with two monitors, a banker's lamp and a phone, two guest chairs, a sofa corner, a coffee bar, plants;
+// glass walls towards the hall with a door at the front
+const GLASS = new THREE.MeshLambertMaterial({color:0xcfe6f2, transparent:true, opacity:.28, depthWrite:false});
+function managerOffice(S, L) { const x1 = W - .3, x0 = Math.max(W / 2 + 4, x1 - 16), z0 = G, z1 = G + HALL, cx = (x0 + x1) / 2; off = {x0, x1, z0, z1};
+  const bx = x0 + (x1 - x0) * .58, bz = z0 + 3.6; boss = {x:bx, z:bz}; visit = {x:bx - .95, z:bz + 2.05};
+  S.box(x1 - x0, .05, z1 - z0, '#5a4433', cx, .34, (z0 + z1) / 2); for (let x = x0 + .6; x < x1; x += 1.2) S.box(.03, .052, z1 - z0, '#4c3a2c', x, .34, (z0 + z1) / 2);
+  S.box(6.4, .02, 4.4, '#e3c48c', bx, .38, bz + 1); S.box(5.9, .025, 3.9, '#8c2f39', bx, .385, bz + 1); S.box(4.6, .03, 2.6, '#a64452', bx, .39, bz + 1);
+  // the feature wall: navy panel, window with the sky, dashboard, clock, frames, bookshelves
+  S.box(x1 - x0, 2.6, .06, '#2f4858', cx, .3, z0 + .03); S.box(x1 - x0, .1, .1, '#c9a65a', cx, 2.86, z0 + .06);
+  L.box(3.2, 1.3, .03, '#ffffff', bx, 1.25, z0 + .08); S.box(3.4, .1, .12, '#d9cdb5', bx, 1.2, z0 + .1); S.box(.08, 1.3, .08, '#d9cdb5', bx, 1.25, z0 + .1); S.box(3.4, .1, .12, '#d9cdb5', bx, 2.55, z0 + .1);
+  S.box(2.4, 1.3, .06, '#16181d', x0 + 2.4, 1.2, z0 + .08); [['#3f9d74', .9], ['#3f73a8', .6], ['#d39a2f', 1.0], ['#d2553d', .4], ['#8a6fc2', .75]].forEach(([c, h], i) => L.box(.28, h * .9, .02, c, x0 + 1.55 + i * .42, 1.32, z0 + .12));
+  L.box(1.9, .05, .02, '#7fd3ff', x0 + 2.4, 2.32, z0 + .12);
+  S.add(CYL, '#f7f3ea', x1 - 2.2, 2.25, z0 + .1, 0, .7, .06, .7, Math.PI / 2); S.add(CYL, '#2b2f38', x1 - 2.2, 2.25, z0 + .07, 0, .76, .04, .76, Math.PI / 2); S.box(.04, .26, .02, '#222', x1 - 2.2, 2.25, z0 + .15); S.box(.2, .04, .02, '#222', x1 - 2.12, 2.25, z0 + .15);
+  [[x1 - 4.2, '#e6d3a3'], [x1 - 3.4, '#a7c4d8']].forEach(([x, c]) => { S.box(.62, .8, .05, '#c9a65a', x, 1.3, z0 + .09); S.box(.5, .66, .02, c, x, 1.37, z0 + .12); });
+  for (const sxx of [x0 + 4.6, x0 + 5.9]) { S.box(1.2, 2.3, .45, '#3b2a20', sxx, .36, z0 + .3); const B = ['#d2553d', '#3f73a8', '#d39a2f', '#3f9d74', '#e7dcc4', '#8a6fc2']; for (let r = 0; r < 4; r++) for (let c = 0; c < 4; c++) S.box(.22, .4 - ((r + c + Math.round(sxx)) % 3) * .06, .3, B[(r * 4 + c + Math.round(sxx)) % 6], sxx - .37 + c * .25, .48 + r * .54, z0 + .42); }
+  // glass towards the hall, door gap at the front
+  const glass = (x, z, w, d) => { const m = new THREE.Mesh(BOX, GLASS); m.scale.set(w, 2.4, d); m.position.set(x, 1.55, z); m.renderOrder = 3; world.add(m); };
+  const gl = z1 - z0 - 2.3; glass(x0, z0 + gl / 2, .06, gl); for (let z = z0; z <= z0 + gl + .01; z += gl / 3) S.box(.1, 2.5, .1, '#3a3f4a', x0, .3, z); S.box(.12, .1, gl, '#3a3f4a', x0, 2.75, z0 + gl / 2);
+  S.box(.1, 2.5, .1, '#3a3f4a', x0, .3, z1 - .05); S.box(.12, .1, 2.3, '#3a3f4a', x0, 2.75, z1 - 1.15);
+  glass(x0 + (x1 - x0) * .25, z1, (x1 - x0) * .5, .05); S.box((x1 - x0) * .5, .1, .1, '#3a3f4a', x0 + (x1 - x0) * .25, .34, z1); S.box((x1 - x0) * .5, .08, .08, '#3a3f4a', x0 + (x1 - x0) * .25, 1.2, z1);
+  S.box(.12, 2.6, z1 - z0, '#e7dcc6', x1 + .06, .3, (z0 + z1) / 2);
+  // the desk: walnut top, modesty panel, a return on the right; monitors, lamp, phone, nameplate, papers, mug
+  const dk = '#4a3426'; S.box(3.8, .12, 1.5, dk, bx, 1.0, bz); S.box(3.6, .66, .1, '#3a281d', bx, .34, bz + .62); S.box(.12, .66, 1.4, '#3a281d', bx - 1.8, .34, bz); S.box(1.3, .12, 2.1, dk, bx + 2.45, 1.0, bz - .3); S.box(1.2, .66, .1, '#3a281d', bx + 2.45, .34, bz + .72);
+  S.box(3.8, .03, 1.5, '#5d4232', bx, 1.12, bz); S.box(1.6, .02, .7, '#2d4a3a', bx - .2, 1.14, bz + .2);
+  for (const [mx, ry] of [[-.65, .35], [.65, -.35]]) { S.box(.12, .35, .12, '#222', bx + mx, 1.12, bz - .35); S.add(BOX, '#1d1f25', bx + mx, 1.7, bz - .4, ry, 1.15, .7, .06); L.add(BOX, '#9fd2ff', bx + mx + Math.sin(ry) * .04, 1.7, bz - .36, ry, 1.05, .6, .01); }
+  S.add(CYL, '#c9a65a', bx - 1.5, 1.15, bz - .3, 0, .22, .06, .22); S.box(.04, .38, .04, '#c9a65a', bx - 1.5, 1.15, bz - .3); S.add(CYL, '#2e7d4f', bx - 1.5, 1.6, bz - .25, 0, .6, .18, .3, Math.PI / 2 * 0); L.box(.5, .04, .22, '#ffe7a8', bx - 1.5, 1.5, bz - .25); lamps.push({x:bx - 1.5, z:bz, r:1.8});
+  S.box(.45, .12, .3, '#1f2228', bx + 1.25, 1.13, bz + .15); S.box(.42, .08, .12, '#2b2f38', bx + 1.25, 1.25, bz + .1); L.box(.12, .02, .08, '#7fe08f', bx + 1.35, 1.26, bz + .24);
+  S.box(1.1, .2, .12, '#c9a65a', bx, 1.13, bz + .62); S.box(.5, .02, .7, '#f7f5ef', bx + .55, 1.14, bz + .35, .2); S.box(.5, .02, .7, '#ffffff', bx + .62, 1.16, bz + .32, .35); S.add(CYL, '#d2553d', bx - .9, 1.13, bz + .45, 0, .2, .22, .2);
+  S.add(BOX, '#1f2228', bx + 2.45, 1.4, bz - .9, -.6, .9, .55, .05); L.add(BOX, '#b8f0c8', bx + 2.43, 1.4, bz - .87, -.6, .8, .45, .01);
+  // the executive chair behind, two guest chairs in front
+  S.box(1.0, .14, .95, '#1f2024', bx, .62, bz - 1.15); S.box(1.0, 1.25, .16, '#1f2024', bx, .7, bz - 1.65); S.box(.12, .3, .8, '#2a2b30', bx - .55, .76, bz - 1.15); S.box(.12, .3, .8, '#2a2b30', bx + .55, .76, bz - 1.15); S.add(CYL, '#555', bx, .34, bz - 1.15, 0, .14, .3, .14); S.add(CYL, '#444', bx, .36, bz - 1.15, 0, .8, .04, .8);
+  for (const gx of [-.95, .95]) { const x = bx + gx, z = visit.z; S.box(.85, .14, .8, '#c89b6d', x, .6, z); S.box(.85, .7, .14, '#b5875a', x, .74, z + .38); S.box(.1, .3, .7, '#8a6447', x - .45, .7, z); S.box(.1, .3, .7, '#8a6447', x + .45, .7, z); for (const lx of [-.35, .35]) for (const lz of [-.3, .3]) S.box(.07, .28, .07, '#5a3d2a', x + lx, .34, z + lz); }
+  // sofa corner with a coffee table, a floor lamp, a coffee bar, tall plants
+  const sx0 = x1 - 2.4, sz0 = z1 - 1.6; S.box(3.6, .45, 1.1, '#5f7f8c', sx0 - .4, .36, sz0 + .55); S.box(3.6, .8, .3, '#55737f', sx0 - .4, .36, sz0 + 1.05); S.box(1.1, .45, 2.4, '#5f7f8c', x1 - .75, .36, sz0 - .7); S.box(.3, .8, 2.4, '#55737f', x1 - .45, .36, sz0 - .7);
+  for (let i = 0; i < 3; i++) S.box(.9, .22, .7, '#6f93a1', sx0 - 1.4 + i * 1.05, .81, sz0 + .5); S.box(.5, .4, .14, '#e3c48c', sx0 - 1.6, .95, sz0 + .85, .2); S.box(.5, .4, .14, '#d2553d', x1 - .8, .95, sz0 - .3, 1.2);
+  S.box(1.5, .06, .9, '#d9e8ee', sx0 - .9, .78, sz0 - 1.1); S.box(1.3, .4, .7, '#4a3426', sx0 - .9, .36, sz0 - 1.1); S.add(CYL, '#e8e2d4', sx0 - .7, .84, sz0 - 1.1, 0, .18, .3, .18); S.add(ICO, '#e85d5d', sx0 - .7, 1.08, sz0 - 1.1, 0, .22, .18, .22);
+  S.box(.08, 2.1, .08, '#2b2f38', x1 - .6, .36, z1 - .45); S.add(CONE, '#efe3c8', x1 - .6, 2.55, z1 - .45, 0, .6, .45, .6); L.add(SPH, '#ffe1a0', x1 - .6, 2.35, z1 - .45, 0, .3, .22, .3); lamps.push({x:x1 - .9, z:z1 - 1.1, r:2.4});
+  S.box(.7, 1.0, 2.4, '#3b2a20', x1 - .45, .36, z0 + 2.2); S.box(.75, .06, 2.5, '#c9a65a', x1 - .45, 1.36, z0 + 2.2); S.box(.45, .5, .4, '#1d1f25', x1 - .45, 1.4, z0 + 1.6); L.box(.06, .06, .02, '#ff5050', x1 - .66, 1.75, z0 + 1.6); S.add(CYL, '#ffffff', x1 - .45, 1.42, z0 + 2.3, 0, .14, .16, .14); S.add(CYL, '#3f73a8', x1 - .45, 1.42, z0 + 2.6, 0, .14, .16, .14);
+  bigPlant(S, x0 + .8, z0 + .9); bigPlant(S, x1 - .8, z0 + 4.2); bigPlant(S, x0 + .9, z1 - 2.9);
+  lamps.push({x:bx, z:bz + 1.2, r:3.4, office:true}); }
+function bigPlant(S, x, z) { S.add(CYL, '#e8e2d4', x, .34 + .35, z, 0, .55, .7, .55); S.add(CYL, '#4a3426', x, .34 + .72, z, 0, .5, .04, .5); S.box(.06, 1.2, .06, '#5b3d26', x, 1.05, z);
+  for (let i = 0; i < 9; i++) { const a = i * 2.4, h = 1.3 + i * .14; S.add(SPH, i % 2 ? '#3f8a3a' : '#5aa548', x + Math.cos(a) * .3, h, z + Math.sin(a) * .3, a, .42, .12, .3, .5, .3); } }
 function plantAt(S, x, z, s) { S.add(CYL, '#b5563c', x, .34 + .25 * s, z, 0, .55 * s, .5 * s, .55 * s); for (let j = 0; j < 4; j++) S.add(ICO, j % 2 ? '#4f9a45' : '#6dbb57', x + Math.cos(j * 1.6) * .18 * s, .34 + (.75 + j * .12) * s, z + Math.sin(j * 1.6) * .18 * s, j, .55 * s, .6 * s, .55 * s); }
 function shelfAt(S, x, z, seed) { S.box(1.5, 1.7, .5, '#7d5f43', x, .34, z); const B = ['#d2553d', '#3f73a8', '#d39a2f', '#3f9d74', '#8a6fc2', '#e7dcc4'];
   for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) S.box(.22, .38 - ((seed >> (c + r)) & 1) * .06, .3, B[(seed >> (r * 3 + c)) % 6], x - .5 + c * .25, .5 + r * .52, z + .14); }
@@ -157,7 +198,7 @@ function addLabel(key, text, x, y, z, kind) { const e = document.createElement('
 const v3 = new THREE.Vector3();
 const PRI = {tag:0, ask:1, work:2, mail:3, wait:4, ready:5, sleep:6, wing:7, box:8};
 function placeLabels(zr) { const w = stage.clientWidth, h = stage.clientHeight, placed = [], near = zr > 1.9;
-  for (const l of labels) { let show = !l.e.textContent ? false : l.kind === 'tag' ? true : l.kind === 'room' ? zr > 1.35 || l.hot : l.kind === 'wing' ? zr > 1.35 : zr > 2.2;
+  for (const l of labels) { let show = !l.e.textContent ? false : l.kind === 'tag' || l.kind === 'say' ? true : l.kind === 'room' ? zr > 1.35 || l.hot : l.kind === 'wing' ? zr > 1.35 : zr > 2.2;
     let x = 0, y = 0; if (show) { v3.copy(l.p).project(camera); x = (v3.x + 1) / 2 * w; y = (1 - v3.y) / 2 * h; show = x > -60 && x < w + 60 && y > -10 && y < h + 40; }
     if (show && l.kind === 'room') { const full = near; if (l.full !== full) { l.full = full; l.e.classList.toggle('full', full); l.w = null; } }
     if (show) { if (l.on !== true) { l.e.style.display = ''; l.on = true; l.w = null; } if (l.w == null) { l.w = l.e.offsetWidth; l.h = l.e.offsetHeight; }
@@ -190,17 +231,19 @@ const up = e => { pts.delete(e.pointerId); if (pts.size < 2) pinch = null; if (!
 cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
 cv.addEventListener('wheel', e => { e.preventDefault(); touched = performance.now(); if (e.shiftKey) cam.yaw += e.deltaY * .002; else cam.z *= e.deltaY < 0 ? 1.12 : .89; clampCam(); applyCam(); }, {passive:false});
 function tapAt(x, z) { const rm = rooms.find(r => x >= r.x0 && x <= r.x0 + TW && z >= r.z0 && z <= r.z0 + TD), sx = screen.position.x;
-  if (Math.abs(x - sx) < 3.6 && z < G + 2.5 && z > G - .5) { const sl = SL[slideI]; if (sl && sl.id) focus(sl.id); return; }
-  if (rm) return focus(rm.p.id === focusId ? null : rm.p.id); if (Math.hypot(x - door.x, z - door.z) < 2 || Math.hypot(x - boss.x, z - boss.z) < 2.2) return tab('work'); if (focusId) focus(null); }
+  if (Math.abs(x - sx) < 3.6 && z < G + 2.5 && z > G - .5 && x < off.x0) { const sl = SL[slideI]; if (sl && sl.id) focus(sl.id); return; }
+  if (rm) return focus(rm.p.id === focusId ? null : rm.p.id); if (Math.hypot(x - door.x, z - door.z) < 2) return tab('work'); if (x > off.x0 && z < off.z1) { Object.assign(goal, fit(off.x0 - .5, off.z0 - .5, off.x1 + .5, off.z1 + 1)); return; } if (focusId) focus(null); }
 function focus(id) { const rm = byId[id]; focusId = rm ? id : null; $('back').classList.toggle('on', !!focusId); $('hint').style.display = focusId ? 'none' : '';
   Object.assign(goal, rm ? fit(rm.x0 - .5, rm.z0 - .5, rm.x0 + TW + .5, rm.z0 + TD + 1) : overview()); SL = slides(); paintScreen(performance.now() / 1000); drawCol(); }
 $('back').addEventListener('click', () => { if (VIEW3) { touched = -1e9; focus(null); } });
 $('camb').addEventListener('click', () => { try { auto = localStorage.getItem('dp-cam') !== '0'; } catch (e) {} touched = -1e9; });
 function director(ms) { if (!auto || focusId || moving || ms - touched < 9000) return null;
-  if (call) return fit(boss.x - 8, G - 2, Math.min(W + 2, boss.x + 6), G + HALL + 4);
+  if (call) return fit(off.x0 - 1, off.z0 - .5, off.x1 + .5, off.z1 + 1);
+  if (meet && meet.a) { const q = meet.a.g.position; return fit(q.x - 7, q.z - 6, q.x + 7, q.z + 6); }
   const wr = rooms.find(r => r.wk && (r.phase === 'in' || r.phase === 'out')); if (wr) { const q = wr.wk.g.position; return fit(q.x - 7, q.z - 6, q.x + 7, q.z + 6); }
   if ((ACT.game || {}).on) return null;
-  if (CHATS.busy) return fit(W / 2 - 9, G - 1, W - 1, G + HALL + 1);
+  if (meet && meet.ph === 'talk') return fit(off.x0 - .8, off.z0 - 4.5, off.x1 + .5, off.z1 + 1.5);
+  if (CHATS.busy) return fit(off.x0 - 1, off.z0 - .5, off.x1 + .5, off.z1 + 1);
   const f = fly[fly.length - 1]; if (f && byId[f.to]) { const r = byId[f.to]; return fit(r.x0 - 4, r.z0 - 3.5, r.x0 + TW + 4, r.z0 + TD + 3.5); }
   const act = rooms.filter(r => r.phase === 'seated'); if (act.length && Math.floor(ms / 9000) % 3) { const r = act[Math.floor(ms / 27000) % act.length]; return fit(r.x0 - 4, r.z0 - 3.5, r.x0 + TW + 4, r.z0 + TD + 3.5); }
   return overview(); }
@@ -208,7 +251,7 @@ function director(ms) { if (!auto || focusId || moving || ms - touched < 9000) r
 // ---- the empty office: nobody sits until the manager phones them; then they walk in from the garden gate,
 // up the middle corridor, to their desk. When the work stops they get up and walk out again.
 const DOTM = new THREE.MeshBasicMaterial({color:0x5fd39a, depthTest:false, transparent:true}); let callL = null, litNow = false, callQ = [], call = null, arc = null, ringS = null, phoneS = null;
-function presence(rm, want) { const ph = rm.phase;
+function presence(rm, want) { const ph = rm.phase; if (ph === 'meeting') { rm.want = want; return; }
   if (ph == null) { rm.phase = 'away'; if (want) { callQ.push(rm); rm.phase = 'queued'; } return; }
   if (want) { if (ph === 'away') { callQ.push(rm); rm.phase = 'queued'; } else if (ph === 'out') rm.phase = 'in'; return; }
   if (ph === 'queued') { callQ = callQ.filter(x => x !== rm); rm.phase = 'away'; } else if (ph === 'calling') { endCall(); rm.phase = 'away'; } else if (ph === 'seated' || ph === 'in') leave(rm); }
@@ -218,12 +261,14 @@ function leave(rm) { if (!rm.wk) { rm.wk = walker(rm); rm.wk.d = plen(rm.wk.path
 function endCall() { if (callL) { callL.e.textContent = ''; } if (arc) { world.remove(arc); arc = null; } if (ringS) ringS.visible = false; if (phoneS) phoneS.visible = false; call = null; }
 function phones(t, dt) {
   if (!ringS) { ringS = sign('☎', COL.work); phoneS = sign('☎', COL.ready); ringS.visible = phoneS.visible = false; world.add(ringS, phoneS); }
-  if (!call && callQ.length) { const rm = callQ.shift(); call = {rm, t:0}; rm.phase = 'calling';
+  if (call && !call.started) { call.started = true; startCall(call.rm); }
+  if (!call && callQ.length && !meetQ.length) { const rm = callQ.shift(); call = {rm, t:0, started:true}; rm.phase = 'calling'; startCall(rm); }
+  function startCall(rm) {
     const a = new THREE.Vector3(boss.x, 2.4, boss.z - .9), b = new THREE.Vector3(rm.cx, 1.7, rm.cz), m = a.clone().lerp(b, .5); m.y += 6 + a.distanceTo(b) * .12;
     arc = new THREE.Group(); arc.userData.curve = new THREE.QuadraticBezierCurve3(a, m, b); for (let i = 0; i < 14; i++) { const d = new THREE.Mesh(SPH, DOTM); d.scale.setScalar(.32); d.renderOrder = 4; arc.add(d); } world.add(arc);
-    callL.e.textContent = '☎ Tổng quản gọi @' + rm.p.id; callL.w = null; ringS.position.copy(b).setY(2.1); phoneS.position.set(boss.x + .5, 2.5, boss.z - .9); ringS.visible = phoneS.visible = true; }
+    callL.e.textContent = '☎ Tổng quản gọi @' + rm.p.id + (call && call.meet ? ' lên phòng' : ' vào làm'); callL.w = null; ringS.position.copy(b).setY(2.1); phoneS.position.set(boss.x + .5, 2.5, boss.z - .9); ringS.visible = phoneS.visible = true; }
   if (call) { call.t += dt; const k = call.t; phoneS.position.y = 2.5 + Math.abs(Math.sin(k * 10)) * .12; ringS.position.x = call.rm.cx + Math.sin(k * 40) * .08; ringS.material.rotation = Math.sin(k * 30) * .2;
-    if (arc) arc.children.forEach((d, i) => { const u = ((i / 14) + k * .35) % 1; arc.userData.curve.getPoint(u, d.position); d.scale.setScalar(.2 + .2 * Math.sin(u * Math.PI)); }); if (k > 3.2) { const rm = call.rm; endCall(); rm.wk = walker(rm); rm.phase = 'in'; } }
+    if (arc) arc.children.forEach((d, i) => { const u = ((i / 14) + k * .35) % 1; arc.userData.curve.getPoint(u, d.position); d.scale.setScalar(.2 + .2 * Math.sin(u * Math.PI)); }); if (k > 3.2) { const rm = call.rm, mt = call.meet; endCall(); if (!mt) { rm.wk = walker(rm); rm.phase = 'in'; } } }
   for (const rm of rooms) { const w = rm.wk; if (!w || (rm.phase !== 'in' && rm.phase !== 'out')) continue; const L = plen(w.path), dir = rm.phase === 'in' ? 1 : -1;
     w.d = Math.max(0, Math.min(L, w.d + dir * 5.2 * dt)); const q = along(w.path, w.d); w.g.position.set(q.x, .34, q.z); w.g.rotation.y = Math.atan2(dir * q.dx, dir * q.dz); w.b.position.y = Math.abs(Math.sin(t * 11)) * .1;
     if (dir > 0 && w.d >= L) { world.remove(w.g); rm.wk = null; rm.phase = 'seated'; rm.head.visible = true; rm.extra.forEach(m => m.visible = true); populateSoon(); }
@@ -231,6 +276,50 @@ function phones(t, dt) {
   for (const l of lamps) if (l.room) l.pool.material.opacity = litNow && l.room.phase === 'seated' ? .4 : 0;
   for (const rm of rooms) { if (rm.sign) rm.sign.position.y = 2 + Math.sin(t * 2.5 + rm.x0) * .1; rm.extra.forEach(m => m.visible = rm.phase === 'seated'); } }
 let popT = 0; function populateSoon() { clearTimeout(popT); popT = setTimeout(() => { if (VIEW3 && STATE) populate(); }, 300); }
+
+// ---- meetings in the manager's office. Triggers: a new letter from the manager in a project's INBOX (he tells
+// what he asked, the orchestra acknowledges), a letter marked done with a result (the orchestra reports the result
+// line it wrote), a new open question (the orchestra asks, the manager takes it to anh Vinh). The words are the
+// letters' own text; only the short acknowledgements are stock phrases.
+let meetQ = [], meet = null, seenTalk = null;
+try { seenTalk = JSON.parse(localStorage.getItem('dp-talk') || 'null'); } catch (e) {}
+function saveSeen() { try { localStorage.setItem('dp-talk', JSON.stringify(seenTalk)); } catch (e) {} }
+function talkEvents() { const ev = [];
+  for (const rm of rooms) { const p = rm.p;
+    for (const m of p.talk || []) { if (m.status === 'done' && m.result) ev.push({rm, key:p.id + m.id + 'done', t:m.t, lines:[['b', 'Việc ' + m.id + ' tới đâu rồi em?'], ['o', m.result], ['b', 'Tốt. Cảm ơn em.']]});
+      else ev.push({rm, key:p.id + m.id, t:m.t, lines:[['b', m.text], ['o', m.status === 'new' ? 'Dạ, em nhận thư ' + m.id + '.' : 'Dạ, em đang làm ' + m.id + '.']]}); }
+    for (const q of p.questions || []) ev.push({rm, key:p.id + q.id, t:q.asked || '', lines:[['o', 'Em hỏi ' + q.id + ': ' + q.text], ['b', 'Để anh chuyển anh Vinh trả lời.']]}); }
+  return ev; }
+function scheduleMeetings() { const ev = talkEvents();
+  if (!seenTalk) { seenTalk = {}; ev.forEach(e => seenTalk[e.key] = 1); const last = ev.filter(e => e.t).sort((a, b) => a.t < b.t ? 1 : -1)[0]; if (last) { delete seenTalk[last.key]; } }
+  for (const e of ev) if (!seenTalk[e.key] && !meetQ.some(m => m.key === e.key) && !(meet && meet.key === e.key)) { seenTalk[e.key] = 1; meetQ.push(e); }
+  saveSeen(); }
+function chunks(text, n = 120) { const out = []; let cur = ''; for (const w of String(text).split(/\s+/)) { if ((cur + ' ' + w).length > n && cur) { out.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; } if (cur) out.push(cur); return out.slice(0, 4).map((c, i, a) => i === a.length - 1 && a.length === 4 && String(text).length > 480 ? c + ' …' : c); }
+function seatPts(rm) { const zc = rm.z0 + TD + G / 2, sx = rm.cx + 1.75; return [{x:rm.cx, z:rm.cz - .95}, {x:sx, z:rm.cz - .95}, {x:sx, z:zc}, {x:W / 2, z:zc}]; }
+function toOffice() { const hc = G + HALL + G / 2; return [{x:W / 2, z:hc}, {x:off.x0 - .9, z:hc}, {x:off.x0 - .9, z:off.z1 - 1.1}, {x:visit.x, z:off.z1 - 1.1}, {x:visit.x, z:visit.z}]; }
+const gateIn = () => [{x:W / 2, z:D + 3}, {x:W / 2, z:D + .4}];
+function bubble(key, x, y, z) { const l = addLabel(key, '', x, y, z, 'say'); l.pri = -1; labels.unshift(labels.pop()); return l; }
+function meetTick(t, dt) {
+  if (!meet && meetQ.length && !call) { const m = meetQ.shift(), rm = m.rm; meet = m; m.ph = 'call'; m.t = 0;
+    if (rm.phase === 'queued') callQ = callQ.filter(x => x !== rm); if (rm.wk) { world.remove(rm.wk.g); rm.wk = null; }
+    m.from = rm.phase === 'seated' ? 'seat' : 'gate'; m.want = rm.phase === 'seated' || rm.phase === 'in' || rm.phase === 'queued' || rm.phase === 'calling'; rm.phase = 'meeting';
+    call = {rm, t:0, meet:true}; }
+  if (!meet) return; const m = meet, rm = m.rm;
+  if (m.ph === 'call') { if (call) return; rm.head.visible = false; rm.extra.forEach(e => e.visible = false);
+    const path = (m.from === 'seat' ? seatPts(rm) : gateIn()).concat(toOffice()); const g = new THREE.Group(), b = person(rm.tint, hsh(rm.p.id), 1, false); g.add(b); world.add(g); m.a = {g, b, path, d:0}; m.ph = 'walk'; }
+  if (m.ph === 'walk' || m.ph === 'back') { const a = m.a, L = plen(a.path); a.d = Math.min(L, a.d + 8 * dt); const q = along(a.path, a.d); a.g.position.set(q.x, .34, q.z); a.g.rotation.y = Math.atan2(q.dx, q.dz); a.b.position.y = Math.abs(Math.sin(t * 11)) * .1;
+    if (a.d >= L) { world.remove(a.g); m.a = null;
+      if (m.ph === 'walk') { m.seat = person(rm.tint, hsh(rm.p.id)); m.seat.position.set(visit.x, .34, visit.z - .1); m.seat.rotation.y = Math.PI; world.add(m.seat);
+        m.bo = bubble('say-b', boss.x, 3.0, boss.z - 1.1); m.bv = bubble('say-o', visit.x, 2.9, visit.z); m.bv.e.style.borderColor = rm.tint; m.bo.e.classList.add('boss');
+        m.lines2 = []; m.lines.forEach(([who, text]) => chunks(text).forEach(c => m.lines2.push([who, c]))); m.i = -1; m.t = 0; m.ph = 'talk'; }
+      else { rm.phase = 'seated'; rm.head.visible = true; rm.extra.forEach(e => e.visible = true); meet = null; populateSoon(); } } return; }
+  if (m.ph === 'talk') { m.t -= dt; if (m.t > 0) { const sp = Math.abs(Math.sin(t * 12)) * .03; (m.lines2[m.i][0] === 'b' ? boss.m : m.seat).position.y = .34 + sp; return; }
+    m.i++; if (m.i < m.lines2.length) { const [who, c] = m.lines2[m.i]; (who === 'b' ? m.bo : m.bv).e.textContent = c; (who === 'b' ? m.bv : m.bo).e.textContent = ''; m.bo.w = m.bv.w = null; m.t = 2.4 + c.length * .05; return; }
+    for (const l of [m.bo, m.bv]) { l.e.remove(); labels.splice(labels.indexOf(l), 1); } world.remove(m.seat); boss.m.position.y = .34;
+    const want = rm.want != null ? rm.want : m.want; rm.want = null; const back = toOffice().reverse();
+    const g = new THREE.Group(), b = person(rm.tint, hsh(rm.p.id), 1, false); g.add(b); world.add(g);
+    if (want) { m.a = {g, b, path:back.concat(seatPts(rm).reverse()), d:0}; m.ph = 'back'; }
+    else { rm.wk = {g, b, path:gateIn().concat(toOffice()), d:0}; rm.wk.d = plen(rm.wk.path); rm.phase = 'out'; meet = null; } } }
 
 // ---- life: who sits, who walks, what glows
 function populate() { const gm = (ACT.game || {}).on;
@@ -245,7 +334,7 @@ function populate() { const gm = (ACT.game || {}).on;
     const want = st === 'work' ? Math.min(2, Math.max(0, (p.working || []).length + (p.sessions || 0) - 1) + Math.max(0, (ACT.claude[p.id] || []).filter(a => a.age < 300).length - 1)) : 0;
     while (rm.extra.length > want) world.remove(rm.extra.pop()); while (rm.extra.length < want) { const k = rm.extra.length, m = person(rm.tint, hsh(p.id + k), .8); m.position.set(rm.x0 + (k ? TW - 1.3 : 1.3), .34, rm.z0 + TD - 1.4); m.rotation.y = k ? -.9 : .9; world.add(m); rm.extra.push(m); } }
   const nq = STATE ? STATE.inbox.questions + STATE.inbox.person + pendingDel().length : 0, dl = labels.find(l => l.key === 'door'); if (dl) { dl.e.textContent = 'Anh Vinh'; dl.w = null; if (nq) { const b = document.createElement('em'); b.textContent = nq; dl.e.append(b); } }
-  if (!boss.m) { boss.m = person('#3f73a8', 77, 1.05); boss.m.position.set(boss.x, .34, boss.z - .95); world.add(boss.m); }
+  if (!boss.m) { boss.m = person('#2f4f7a', 77, 1.05); boss.m.position.set(boss.x, .34, boss.z - 1.1); world.add(boss.m); }
   // couriers: a question walks to the door, a letter from the manager, a report up to the parent
   const old = Object.fromEntries(walkers.map(w => [w.key, w])), keep = []; const mk = (key, rm, kind, glyph, a, b) => { let w = old[key]; if (!w) { w = {key, m:new THREE.Group(), t:Math.random() * 20, leg:0}; const body = person(COL[kind], hsh(key), .62, false); w.m.add(body); w.body = body; const s = sign(glyph, COL[kind]); s.position.set(0, 1.45, 0); s.scale.set(.6, .6, 1); w.m.add(s); world.add(w.m); w.m.position.set(a.x, .34, a.z); }
     w.path = route(a, b); w.rm = rm; keep.push(w); };
@@ -255,7 +344,7 @@ function populate() { const gm = (ACT.game || {}).on;
     if (p.mail) mk(p.id + ':mail', rm, 'mail', '✉', {x:boss.x - 1.6, z:boss.z + 1.2, zc:G + HALL + G / 2, vx:boss.x - 3}, {x:rm.cx - 1.5, z:rm.z0 + TD - 1.2, zc:rm.z0 + TD + G / 2});
     if (p.parent && byId[p.parent] && byId[p.parent].phase === 'seated') { const pr = byId[p.parent]; mk(p.id + ':link', rm, 'link', '↑', {x:rm.cx - 2.2, z:rm.z0 + TD - 1, zc:rm.z0 + TD + G / 2, vx:rm.x0 - G / 2}, {x:pr.cx + 2, z:pr.z0 + TD - 1, zc:pr.z0 + TD + G / 2}); } }
   for (const w of walkers) if (!keep.includes(w)) world.remove(w.m); walkers = keep; SL = slides();
-  for (const l of labels) if (l.pri == null) l.pri = PRI[l.kind] != null ? PRI[l.kind] : 6; labels.sort((a, b) => a.pri - b.pri); }
+  for (const l of labels) if (l.pri == null) l.pri = PRI[l.kind] != null ? PRI[l.kind] : 6; labels.sort((a, b) => a.pri - b.pri); scheduleMeetings(); }
 function route(a, b) { const vx = a.vx != null ? a.vx : a.x; return [a, {x:a.x, z:a.zc}, {x:vx, z:a.zc}, {x:vx, z:b.zc}, {x:b.x, z:b.zc}, b]; }
 function along(path, d) { for (let i = 1; i < path.length; i++) { const p = path[i - 1], q = path[i], l = Math.hypot(q.x - p.x, q.z - p.z); if (d <= l) return {x:p.x + (q.x - p.x) * d / l, z:p.z + (q.z - p.z) * d / l, dx:q.x - p.x, dz:q.z - p.z}; d -= l; } const e = path[path.length - 1]; return {x:e.x, z:e.z, dx:0, dz:0}; }
 const plen = p => p.slice(1).reduce((s, q, i) => s + Math.hypot(q.x - p[i].x, q.z - p[i].z), 0);
@@ -293,13 +382,13 @@ function flights(ms) { fly = fly.filter(f => { const u = (ms - f.t0) / 1800; if 
 
 // ---- the loop
 let VIEW3 = false, running = false, last = 0, zoomIn = false;
-function frame(ms) { if (!running) return; requestAnimationFrame(frame); const wet = WX.now().wet, busy = moving || Object.keys(goal).length || fly.length || call || callQ.length || rooms.some(r => r.wk); if (ms - last < (busy || wet ? 30 : 60)) return; const dt = Math.min(.1, (ms - last) / 1000); last = ms; const t = ms / 1000;
+function frame(ms) { if (!running) return; requestAnimationFrame(frame); const wet = WX.now().wet, busy = moving || Object.keys(goal).length || fly.length || call || callQ.length || meet || meetQ.length || rooms.some(r => r.wk); if (ms - last < (busy || wet ? 30 : 60)) return; const dt = Math.min(.1, (ms - last) / 1000); last = ms; const t = ms / 1000;
   const dg = director(ms); if (dg) Object.assign(goal, dg); if (goal.z && !moving) { const a = 1 - Math.exp(-dt * 2.4); cam.tx += (goal.tx - cam.tx) * a; cam.tz += (goal.tz - cam.tz) * a; cam.z += (goal.z - cam.z) * a; let dy = goal.yaw - cam.yaw; cam.yaw += dy * a; if (Math.abs(goal.z - cam.z) < .002 && Math.hypot(goal.tx - cam.tx, goal.tz - cam.tz) < .02) Object.keys(goal).forEach(k => delete goal[k]); applyCam(); }
   const zin = cam.z > fitZ * 1.3; if (zin !== zoomIn) { zoomIn = zin; stage.classList.toggle('zoomin', zin); }
   for (const rm of rooms) { const h = rm.head; if (rm.st === 'work') { h.position.y = .34 + Math.abs(Math.sin(t * 7 + rm.x0)) * .04; h.rotation.y = Math.sin(t * .7 + rm.z0) * .25; } else if (rm.st === 'sleep') { h.rotation.x = .25; h.position.y = .3; } else { h.rotation.x = 0; h.position.y = .34; h.rotation.y = Math.sin(t * .4 + rm.x0) * .15; }
     rm.extra.forEach((m, k) => { m.position.y = .34 + Math.abs(Math.sin(t * 8 + k)) * .03; }); if (rm.st === 'work') rm.light.scale.setScalar(.16 + Math.sin(t * 5) * .03); }
   if (boss.m) { boss.m.position.y = .34 + (CHATS.busy ? Math.abs(Math.sin(t * 8)) * .05 : 0); boss.m.rotation.y = CHATS.busy ? Math.sin(t * 1.2) * .3 : 0; }
-  for (const w of walkers) walk(w, dt); phones(t, dt); flights(ms); weather(t, dt); paintScreen(t); placeLabels(cam.z / fitZ); R.render(scene, camera); }
+  for (const w of walkers) walk(w, dt); phones(t, dt); meetTick(t, dt); flights(ms); weather(t, dt); paintScreen(t); placeLabels(cam.z / fitZ); R.render(scene, camera); }
 function size() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return false; R.setSize(w, h, false); applyCam(); return true; }
 function wake() { const on = VIEW3 && cur === 'office' && !document.hidden && STATE; if (on && !running) { if (!size()) return; if (!rooms.length) set(STATE); running = true; last = performance.now(); requestAnimationFrame(frame); } else if (!on) running = false; }
 function set(s) { if (!s || !VIEW3) return; if (!stage.clientWidth) return; const fresh = build(s); populate(); if (fresh) { const o = overview(); Object.assign(cam, o); clampCam(); applyCam(); skyKey = ''; } }
