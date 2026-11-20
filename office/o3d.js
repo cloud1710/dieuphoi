@@ -17,7 +17,7 @@ const C = c => new THREE.Color(c);
 
 // ---- lights
 const hemi = new THREE.HemisphereLight(0xdfefff, 0x6b7f4a, 1.1), sun = new THREE.DirectionalLight(0xfff2d8, 2.2);
-sun.castShadow = true; sun.shadow.mapSize.set(1536, 1536); sun.shadow.bias = -0.0008; sun.shadow.normalBias = 0.03; scene.add(hemi, sun, sun.target);
+sun.castShadow = true; sun.shadow.mapSize.set(1536, 1536); sun.shadow.bias = -0.0015; sun.shadow.normalBias = 0.06; scene.add(hemi, sun, sun.target);
 
 // ---- geometry baking: static things become one mesh with vertex colours (one draw call), glowing bits another
 const MSOLID = new THREE.MeshLambertMaterial({vertexColors:true}), MGLOW = new THREE.MeshBasicMaterial({vertexColors:true});
@@ -87,8 +87,8 @@ function build(s) {
     const k = seed % 4; if (k === 0) plantAt(S, x0 + TW - .8, z0 + .9, .9); else if (k === 1) shelfAt(S, x0 + TW - 1.3, z0 + .55, seed); else if (k === 2) { S.box(2, 1.1, .06, '#ffffff', rm.cx - 1.5, .9, z0 + .25); S.box(2.1, .08, .1, '#9aa3ad', rm.cx - 1.5, .86, z0 + .27); for (let j = 0; j < 3; j++) S.box(.9 - j * .2, .05, .02, ['#d2553d', '#3f73a8', '#3f9d74'][j], rm.cx - 1.9, 1.7 - j * .25, z0 + .29); } else plantAt(S, x0 + .8, z0 + TD - .8, .8);
     if ((seed >> 5) % 2) { S.box(.08, 1.6, .08, '#6b6f7a', x0 + .9, .34, z0 + .9); S.add(CONE, '#e9dcc0', x0 + .9, 2.05, z0 + .9, 0, .55, .45, .55); L.add(SPH, '#ffe1a0', x0 + .9, 1.88, z0 + .9, 0, .25, .2, .25); lamps.push({x:x0 + .9, z:z0 + .9, r:1.6, room:rm}); }
     rm.head = person(tint, seed); rm.head.position.set(rm.cx, .34, rm.cz - .95); world.add(rm.head); rm.extra = [];
-    addLabel(p.id, '@' + p.id, rm.cx, 2.0, z0 + .1, 'name'); rm.plq = addLabel(p.id + ':st', '', rm.cx, .4, rm.cz + 1.6, 'st');
-    if (rm.first) addLabel(p.id + ':g', rm.gname, x0 + .2, 2.0, z0 - .15, 'wing'); });
+    rm.lab = addLabel(p.id, '', rm.cx, .45, z0 + TD - .25, 'room');
+    if (rm.first) addLabel(p.id + ':g', rm.gname, x0 + .3, 1.95, z0 + .1, 'wing'); });
   // crates for finished or stored projects, at the front
   crates = []; const cz = HZ + G + rows * (TD + G) + .6; box.forEach((p, i) => { const x = G + 1 + (i % (cols * 2)) * ((W - 2 * G) / (cols * 2)), z = cz + Math.floor(i / (cols * 2)) * 1.6;
     S.box(.9, .7, .9, '#c9a36b', x, .34, z); S.box(.92, .1, .92, '#b48d57', x, .7, z); S.box(.2, .72, .92, '#e9dcc0', x, .33, z); crates.push(addLabel(p.id + ':box', p.name, x, 1.2, z, 'box')); });
@@ -105,7 +105,7 @@ function build(s) {
     if (k < .5) S.add(CONE, '#6fa64c', x, .12, z, rnd() * 6, .18, .35, .18); else if (k < .8) { S.box(.08, .25, .08, '#4f8a3a', x, 0, z); S.add(SPH, ['#f4d35e', '#ef8fa8', '#ffffff', '#e85d5d', '#b48ef0'][Math.floor(rnd() * 5)], x, .3, z, 0, .2, .16, .2); } else S.add(DOD, '#9aa0a2', x, .1, z, rnd() * 6, .5 + rnd() * .5, .35, .45); }
   for (const [x, z] of [[W / 2 - 1.6, D + 2.5], [W / 2 + 1.6, D + 7.5], [-mx * .5, D * .3], [W + mx * .5, D * .2]]) { S.box(.12, 2.2, .12, '#4b4f58', x, 0, z); S.box(.3, .1, .3, '#4b4f58', x, 2.2, z); L.add(SPH, '#fff0c8', x, 2.42, z, 0, .32, .32, .32); lamps.push({x, z, r:2.6, post:true}); }
   const solid = S.mesh(MSOLID); solid.castShadow = solid.receiveShadow = true; world.add(solid); world.add(L.mesh(MGLOW));
-  for (const l of lamps) { const m = new THREE.Mesh(new THREE.CircleGeometry(l.r, 20), new THREE.MeshBasicMaterial({color:0xffc870, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false})); m.rotation.x = -Math.PI / 2; m.position.set(l.x, .4, l.z); world.add(m); l.pool = m; }
+  for (const l of lamps) { const m = new THREE.Mesh(new THREE.PlaneGeometry(l.r * 2.4, l.r * 2.4), new THREE.MeshBasicMaterial({map:poolTex(), color:0xffc070, transparent:true, opacity:0, blending:THREE.AdditiveBlending, depthWrite:false, polygonOffset:true, polygonOffsetFactor:-4})); m.rotation.x = -Math.PI / 2; m.position.set(l.x, .46, l.z); m.renderOrder = 2; world.add(m); l.pool = m; }
   // clouds and rain live with the island
   clouds = []; for (let i = 0; i < 9; i++) { const b = Baker(); for (let j = 0; j < 5; j++) b.add(ICO, '#ffffff', (j - 2) * 1.1, Math.sin(j * 2.1) * .4, Math.cos(j * 1.7) * .7, j, 1.6 + (j % 2) * .6, 1.2 + (j % 3) * .3, 1.4);
     const m = b.mesh(new THREE.MeshLambertMaterial({vertexColors:true, transparent:true, opacity:.95})); m.castShadow = true; m.userData = {sp:.4 + (i % 3) * .25, z:isle.z0 - 14 + (i * 5.3) % 12, y:9 + (i % 3) * 2.5, off:i * 13.7}; world.add(m); clouds.push(m); }
@@ -114,6 +114,7 @@ function build(s) {
   // shadows cover the island
   const sc = sun.shadow.camera, half = Math.max(iw, id) * .62; sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.near = 1; sc.far = 160; sc.updateProjectionMatrix();
   walkers.forEach(w => world.remove(w.m)); walkers = []; return true; }
+let PT = null; function poolTex() { if (PT) return PT; const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), g = x.createRadialGradient(64, 64, 2, 64, 64, 63); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.45, 'rgba(255,255,255,.45)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); return PT = new THREE.CanvasTexture(c); }
 function shade(c, k) { const x = C(c); x.multiplyScalar(k); return '#' + x.getHexString(); }
 function deskAt(S, L, x, z, wood) { S.box(2.6, .1, 1.1, wood, x, .98, z); S.box(.12, .64, 1, shade(wood, .8), x - 1.2, .34, z); S.box(.12, .64, 1, shade(wood, .8), x + 1.2, .34, z); S.box(2.3, .4, .06, shade(wood, .85), x, .58, z - .4);
   S.box(1.05, .05, .7, '#3a3f4a', x, 1.08, z + .1); S.box(1.05, .68, .05, '#2b2f38', x, 1.1, z - .25, 0); L.box(.95, .58, .01, '#bfe3ff', x, 1.15, z - .28); S.add(CYL, '#f4f0e6', x + .85, 1.08, z + .2, 0, .18, .2, .18);
@@ -154,11 +155,16 @@ const clip = (x, s, w) => { if (x.measureText(s).width <= w) return s; while (s.
 // ---- labels in HTML, placed over the 3D world every frame
 function addLabel(key, text, x, y, z, kind) { const e = document.createElement('div'); e.className = 'l3 ' + kind; e.textContent = text; LB.append(e); const l = {key, e, p:new THREE.Vector3(x, y, z), kind}; labels.push(l); return l; }
 const v3 = new THREE.Vector3();
-function placeLabels(zr) { const w = stage.clientWidth, h = stage.clientHeight;
-  for (const l of labels) { const show = l.kind === 'tag' ? zr > .5 : l.kind === 'name' ? zr > 1.35 || l.hot : l.kind === 'wing' ? zr > 1.35 : zr > 1.9; if (!show || (l.kind === 'st' && !l.e.textContent)) { if (l.on !== false) { l.e.style.display = 'none'; l.on = false; } continue; }
-    v3.copy(l.p).project(camera); const x = (v3.x + 1) / 2 * w, y = (1 - v3.y) / 2 * h; if (x < -80 || x > w + 80 || y < -30 || y > h + 30) { if (l.on !== false) { l.e.style.display = 'none'; l.on = false; } continue; }
-    if (l.on !== true) { l.e.style.display = ''; l.on = true; } l.e.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) translate(' + (l.kind === 'wing' ? '0' : '-50%') + ',-100%)'; } }
-
+const PRI = {tag:0, ask:1, work:2, mail:3, wait:4, ready:5, sleep:6, wing:7, box:8};
+function placeLabels(zr) { const w = stage.clientWidth, h = stage.clientHeight, placed = [], near = zr > 1.9;
+  for (const l of labels) { let show = l.kind === 'tag' ? true : l.kind === 'room' ? zr > 1.35 || l.hot : l.kind === 'wing' ? zr > 1.35 : zr > 2.2;
+    let x = 0, y = 0; if (show) { v3.copy(l.p).project(camera); x = (v3.x + 1) / 2 * w; y = (1 - v3.y) / 2 * h; show = x > -60 && x < w + 60 && y > -10 && y < h + 40; }
+    if (show && l.kind === 'room') { const full = near; if (l.full !== full) { l.full = full; l.e.classList.toggle('full', full); l.w = null; } }
+    if (show) { if (l.on !== true) { l.e.style.display = ''; l.on = true; l.w = null; } if (l.w == null) { l.w = l.e.offsetWidth; l.h = l.e.offsetHeight; }
+      const r = l.kind === 'wing' ? [x, y - l.h, x + l.w, y] : [x - l.w / 2, y - l.h, x + l.w / 2, y];
+      if (placed.some(q => r[0] < q[2] + 3 && r[2] > q[0] - 3 && r[1] < q[3] + 2 && r[3] > q[1] - 2)) show = false; else placed.push(r); }
+    if (!show) { if (l.on !== false) { l.e.style.display = 'none'; l.on = false; } continue; }
+    l.e.style.transform = 'translate(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px) translate(' + (l.kind === 'wing' ? '0' : '-50%') + ',-100%)'; } }
 // ---- the camera: isometric-ish, pans on the ground, pinches to zoom, twists to turn
 const cam = {tx:0, tz:0, z:1, yaw:.38, pitch:.8}, goal = {}; let fitZ = 1, auto = true, touched = -1e9, moving = false;
 try { auto = localStorage.getItem('dp-cam') !== '0'; } catch (e) {}
@@ -192,8 +198,8 @@ $('back').addEventListener('click', () => { if (VIEW3) { touched = -1e9; focus(n
 $('camb').addEventListener('click', () => { try { auto = localStorage.getItem('dp-cam') !== '0'; } catch (e) {} touched = -1e9; });
 function director(ms) { if (!auto || focusId || moving || ms - touched < 9000 || (ACT.game || {}).on) return null;
   if (CHATS.busy) return fit(W / 2 - 9, G - 1, W - 1, G + HALL + 1);
-  const f = fly[fly.length - 1]; if (f && byId[f.to]) { const r = byId[f.to]; return fit(r.x0 - 2, r.z0 - 2, r.x0 + TW + 2, r.z0 + TD + 2); }
-  const act = rooms.filter(r => stateOf(r.p) === 'work'); if (act.length && Math.floor(ms / 9000) % 3) { const r = act[Math.floor(ms / 27000) % act.length]; return fit(r.x0 - 1.5, r.z0 - 1.5, r.x0 + TW + 1.5, r.z0 + TD + 1.5); }
+  const f = fly[fly.length - 1]; if (f && byId[f.to]) { const r = byId[f.to]; return fit(r.x0 - 4, r.z0 - 3.5, r.x0 + TW + 4, r.z0 + TD + 3.5); }
+  const act = rooms.filter(r => stateOf(r.p) === 'work'); if (act.length && Math.floor(ms / 9000) % 3) { const r = act[Math.floor(ms / 27000) % act.length]; return fit(r.x0 - 4, r.z0 - 3.5, r.x0 + TW + 4, r.z0 + TD + 3.5); }
   return overview(); }
 
 // ---- life: who sits, who walks, what glows
@@ -201,12 +207,13 @@ function populate() { const gm = (ACT.game || {}).on;
   for (const rm of rooms) { const p = rm.p, st = gm ? 'sleep' : stateOf(p); rm.st = st; rm.light.material = STMAT[st];
     const a0 = (ACT.claude[p.id] || []).find(a => a.age < 300), w0 = (p.working || [])[0], pg = progs(p.id)[0], q0 = (p.questions || [])[0], r0 = (p.ready || [])[0];
     const say = st === 'work' ? (a0 ? a0.what : w0 ? 'đang làm ' + w0.id : pg ? 'đang chạy ' + (pg.script || pg.name) : 'phiên đang mở') : q0 ? 'chờ anh trả lời ' + q0.id : r0 ? 'sẵn sàng ' + r0.id + ' · ' + r0.title : st === 'sleep' ? 'đang nghỉ' : p.waiting ? p.waiting + ' mục bị chặn' : 'không có việc mở';
-    rm.plq.e.textContent = say.charAt(0).toUpperCase() + say.slice(1); rm.plq.e.style.borderLeftColor = COL[st];
-    const nm = labels.find(l => l.key === p.id); if (nm) { nm.hot = st === 'work' || st === 'ask' || !!p.mail; nm.e.textContent = '@' + p.id; if ((p.questions || []).length) { const b = document.createElement('em'); b.textContent = p.questions.length + ' ?'; nm.e.append(b); } if (p.mail) { const b = document.createElement('em'); b.className = 'm'; b.textContent = '✉' + p.mail; nm.e.append(b); } }
+    { const l = rm.lab, e = l.e; l.hot = st === 'work' || st === 'ask' || !!p.mail; l.pri = PRI[st]; e.textContent = ''; e.style.borderTopColor = COL[st]; const b = document.createElement('b'); b.textContent = '@' + p.id; e.append(b);
+      if ((p.questions || []).length) { const m = document.createElement('em'); m.textContent = p.questions.length + ' ?'; e.append(m); } if (p.mail) { const m = document.createElement('em'); m.className = 'm'; m.textContent = '✉' + p.mail; e.append(m); }
+      const sm = document.createElement('small'); sm.textContent = say.charAt(0).toUpperCase() + say.slice(1); e.append(sm); l.w = null; }
     if (rm.sign) { rm.head.remove(rm.sign); rm.sign = null; } if (st === 'ask' || st === 'sleep') { rm.sign = sign(st === 'ask' ? '?' : 'z', COL[st]); rm.sign.position.set(.5, 2.1, 0); rm.head.add(rm.sign); }
     const want = st === 'work' ? Math.min(2, Math.max(0, (p.working || []).length + (p.sessions || 0) - 1) + Math.max(0, (ACT.claude[p.id] || []).filter(a => a.age < 300).length - 1)) : 0;
     while (rm.extra.length > want) world.remove(rm.extra.pop()); while (rm.extra.length < want) { const k = rm.extra.length, m = person(rm.tint, hsh(p.id + k), .8); m.position.set(rm.x0 + (k ? TW - 1.3 : 1.3), .34, rm.z0 + TD - 1.4); m.rotation.y = k ? -.9 : .9; world.add(m); rm.extra.push(m); } }
-  const nq = STATE ? STATE.inbox.questions + STATE.inbox.person + pendingDel().length : 0, dl = labels.find(l => l.key === 'door'); if (dl) { dl.e.textContent = 'Anh Vinh'; if (nq) { const b = document.createElement('em'); b.textContent = nq; dl.e.append(b); } }
+  const nq = STATE ? STATE.inbox.questions + STATE.inbox.person + pendingDel().length : 0, dl = labels.find(l => l.key === 'door'); if (dl) { dl.e.textContent = 'Anh Vinh'; dl.w = null; if (nq) { const b = document.createElement('em'); b.textContent = nq; dl.e.append(b); } }
   if (!boss.m) { boss.m = person('#3f73a8', 77, 1.05); boss.m.position.set(boss.x, .34, boss.z - .95); world.add(boss.m); }
   // couriers: a question walks to the door, a letter from the manager, a report up to the parent
   const old = Object.fromEntries(walkers.map(w => [w.key, w])), keep = []; const mk = (key, rm, kind, glyph, a, b) => { let w = old[key]; if (!w) { w = {key, m:new THREE.Group(), t:Math.random() * 20, leg:0}; const body = person(COL[kind], hsh(key), .62, false); w.m.add(body); w.body = body; const s = sign(glyph, COL[kind]); s.position.set(0, 1.45, 0); s.scale.set(.6, .6, 1); w.m.add(s); world.add(w.m); w.m.position.set(a.x, .34, a.z); }
@@ -215,7 +222,8 @@ function populate() { const gm = (ACT.game || {}).on;
     if ((p.questions || []).length) mk(p.id + ':ask', rm, 'ask', '?', home, {x:door.x + 1, z:door.z + 1.6, zc:G + HALL + G / 2});
     if (p.mail) mk(p.id + ':mail', rm, 'mail', '✉', {x:boss.x - 1.6, z:boss.z + 1.2, zc:G + HALL + G / 2, vx:boss.x - 3}, {x:rm.cx - 1.5, z:rm.z0 + TD - 1.2, zc:rm.z0 + TD + G / 2});
     if (p.parent && byId[p.parent]) { const pr = byId[p.parent]; mk(p.id + ':link', rm, 'link', '↑', {x:rm.cx - 2.2, z:rm.z0 + TD - 1, zc:rm.z0 + TD + G / 2, vx:rm.x0 - G / 2}, {x:pr.cx + 2, z:pr.z0 + TD - 1, zc:pr.z0 + TD + G / 2}); } }
-  for (const w of walkers) if (!keep.includes(w)) world.remove(w.m); walkers = keep; SL = slides(); }
+  for (const w of walkers) if (!keep.includes(w)) world.remove(w.m); walkers = keep; SL = slides();
+  for (const l of labels) if (l.pri == null) l.pri = PRI[l.kind] != null ? PRI[l.kind] : 6; labels.sort((a, b) => a.pri - b.pri); }
 function route(a, b) { const vx = a.vx != null ? a.vx : a.x; return [a, {x:a.x, z:a.zc}, {x:vx, z:a.zc}, {x:vx, z:b.zc}, {x:b.x, z:b.zc}, b]; }
 function along(path, d) { for (let i = 1; i < path.length; i++) { const p = path[i - 1], q = path[i], l = Math.hypot(q.x - p.x, q.z - p.z); if (d <= l) return {x:p.x + (q.x - p.x) * d / l, z:p.z + (q.z - p.z) * d / l, dx:q.x - p.x, dz:q.z - p.z}; d -= l; } const e = path[path.length - 1]; return {x:e.x, z:e.z, dx:0, dz:0}; }
 const plen = p => p.slice(1).reduce((s, q, i) => s + Math.hypot(q.x - p[i].x, q.z - p[i].z), 0);
@@ -233,9 +241,9 @@ function weather(t, dt) { const s = skyNow(), w = s.w, key = s.k + w.kind + Math
   if (key !== skyKey) { skyKey = key; cv.style.background = 'linear-gradient(' + s.top + ',' + s.bot + ' 70%)'; const night = s.k === 'night', low = s.k !== 'day';
     const u = Math.max(.02, Math.min(.98, night ? s.v : s.u)), az = Math.PI * (1 - u), el = (night ? .7 : 1.15) * Math.sin(Math.PI * u) + .12, cx = (isle.x0 + isle.x1) / 2, cz = (isle.z0 + isle.z1) / 2;
     sun.position.set(cx + Math.cos(az) * Math.cos(el) * 60, Math.sin(el) * 60, cz + Math.sin(az) * Math.cos(el) * 26 + 10); sun.target.position.set(cx, 0, cz);
-    sun.color.set(night ? '#9fb3ff' : low ? '#ffb27a' : '#fff2d8'); sun.intensity = (night ? .75 : low ? 1.4 : 2.3) * (w.wet || w.cloud > 85 ? .45 : 1);
-    hemi.color.set(night ? '#8a9ad0' : '#dfefff'); hemi.groundColor.set(night ? '#3a3a4a' : '#6b7f4a'); hemi.intensity = night ? 1.15 : w.wet ? 1.25 : 1.05;
-    const lit = night || s.k === 'dusk'; MGLOW.color.set(lit ? '#ffd27a' : w.wet ? '#c7d3dc' : '#cfe8fb'); for (const l of lamps) l.pool.material.opacity = lit ? (l.post ? .3 : l.room ? (l.room.st === 'sleep' ? .06 : .22) : .2) : 0;
+    sun.castShadow = !night; sun.color.set(night ? '#c4ccf0' : low ? '#ffb27a' : '#fff2d8'); sun.intensity = (night ? .55 : low ? 1.4 : 2.3) * (w.wet || w.cloud > 85 ? .45 : 1);
+    hemi.color.set(night ? '#b4b9d6' : '#dfefff'); hemi.groundColor.set(night ? '#5a5048' : '#6b7f4a'); hemi.intensity = night ? 1.45 : w.wet ? 1.25 : 1.05;
+    const lit = night || s.k === 'dusk'; MGLOW.color.set(lit ? '#ffd27a' : w.wet ? '#c7d3dc' : '#cfe8fb'); for (const l of lamps) l.pool.material.opacity = lit ? (l.post ? .5 : l.room ? (l.room.st === 'sleep' ? .12 : .4) : .35) : 0;
     scene.fog = w.kind === 'fog' ? new THREE.Fog(s.bot, 40, 110) : null; if (pond) pond.mesh.material.color.set(night ? '#2a4660' : w.wet ? '#7d9db0' : '#6fb2d6');
     const cc = night ? '#5a6280' : w.wet || w.cloud > 80 ? '#c9d0d8' : '#ffffff'; clouds.forEach(c => { c.material.color.set(cc); c.material.opacity = night ? .55 : .92; }); }
   const nc = Math.min(9, Math.round((w.cloud || 0) / 11) + (w.wet ? 2 : 0)), span = isle.x1 - isle.x0 + 30;
