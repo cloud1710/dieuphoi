@@ -15,7 +15,8 @@ tunnel: {enabled: true, worker: dieuphoi}
 # games: khi một trong các chương trình này chạy, hub tự bật chế độ chơi game (tạm dừng agents); tắt game thì chạy lại.
 # processes: chỉ những tên ở đây mới tự bật chế độ chơi game (đúng như Task Manager). Danh sách NVIDIA app quét được nằm ở
 # out/nvidia-games.json để tham khảo; không tự lấy vì nó lẫn cả phần mềm chạy nền như Logitech G Hub (nvidia: false).
-games: {auto: true, nvidia: false, processes: ['League of Legends.exe', 'PBZ.exe']}
+# stream: true = khi GPU đang mã hoá hình để stream (MoonlightWeb, Moonlight) cũng tự bật chế độ chơi game.
+games: {auto: true, nvidia: false, stream: true, processes: ['League of Legends.exe', 'PBZ.exe']}
 # chat: model cho ô chat tổng quản trong app. model: auto = tự chọn theo tin nhắn (hỏi nhanh -> light, việc thường -> normal,
 # thiết kế/phân tích/tin dài -> deep). Đặt model: sonnet (hoặc tên khác) để cố định. Mở đầu tin bằng /haiku /sonnet /opus để ép.
 # Mỗi model giữ một phiên riêng; phiên vượt max_context token thì lượt sau mở phiên mới (kèm vài tin gần nhất) để đỡ tốn.

@@ -1759,6 +1759,15 @@ def game_watch():
             if cfg.get('nvidia') is True:               # opt in only: that list also holds background software
                 names += [x for g in nvidia_games() for x in g['exes']]
             playing = running_games(names)
+            if not playing and cfg.get('stream', True):      # someone plays through MoonlightWeb or Moonlight: the GPU encoder is busy
+                try:
+                    sys.path.insert(0, str(Path(__file__).resolve().parent))
+                    import hw
+                    rows = hw._smi('--query-gpu=encoder.stats.sessionCount') or []
+                    if any(r and r[0].isdigit() and int(r[0]) > 0 for r in rows):
+                        playing = ['stream (MoonlightWeb/Sunshine)']
+                except Exception:
+                    pass
             if playing and not GAME['on']:
                 game_set(True, 'auto: ' + playing[0])
             elif GAME['on'] and str(GAME['by']).startswith('auto'):
