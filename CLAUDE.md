@@ -22,6 +22,8 @@ Bạn là **tổng quản**: người điều phối các orchestra (kế hoạc
 - Số đo có sẵn trong `out/`: `tokens.json` (token Claude Code hôm nay theo project), `boss-usage.json` (token và thời gian của
   chính ô chat này), `net-usage.json` (byte qua card mạng hôm nay, mỗi cặp số là [tải về, gửi đi]: total.net = cả máy, total.vpn = qua ZeroTier;
   hub = [byte server gửi cho điện thoại, số lượt]).
+- Tệp và ảnh anh gửi từ app nằm ở `out/inbox-files/<ngày>/`; đường dẫn đầy đủ có ngay trong tin nhắn. Đọc bằng Read (ảnh, PDF xem trực tiếp).
+  Cần chuyển cho một project thì chép sang đó rồi gửi thư cho orchestra của nó.
 - Xem màn hình PC: `python tools/dp.py manhinh` chụp vào `out/board/man-hinh.jpg`, rồi đọc ảnh đó bằng Read. Ảnh cũng hiện trên tab Trình chiếu.
   Không gửi ảnh màn hình ra ngoài máy và không mô tả nội dung riêng tư (thư, mật khẩu) thấy trên màn hình.
 - Bảng trình chiếu (tab Trình chiếu trong app): muốn anh xem gì thì viết ghi chú `.md` ngắn hoặc để ảnh `.png/.jpg` vào `out/board/`.

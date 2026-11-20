@@ -20,6 +20,7 @@ import datetime
 import hashlib
 import hmac
 import json
+import mimetypes
 import os
 import re
 import secrets
@@ -342,6 +343,22 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(400, {'error': short(e, 120)})
         if not pass_ok(self.headers.get('X-DP-Key'), self.ip()):
             return self.reply(401, {'error': 'key', 'why': _WHY.get(self.ip(), 'none')})
+        if path == '/api/upload':
+            try:
+                n = int(self.headers.get('Content-Length') or 0)
+                if not 0 < n <= UPLOAD_MAX:
+                    raise ValueError('tệp phải nhỏ hơn %d MB' % (UPLOAD_MAX // 2 ** 20))
+                name = parse_qs(urlsplit(self.path).query).get('name', ['tep'])[0]
+                data, left = bytearray(), n
+                while left:
+                    chunk = self.rfile.read(min(left, 1 << 20))
+                    if not chunk:
+                        raise ValueError('tải lên bị ngắt')
+                    data += chunk
+                    left -= len(chunk)
+                return self.reply(200, save_upload(name, bytes(data)))
+            except Exception as e:
+                return self.reply(400, {'error': '%s: %s' % (type(e).__name__, short(e, 200))})
         try:
             n = int(self.headers.get('Content-Length') or 0)
             if not 0 < n <= 16384:
@@ -350,7 +367,7 @@ class Handler(SimpleHTTPRequestHandler):
             if path == '/api/chat':
                 if data.get('ask'):
                     return self.reply(200, answer_ask(str(data['ask']), str(data.get('choice') or '')))
-                return self.reply(200, chat_send(data.get('text'), again=data.get('again') is True))
+                return self.reply(200, chat_send(data.get('text'), again=data.get('again') is True, files=data.get('files')))
             if path == '/api/delete':
                 out = {'ok': True, 'result': _xoa().decide(HUB, str(data.get('id')), data.get('yes') is True, 'Vinh qua app')}
                 chat_log('boss', out['result'])
@@ -487,6 +504,17 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header('Content-Length', str(len(jpg)))
             self.end_headers()
             return self.wfile.write(jpg)
+        if path == '/api/upload':
+            f = upload_path(parse_qs(urlsplit(self.path).query).get('id', [''])[0])
+            if not f:
+                return self.reply(404, {'error': 'no such file'})
+            data = f.read_bytes()
+            self.send_response(200)
+            self.send_header('Content-Type', mimetypes.guess_type(f.name)[0] or 'application/octet-stream')
+            self.send_header('Cache-Control', 'private, max-age=86400')
+            self.send_header('Content-Length', str(len(data)))
+            self.end_headers()
+            return self.wfile.write(data)
         if path == '/api/board/file':
             q = parse_qs(urlsplit(self.path).query)
             got = _board().image(HUB, _pairs(True), q.get('src', [''])[0], q.get('name', [''])[0])
@@ -1524,6 +1552,28 @@ def chat_run(text):
 
 
 PENDING = HUB / 'out' / 'chat-pending.json'
+UPLOAD_MAX = 40 * 2 ** 20
+UPLOADS = HUB / 'out' / 'inbox-files'
+IMAGE_EXT = ('.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic')
+
+
+def save_upload(name, data):
+    """A file the owner sends from the phone: kept under out/inbox-files/<day>/ (not on GitHub), for the manager."""
+    base = re.sub(r'[^\w.\- ]+', '_', Path(str(name).replace('\\', '/')).name, flags=re.UNICODE).strip(' .') or 'tep'
+    day = UPLOADS / datetime.date.today().isoformat()
+    day.mkdir(parents=True, exist_ok=True)
+    f = day / ('%s-%s' % (datetime.datetime.now().strftime('%H%M%S'), base[-120:]))
+    f.write_bytes(data)
+    rel = f.relative_to(UPLOADS).as_posix()
+    return {'ok': True, 'id': rel, 'name': base, 'size': len(data), 'image': f.suffix.lower() in IMAGE_EXT, 'path': str(f)}
+
+
+def upload_path(rel):
+    rel = str(rel or '').replace('\\', '/')
+    if '..' in rel.split('/') or rel.startswith('/'):
+        return None
+    f = UPLOADS / rel
+    return f if f.is_file() else None
 QUEUE = HUB / 'out' / 'chat-queue.json'
 ASKS = HUB / 'out' / 'asks.json'
 
@@ -1570,20 +1620,26 @@ def answer_ask(hid, choice):
     return chat_send('%s (anh chọn ở câu hỏi %s: %s)' % (choice, hid, a['q']))
 
 
-def chat_send(text, who='vinh', again=False):
+def chat_send(text, who='vinh', again=False, files=None):
     text = str(text or '').strip()[:4000]
+    files = [f for f in (upload_path(x) for x in (files or [])[:10]) if f]
+    meta = {'files': [{'id': f.relative_to(UPLOADS).as_posix(), 'name': f.name.split('-', 1)[-1], 'size': f.stat().st_size,
+                       'image': f.suffix.lower() in IMAGE_EXT} for f in files]} if files else None
+    if files:
+        shown = text or '(anh gửi %d tệp)' % len(files)
+        text = shown + '\n\nTệp anh gửi kèm (đọc bằng Read, ảnh xem được trực tiếp):\n' + '\n'.join('- ' + str(f) for f in files)
     if not text:
         raise ValueError('empty message')
     if CHAT['busy']:
         if again:
             raise ValueError('tổng quản đang trả lời tin trước, chờ một chút')
-        chat_log(who, text)
+        chat_log(who, shown if files else text, meta)
         q = _queue()
         q.append(text)
         QUEUE.write_text(json.dumps(q, ensure_ascii=False), encoding='utf-8')
         return chat_state()
     if not again:
-        chat_log(who, text)
+        chat_log(who, shown if files else text, meta)
     CHAT['busy'] = True
     PENDING.write_text(json.dumps({'text': text, 'at': time.time()}, ensure_ascii=False), encoding='utf-8')
     threading.Thread(target=chat_run, args=(text,), daemon=True).start()
