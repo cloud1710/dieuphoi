@@ -36,7 +36,7 @@ const BOX = new THREE.BoxGeometry(1, 1, 1), CYL = new THREE.CylinderGeometry(.5,
 
 // ---- people: one baked mesh each (legs, body, arms, head, hair), so many of them stay cheap
 const SKIN = ['#f3cfa6', '#e2b084', '#c88d62', '#9a6342'], HAIR = ['#2a2019', '#56371f', '#9b6229', '#d6ad66', '#25304d', '#7c3030', '#cfcfcf'], PANTS = ['#2f3447', '#3b3a36', '#24384a', '#40303a'];
-function person(shirt, seed, scale = 1, seated = true) { const b = Baker(), sk = SKIN[seed % 4], hr = HAIR[(seed >> 3) % 7], pt = PANTS[(seed >> 6) % 4], long = (seed >> 9) % 3 === 0;
+function person(shirt, seed, scale = 1, seated = true) { const b = Baker(), sk = SKIN[seed % 4], hr = HAIR[(seed >>> 3) % 7], pt = PANTS[(seed >>> 6) % 4], long = (seed >>> 9) % 3 === 0;
   if (seated) { b.box(.42, .16, .5, pt, 0, .44, .18); b.box(.16, .45, .16, pt, -.11, 0, .4); b.box(.16, .45, .16, pt, .11, 0, .4); }
   else { b.box(.16, .5, .16, pt, -.11, 0, 0); b.box(.16, .5, .16, pt, .11, 0, 0); }
   const y0 = seated ? .55 : .5; b.add(new THREE.CapsuleGeometry(.24, .3, 3, 8), shirt, 0, y0 + .32, 0); b.box(.12, .42, .12, shirt, -.32, y0 + .12, seated ? .14 : 0); b.box(.12, .42, .12, shirt, .32, y0 + .12, seated ? .14 : 0);
@@ -63,7 +63,7 @@ function build(s) {
   // the building: a stone base, an outer back wall, the office inside
   S.box(W + 1, .34, D + 1, '#cdbb98', W / 2, 0, D / 2); S.box(W + .2, 2.7, .3, '#efe6d4', W / 2, .3, -.15); S.box(W + .4, .14, .4, '#c9b48d', W / 2, 3.0, -.15);
   managerOffice(S, L); ent = W / 2 + 1.7;
-  callL = addLabel('call', '', boss.x, 3.4, boss.z - 1.1, 'tag'); addLabel('room', 'Phòng tổng quản', W * .3, 3, D, 'tag');
+  callL = addLabel('call', '', boss.x, 3.4, boss.z - 1.1, 'tag'); addLabel('room', 'Phòng CEO', W * .3, 3, D, 'tag');
   // garden: an arch and a stone path from the gate, a pond with a bench, flower beds, trees, palms, rocks, lamps
   for (let z = D + 1; z < isle.z1 - 1; z += 1.1) S.add(CYL, '#d9c7a3', ent + Math.sin(z * .7) * .4, .02, z, z, 1.1, .06, .8);
   for (const sx of [-1.1, 1.1]) S.box(.3, 2.6, .3, '#7d5f43', ent + sx, 0, isle.z1 - 2.2); S.box(2.7, .3, .4, '#7d5f43', ent, 2.6, isle.z1 - 2.2); S.box(2.2, .25, .3, '#3f73a8', ent, 2.28, isle.z1 - 2.15);
@@ -131,7 +131,7 @@ function bigPlant(S, x, z) { S.add(CYL, '#e8e2d4', x, .34 + .35, z, 0, .55, .7, 
   for (let i = 0; i < 9; i++) { const a = i * 2.4, h = 1.3 + i * .14; S.add(SPH, i % 2 ? '#3f8a3a' : '#5aa548', x + Math.cos(a) * .3, h, z + Math.sin(a) * .3, a, .42, .12, .3, .5, .3); } }
 function plantAt(S, x, z, s) { S.add(CYL, '#b5563c', x, .34 + .25 * s, z, 0, .55 * s, .5 * s, .55 * s); for (let j = 0; j < 4; j++) S.add(ICO, j % 2 ? '#4f9a45' : '#6dbb57', x + Math.cos(j * 1.6) * .18 * s, .34 + (.75 + j * .12) * s, z + Math.sin(j * 1.6) * .18 * s, j, .55 * s, .6 * s, .55 * s); }
 function shelfAt(S, x, z, seed) { S.box(1.5, 1.7, .5, '#7d5f43', x, .34, z); const B = ['#d2553d', '#3f73a8', '#d39a2f', '#3f9d74', '#8a6fc2', '#e7dcc4'];
-  for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) S.box(.22, .38 - ((seed >> (c + r)) & 1) * .06, .3, B[(seed >> (r * 3 + c)) % 6], x - .5 + c * .25, .5 + r * .52, z + .14); }
+  for (let r = 0; r < 3; r++) for (let c = 0; c < 5; c++) S.box(.22, .38 - ((seed >>> (c + r)) & 1) * .06, .3, B[(seed >>> (r * 3 + c)) % 6], x - .5 + c * .25, .5 + r * .52, z + .14); }
 function treeAt(S, x, z, s, v) { S.add(CYL, '#6b4a2e', x, .4 + .9 * s, z, 0, .32 * s, 1.8 * s, .32 * s); const g = ['#4f9a45', '#3f8a52', '#6a9d3a'][Math.floor(v * 3)];
   S.add(ICO, g, x, .5 + 2.3 * s, z, v * 6, 2.3 * s, 2.1 * s, 2.3 * s); S.add(ICO, shade(g, 1.15), x + .35 * s, .5 + 2.9 * s, z - .2 * s, v * 3, 1.5 * s, 1.4 * s, 1.5 * s); }
 function pineAt(S, x, z, s) { S.add(CYL, '#5b3d26', x, .4 + .4 * s, z, 0, .26 * s, .8 * s, .26 * s); for (let k = 0; k < 3; k++) S.add(CONE, k % 2 ? '#2f7a5c' : '#3a8a66', x, .4 + (1.3 + k * .75) * s, z, k, (2 - k * .45) * s, 1.4 * s, (2 - k * .45) * s); }
@@ -176,16 +176,30 @@ cv.addEventListener('wheel', e => { e.preventDefault(); touched = performance.no
 // ---- the working orchestras: one row each on the left, a drawn face and the name
 const LIST = document.createElement('div'); LIST.id = 'act3'; stage.append(LIST);
 const SKIN2 = SKIN, HAIR2 = HAIR, FACES = {};
-function face(o) { const k = o.p.id + o.tint; if (FACES[k]) return FACES[k]; const c = document.createElement('canvas'); c.width = c.height = 56; const x = c.getContext('2d'), sd = o.seed;
-  const sk = SKIN2[sd % 4], hr = HAIR2[(sd >> 3) % 7], long = (sd >> 9) % 3 === 0;
-  x.fillStyle = shade(o.tint, 1.12); x.beginPath(); x.arc(28, 28, 28, 0, 7); x.fill();
-  x.save(); x.beginPath(); x.arc(28, 28, 28, 0, 7); x.clip();
-  if (long) { x.fillStyle = hr; x.beginPath(); x.roundRect(11, 16, 34, 30, 10); x.fill(); }
-  x.fillStyle = o.tint === '#ffffff' ? '#ccc' : shade(o.tint, .8); x.beginPath(); x.ellipse(28, 58, 22, 16, 0, 0, 7); x.fill();
-  x.fillStyle = sk; x.fillRect(24, 36, 8, 8); x.beginPath(); x.ellipse(28, 26, 13, 14, 0, 0, 7); x.fill();
-  x.fillStyle = hr; x.beginPath(); x.ellipse(28, 17, 14.5, 8.5, 0, Math.PI, 2 * Math.PI); x.fill(); x.fillRect(13.5, 15, 29, 5); x.restore();
-  x.fillStyle = '#222'; x.fillRect(21.5, 25, 3, 3.5); x.fillRect(31.5, 25, 3, 3.5); x.strokeStyle = '#7a3d2a'; x.lineWidth = 1.6; x.beginPath(); x.arc(28, 31, 4, .2 * Math.PI, .8 * Math.PI); x.stroke();
-  return FACES[k] = c.toDataURL(); }
+function face(o) { const k = o.p.id + o.tint; if (FACES[k]) return FACES[k]; const c = document.createElement('canvas'); c.width = c.height = 120; const x = c.getContext('2d'), sd = o.seed;
+  const sk = SKIN2[sd % 4], hr = HAIR2[(sd >>> 3) % 7], long = (sd >>> 9) % 3 === 0, style = long ? (sd >>> 11) % 2 : 2 + (sd >>> 11) % 3, specs = (sd >>> 14) % 4 === 0, shirt = o.tint;
+  const R = (cx, cy, rx, ry, col) => { x.fillStyle = col; x.beginPath(); x.ellipse(cx, cy, rx, ry, 0, 0, 7); x.fill(); };
+  const bg = x.createRadialGradient(42, 34, 8, 60, 60, 66); bg.addColorStop(0, shade(shirt, 1.25)); bg.addColorStop(1, shade(shirt, .92)); x.fillStyle = bg; x.beginPath(); x.arc(60, 60, 60, 0, 7); x.fill();
+  x.save(); x.beginPath(); x.arc(60, 60, 60, 0, 7); x.clip();
+  if (style === 0) { x.fillStyle = hr; x.beginPath(); x.roundRect(28, 30, 64, 66, 22); x.fill(); }                     // long hair behind
+  if (style === 1) { R(60, 22, 13, 11, hr); }                                                                            // a bun
+  const sh = x.createLinearGradient(0, 88, 0, 120); sh.addColorStop(0, shade(shirt, .82)); sh.addColorStop(1, shade(shirt, .62)); x.fillStyle = sh; x.beginPath(); x.ellipse(60, 124, 44, 34, 0, 0, 7); x.fill();   // shoulders
+  x.fillStyle = shade(sk, .86); x.fillRect(51, 74, 18, 18); x.fillStyle = '#fff'; x.beginPath(); x.moveTo(46, 92); x.lineTo(60, 104); x.lineTo(74, 92); x.lineTo(68, 89); x.lineTo(60, 97); x.lineTo(52, 89); x.closePath(); x.fill();  // neck, collar
+  R(33, 56, 5, 7, shade(sk, .92)); R(87, 56, 5, 7, shade(sk, .92));                                                      // ears
+  const fg = x.createRadialGradient(50, 44, 4, 60, 54, 30); fg.addColorStop(0, shade(sk, 1.08)); fg.addColorStop(1, shade(sk, .94)); x.fillStyle = fg; x.beginPath(); x.ellipse(60, 54, 26, 29, 0, 0, 7); x.fill();  // face
+  x.fillStyle = hr; x.beginPath();                                                                                      // hair on top, by style
+  if (style === 0 || style === 1) { x.ellipse(60, 40, 28, 19, 0, Math.PI, 2 * Math.PI); x.fill(); x.beginPath(); x.moveTo(34, 42); x.quadraticCurveTo(52, 26, 66, 40); x.quadraticCurveTo(76, 30, 87, 44); x.lineTo(87, 36); x.lineTo(34, 36); x.fill(); }
+  else if (style === 2) { x.ellipse(60, 38, 28, 17, 0, Math.PI, 2 * Math.PI); x.fill(); x.beginPath(); x.moveTo(33, 40); x.quadraticCurveTo(40, 30, 58, 33); x.quadraticCurveTo(76, 30, 87, 42); x.lineTo(87, 36); x.lineTo(33, 36); x.fill(); x.fillRect(32, 36, 5, 14); x.fillRect(83, 36, 5, 12); }
+  else if (style === 3) { for (let i = 0; i < 9; i++) R(36 + i * 6, 32 + Math.abs(4 - i) * 1.6, 7, 7, hr); }
+  else { x.ellipse(60, 36, 27, 14, 0, Math.PI, 2 * Math.PI); x.fill(); x.beginPath(); x.moveTo(34, 38); x.lineTo(46, 26); x.lineTo(52, 34); x.lineTo(62, 24); x.lineTo(70, 34); x.lineTo(80, 27); x.lineTo(86, 40); x.lineTo(86, 36); x.fill(); }
+  x.fillStyle = 'rgba(255,255,255,.18)'; x.beginPath(); x.ellipse(50, 32, 9, 3, -.3, 0, 7); x.fill();                 // hair shine
+  x.strokeStyle = shade(hr, .9); x.lineWidth = 2.6; x.lineCap = 'round'; x.beginPath(); x.moveTo(42, 46); x.quadraticCurveTo(48, 43, 53, 45); x.moveTo(67, 45); x.quadraticCurveTo(72, 43, 78, 46); x.stroke();   // brows
+  for (const ex of [48, 72]) { R(ex, 54, 4.2, 5, '#2a2320'); R(ex + 1.4, 52.4, 1.5, 1.5, '#fff'); }                    // eyes with a glint
+  R(42, 63, 5, 3, 'rgba(240,120,120,.35)'); R(78, 63, 5, 3, 'rgba(240,120,120,.35)');                                 // cheeks
+  x.strokeStyle = shade(sk, .72); x.lineWidth = 1.8; x.beginPath(); x.moveTo(60, 56); x.quadraticCurveTo(57, 62, 61, 63); x.stroke();   // nose
+  x.strokeStyle = '#8a3f33'; x.lineWidth = 2.4; x.beginPath(); x.arc(60, 64, 7, .18 * Math.PI, .82 * Math.PI); x.stroke();          // smile
+  if (specs) { x.strokeStyle = '#2b2f38'; x.lineWidth = 2.2; x.beginPath(); x.roundRect(39, 47, 18, 14, 5); x.roundRect(63, 47, 18, 14, 5); x.moveTo(57, 53); x.lineTo(63, 53); x.stroke(); }
+  x.restore(); return FACES[k] = c.toDataURL(); }
 function drawList() { LIST.textContent = ''; const act = orchs.filter(o => o.st === 'work');
   if (!act.length) { const r = document.createElement('div'); r.className = 'ar none'; r.textContent = 'Chưa orchestra nào đang làm'; LIST.append(r); return; }
   for (const o of act) { const r = document.createElement('div'); r.className = 'ar' + (meet && meet.o === o ? ' meet' : '') + (focusId === o.p.id ? ' sel' : ''); const im = document.createElement('img'); im.src = face(o); im.alt = '';
@@ -227,7 +241,7 @@ function meetTick(t, dt) {
   if (!meet && meetQ.length && !(ACT.game || {}).on) { const m = meetQ.shift(); meet = m; m.ph = 'call'; call = {t:0};
     const a = new THREE.Vector3(boss.x, 2.4, boss.z - 1.1), b = new THREE.Vector3(ent, 1.2, isle.z1 - 1.4), mid = a.clone().lerp(b, .5); mid.y += 8;
     arc = new THREE.Group(); arc.userData.curve = new THREE.QuadraticBezierCurve3(a, mid, b); for (let i = 0; i < 14; i++) { const d = new THREE.Mesh(SPH, DOTM); d.scale.setScalar(.32); d.renderOrder = 4; arc.add(d); } world.add(arc);
-    callL.e.textContent = '☎ Tổng quản gọi @' + m.o.p.id + ' lên phòng'; callL.w = null; phoneS.position.set(boss.x + .55, 2.6, boss.z - 1.1); phoneS.visible = true; drawList(); }
+    callL.e.textContent = '☎ CEO gọi @' + m.o.p.id + ' lên phòng'; callL.w = null; phoneS.position.set(boss.x + .55, 2.6, boss.z - 1.1); phoneS.visible = true; drawList(); }
   if (!meet) return; const m = meet, o = m.o;
   if (m.ph === 'call') { call.t += dt; const k = call.t; phoneS.position.y = 2.6 + Math.abs(Math.sin(k * 10)) * .12; arc.children.forEach((d, i) => { const u = ((i / 14) + k * .35) % 1; arc.userData.curve.getPoint(u, d.position); d.scale.setScalar(.2 + .2 * Math.sin(u * Math.PI)); });
     if (k < 3.2) return; endCall(); const g = new THREE.Group(), b = person(o.tint, o.seed, 1, false); g.add(b); world.add(g); m.a = {g, b, path:inPath(), d:0, dir:1}; m.ph = 'walk'; }

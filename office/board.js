@@ -1,4 +1,4 @@
-// Bảng trình chiếu: xem server local của PC, ảnh chụp và ghi chú của tổng quản và các orchestra.
+// Bảng trình chiếu: xem server local của PC, ảnh chụp và ghi chú của CEO và các orchestra.
 // Dùng các hàm chung của m.html (E, $, api, CHATS, ACT, cur, liveMode).
 (() => {
   const css = document.createElement('style');
@@ -69,7 +69,7 @@ details.grp>summary{padding:10px 12px}details.grp>.in .row{padding-left:33px}
   }
   function bossSlide() {
     const d = E('div', 'slide'), last = (CHATS.messages || []).filter(m => m.who !== 'vinh').slice(-1)[0], note = CHATS.note;
-    d.append(E('b', '', CHATS.busy ? 'Tổng quản ' + (CHATS.step || 'đang trả lời') : 'Tổng quản'));
+    d.append(E('b', '', CHATS.busy ? 'CEO ' + (CHATS.step || 'đang trả lời') : 'CEO'));
     d.append(CHATS.busy ? 'Đang xử lý tin của anh từ ' + (CHATS.since || '') + '…' : last ? last.text.replace(/[*`]/g, '').slice(0, 700) : 'Chưa có gì để trình chiếu. Chọn một server hoặc một ảnh ở bên dưới.');
     if (note && note.text) { d.append(E('b', '', '\nViệc gần nhất' + (note.t ? ' · ' + note.t : ''))); d.lastChild.style.marginTop = '12px'; d.append(String(note.text).slice(0, 400)); }
     return d;
@@ -78,8 +78,8 @@ details.grp>summary{padding:10px 12px}details.grp>.in .row{padding-left:33px}
   function fsBtn(sc) { const b = E('button', 'act', 'Toàn màn hình'); b.onclick = () => { sc.classList.add('fs', 'full'); const x = E('button', 'act', '✕ Đóng'); x.id = 'bclose'; x.onclick = () => { sc.classList.remove('fs', 'full'); x.remove(); }; sc.append(x); }; return b; }
   function screen() {
     const sc = $('bscreen'), bar = $('bbar'); sc.textContent = ''; bar.textContent = ''; sc.classList.remove('full', 'fs');
-    if (!sel) { sc.append(bossSlide()); bar.append(E('span', '', 'Màn chiếu: tổng quản')); return; }
-    const home = E('button', 'act', 'Tổng quản'); home.onclick = () => { sel = null; screen(); lists(); };
+    if (!sel) { sc.append(bossSlide()); bar.append(E('span', '', 'Màn chiếu: CEO')); return; }
+    const home = E('button', 'act', 'CEO'); home.onclick = () => { sel = null; screen(); lists(); };
     if (sel.kind === 'pc') {
       const i = E('img'); i.alt = 'Màn hình PC'; sc.append(i); let on = true, fails = 0;
       const next = () => { if (!on || !document.body.contains(i)) return; const n = new Image(); n.onload = () => { i.src = n.src; fails = 0; setTimeout(next, document.hidden ? 4000 : 1200); };
@@ -99,7 +99,7 @@ details.grp>summary{padding:10px 12px}details.grp>.in .row{padding-left:33px}
       const i = E('img'); i.src = imgUrl(sel); i.alt = sel.name; sc.append(i);
       const out = fsBtn(sc);
       bar.append(E('span', '', sel.name + ' · ' + sel.when + (sel.src === 'hub' ? '' : ' · @' + sel.src)), out, home);
-    } else { const d = E('div', 'slide'); d.append(E('b', '', sel.name + ' · ' + sel.when), sel.text || ''); sc.append(d); bar.append(E('span', '', 'Ghi chú' + (sel.src === 'hub' ? ' của tổng quản' : ' của @' + sel.src)), home); }
+    } else { const d = E('div', 'slide'); d.append(E('b', '', sel.name + ' · ' + sel.when), sel.text || ''); sc.append(d); bar.append(E('span', '', 'Ghi chú' + (sel.src === 'hub' ? ' của CEO' : ' của @' + sel.src)), home); }
   }
   function lists() {
     const l = $('blists'); l.textContent = ''; if (!B) return;
@@ -127,7 +127,7 @@ details.grp>summary{padding:10px 12px}details.grp>.in .row{padding-left:33px}
       d.append(nm, E('span', 'chip', 'Xem')); d.onclick = () => { sel = me; screen(); lists(); scrollTo(0, 0); }; ks.append(d); });
     l.append(sect('b-srv', 'Server local trên PC', ks, true, sv ? sv.length + ' đang chạy' : ''));
     const its = B.items || [], kt = E('div', 'card');
-    if (!its.length) kt.append(E('div', 'empty', 'Chưa có ảnh hay ghi chú. Bấm "Chụp" khi đang xem một server, hoặc nhắn tổng quản "đưa … lên bảng".'));
+    if (!its.length) kt.append(E('div', 'empty', 'Chưa có ảnh hay ghi chú. Bấm "Chụp" khi đang xem một server, hoặc nhắn CEO "đưa … lên bảng".'));
     else { const g = E('div', 'thumbs'); its.forEach(it => { const me = {id:it.src + '/' + it.name, ...it}, b = E('button', same(sel, me) ? 'on' : '');
       if (it.kind === 'image') { const i = E('img'); i.loading = 'lazy'; i.src = imgUrl(it); i.alt = ''; b.append(i); } else b.append(E('div', 'nt', (it.text || '').slice(0, 140)));
       b.append(E('small', '', (it.src === 'hub' ? '' : '@' + it.src + ' · ') + it.when)); b.onclick = () => { sel = me; screen(); lists(); scrollTo(0, 0); }; g.append(b); }); kt.append(g); }

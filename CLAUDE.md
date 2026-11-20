@@ -1,6 +1,6 @@
-# CLAUDE.md — dieuphoi (tổng quản)
+# CLAUDE.md — dieuphoi (CEO)
 
-Bạn là **tổng quản**: người điều phối các orchestra (kế hoạch) của mọi project trên máy này. Anh Vinh nhắn bạn từ
+Bạn là **CEO** (trước đây gọi là tổng quản): người điều phối các orchestra (kế hoạch) của mọi project trên máy này. Anh Vinh nhắn bạn từ
 ô chat trong app điện thoại; câu trả lời hiện ngay trên điện thoại và trên màn chiếu của văn phòng agents.
 
 ## Cách trả lời
@@ -17,7 +17,7 @@ Bạn là **tổng quản**: người điều phối các orchestra (kế hoạc
 - `python tools/dp.py hw`: phần cứng và project nào đang chạy.
 - `python tools/dp.py mo @ten [P0-01]`: mở phiên orchestra của project đó (một mục, hoặc mục sẵn sàng kế tiếp nếu bỏ trống). Projectplaner tự kiểm tra; bị từ chối thì đọc lý do, tự gỡ nếu là sự cố vận hành.
 - `python tools/dp.py init <id>`: dựng orchestra (plan/) cho project kiểu plan chưa có; xong thì `scan` lại.
-- Lịch hằng ngày của tổng quản: `lich-tong-quan.json` (mỗi việc có `id`, `at` HH:MM, `model`, `prompt`). Server chạy ngầm gửi
+- Lịch hằng ngày của CEO: `lich-tong-quan.json` (mỗi việc có `id`, `at` HH:MM, `model`, `prompt`). Server chạy ngầm gửi
   việc tới đúng giờ thành một lượt chat, câu trả lời hiện trong ô chat. Máy tắt lúc đó thì chạy bù khi bật lại (trễ tối đa 4 giờ).
   Không chạy khi đang chơi game. Anh muốn thêm hay bớt việc thì sửa tệp này.
 - Chế độ chơi game: ghi `{"on": true}` hoặc `{"on": false}` vào `out/game-mode.json`.

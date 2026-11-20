@@ -739,7 +739,7 @@ def cmd_mo(args):
     try:                                          # read-only projects (CLOUD): only anh Vinh opens sessions there
         ro = json.loads((HUB / 'quyen-tong-quan.json').read_text(encoding='utf-8')).get('chi_doc') or []
         if any(str(p['path']).replace('\\', '/').lower().rstrip('/').startswith(str(x).replace('\\', '/').lower().rstrip('/')) for x in ro):
-            print('dp mo: @%s chỉ đọc với tổng quản; anh Vinh mở phiên ở đó (nút Mở trong app)' % p['id'])
+            print('dp mo: @%s chỉ đọc với CEO; anh Vinh mở phiên ở đó (nút Mở trong app)' % p['id'])
             return 1
     except (OSError, ValueError):
         pass
@@ -1474,7 +1474,7 @@ def chat_recent(n=6):
     if not rows:
         return ''
     return 'Các tin gần đây trong ô chat (để nắm mạch chuyện, không cần trả lời lại):\n' + '\n'.join(
-        '- %s: %s' % ('anh Vinh' if r.get('who') == 'vinh' else 'tổng quản', short(r.get('text', ''), 400)) for r in rows) + '\n\nTin mới của anh Vinh:\n'
+        '- %s: %s' % ('anh Vinh' if r.get('who') == 'vinh' else 'CEO', short(r.get('text', ''), 400)) for r in rows) + '\n\nTin mới của anh Vinh:\n'
 
 
 def chat_turn(text, model, session=None):
@@ -1588,7 +1588,7 @@ def chat_run(text):
             chat_sessions(book)
         boss_usage(meta)
     except Exception as e:
-        reply = 'Lỗi khi gọi tổng quản trên PC: %s' % one_line(e, 300)
+        reply = 'Lỗi khi gọi CEO trên PC: %s' % one_line(e, 300)
     chat_log('boss', reply[:6000], meta)
     try:
         PENDING.write_text('', encoding='utf-8')
@@ -1646,7 +1646,7 @@ def _asks():
         return {}
 
 
-def ask_owner(question, options, by='tổng quản'):
+def ask_owner(question, options, by='CEO'):
     """A question with buttons on a chat bubble. The owner's tap comes back as his message, so the manager
     answers it in a normal turn."""
     asks = _asks()
@@ -1684,7 +1684,7 @@ def chat_send(text, who='vinh', again=False, files=None):
         raise ValueError('empty message')
     if CHAT['busy']:
         if again:
-            raise ValueError('tổng quản đang trả lời tin trước, chờ một chút')
+            raise ValueError('CEO đang trả lời tin trước, chờ một chút')
         chat_log(who, shown if files else text, meta)
         q = _queue()
         q.append(text)
@@ -2203,14 +2203,14 @@ def main(argv=None):
     x = sub.add_parser('xoa', help='đề xuất xoá: anh Vinh xác nhận trong app, hub làm')
     x.add_argument('items', nargs='+', help='đường dẫn, hoặc repo#nhánh')
     x.add_argument('--why', required=True)
-    x.add_argument('--by', default='tổng quản')
+    x.add_argument('--by', default='CEO')
     x.set_defaults(fn=cmd_xoa)
-    mh = sub.add_parser('manhinh', help='chụp màn hình PC vào out/board/man-hinh.jpg (tổng quản đọc ảnh này để xem PC)')
+    mh = sub.add_parser('manhinh', help='chụp màn hình PC vào out/board/man-hinh.jpg (CEO đọc ảnh này để xem PC)')
     mh.set_defaults(fn=lambda a: (lambda j: ((HUB / 'out' / 'board').mkdir(parents=True, exist_ok=True), (HUB / 'out' / 'board' / 'man-hinh.jpg').write_bytes(j or b''), print(str(HUB / 'out' / 'board' / 'man-hinh.jpg') if j else 'chưa chụp được (đang cài Pillow?)'))[-1])(_board().screen_jpeg(1600)) or 0)
     hq = sub.add_parser('hoi', help='hỏi anh Vinh bằng nút bấm trên bong bóng chat')
     hq.add_argument('question')
     hq.add_argument('--options', default='Đồng ý|Không', help='các lựa chọn, ngăn bằng |')
-    hq.add_argument('--by', default='tổng quản')
+    hq.add_argument('--by', default='CEO')
     hq.set_defaults(fn=lambda a: print(ask_owner(a.question, a.options.split('|'), a.by)) or 0)
     mo = sub.add_parser('mo', help='mở phiên orchestra của một project: một mục, hoặc mục sẵn sàng kế tiếp')
     mo.add_argument('name')
