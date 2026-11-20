@@ -52,12 +52,12 @@ const SIGNS = {}; function sign(glyph, color) { const k = glyph + color; if (!SI
 
 // ---- the world: a tower on a garden island. The CEO works in the penthouse on the roof, with a terrace around it:
 // a pool, loungers, trees in planters, string lights, a glass railing. A glass lift runs up the front of the tower.
-const G = 1.4, W = 18, D = 10.5, FL = 7, FH = 3.2, TOP = FL * FH + .4, T = {x0:-3.5, x1:W + 3.5, z0:-3, z1:D + 6.5};
-let off = null, visit = null, world = null, up = null, car = null, orchs = [], byId = {}, isle = null, boss = {x:0, z:0}, ent = 0, ex = 0, ez = 0, labels = [], sig = '', lamps = [], clouds = [], rain = null, pond = null, pool = null, callL = null;
+const G = 1.4, W = 18, D = 10.5, FL = 7, FH = 3.2, TOP = FL * FH + .4, T = {x0:-3.5, x1:W + 3.5, z0:-13.5, z1:D + 6.5};
+let chair = {x:0, z:0}, chairL = null, off = null, visit = null, world = null, up = null, car = null, orchs = [], byId = {}, isle = null, boss = {x:0, z:0}, ent = 0, ex = 0, ez = 0, labels = [], sig = '', lamps = [], clouds = [], rain = null, pond = null, pool = null, callL = null;
 function build(s) {
   if (world) return false; world = new THREE.Group(); scene.add(world); up = new THREE.Group(); up.position.y = TOP; world.add(up); LB.textContent = ''; labels = []; lamps = [];
   const S = Baker(), L = Baker(), P = Baker(), PL = Baker();          // ground: solid and glowing; penthouse: built at 0, lifted to the roof
-  const mx = 13, mz0 = 9, mz1 = 13; isle = {x0:-mx, z0:-mz0, x1:W + mx, z1:T.z1 + mz1}; const iw = isle.x1 - isle.x0, id = isle.z1 - isle.z0;
+  const mx = 13, mz0 = 9, mz1 = 13; isle = {x0:-mx, z0:T.z0 - mz0, x1:W + mx, z1:T.z1 + mz1}; const iw = isle.x1 - isle.x0, id = isle.z1 - isle.z0;
   const sh = new THREE.Shape(), r = 5, ix = isle.x0, iz = isle.z0; sh.moveTo(ix + r, iz); sh.lineTo(ix + iw - r, iz); sh.quadraticCurveTo(ix + iw, iz, ix + iw, iz + r); sh.lineTo(ix + iw, iz + id - r); sh.quadraticCurveTo(ix + iw, iz + id, ix + iw - r, iz + id); sh.lineTo(ix + r, iz + id); sh.quadraticCurveTo(ix, iz + id, ix, iz + id - r); sh.lineTo(ix, iz + r); sh.quadraticCurveTo(ix, iz, ix + r, iz);
   const grass = new THREE.ExtrudeGeometry(sh, {depth:.5, bevelEnabled:false, curveSegments:4}); grass.rotateX(Math.PI / 2); S.add(grass, '#86bf5e', 0, 0, 0);
   const soil = new THREE.ExtrudeGeometry(sh, {depth:2.6, bevelEnabled:false, curveSegments:4}); soil.rotateX(Math.PI / 2); S.add(soil, '#8a6243', 0, -.5, 0); S.add(soil, '#6f5038', 0, -2.4, 0, 0, 1, .35, 1);
@@ -86,7 +86,7 @@ function build(s) {
   const n0 = lamps.length;
   P.box(tw, .05, td, '#d8d0c0', tcx, 0, tcz); P.box(tw - .4, .04, T.z1 - D - .4, '#a8825a', tcx, .05, (D + T.z1) / 2 + .1); for (let x = T.x0 + .5; x < T.x1; x += .7) P.box(.03, .045, T.z1 - D - .4, '#8f6c48', x, .05, (D + T.z1) / 2 + .1);
   P.box(W + .2, 2.7, .3, '#efe6d4', W / 2, .05, -.15); P.box(W + .4, .14, .4, '#c9b48d', W / 2, 2.75, -.15);
-  managerOffice(P, PL);
+  managerOffice(P, PL); chairmanOffice(P, PL);
   const px0 = .6, px1 = 8.6, pz0 = D + 1, pz1 = T.z1 - 1.6; pool = {x:(px0 + px1) / 2, z:(pz0 + pz1) / 2, w:px1 - px0, d:pz1 - pz0};
   P.box(pool.w + .7, .32, pool.d + .7, '#f4f0e8', pool.x, .05, pool.z); P.box(pool.w, .05, pool.d, '#5aa7c9', pool.x, .33, pool.z); PL.box(pool.w - .1, .03, .06, '#aef0ff', pool.x, .3, pz0 + .05);
   pool.mesh = new THREE.Mesh(BOX, new THREE.MeshLambertMaterial({color:0x4fc3e8, transparent:true, opacity:.82})); pool.mesh.scale.set(pool.w, .06, pool.d); pool.mesh.position.set(pool.x, .36, pool.z); up.add(pool.mesh); lamps.push({x:pool.x, z:pool.z, r:4.2, pool:true});
@@ -94,14 +94,14 @@ function build(s) {
   P.box(.08, 2.5, .08, '#8a8f99', T.x0 + 1.6, .05, 9.2); P.add(CONE, '#e85d5d', T.x0 + 1.6, 2.6, 9.2, 0, 3, .6, 3); P.add(CONE, '#ffffff', T.x0 + 1.6, 2.62, 9.2, .4, 2.2, .5, 2.2);
   const dx = W + 1.7, dz = D + 2.6; P.add(CYL, '#f4f0e8', dx, .8, dz, 0, 1.4, .08, 1.4); P.box(.1, .75, .1, '#3a3f4a', dx, .05, dz); for (const [a, b] of [[-1, 0], [1, 0], [0, -1]]) { P.box(.55, .08, .55, '#3a3f4a', dx + a, .5, dz + b); P.box(.55, .5, .08, '#3a3f4a', dx + a, .55, dz + b + (b ? -.25 : .25) * 0 - .25); }
   const planter = (x, z, w, d) => { P.box(w, .6, d, '#7d6a58', x, .05, z); P.box(w - .1, .05, d - .1, '#4a3a2a', x, .62, z); };
-  for (const [x, z, k] of [[W + 2, 1, 0], [W + 2, 4.2, 1], [W + 2, 7.4, 0], [T.x0 + .9, -1.9, 1], [W + 2.4, -1.9, 0], [W / 2 - 3, -1.9, 2]]) { planter(x, z, 1.6, 1.6); if (k === 0) treeAt(P, x, z, .55, .3 + x % .5); else if (k === 1) palmAt(P, x, z, .6, .4); else bushAt(P, x, z, .8); }
+  for (const [x, z, k] of [[W + 2, 1, 0], [W + 2, 4.2, 1], [W + 2, 7.4, 0], [W + 2, -3, 1], [W + 2, -7, 0], [W + 2, -11, 1], [T.x0 + 1.4, -11.8, 0], [T.x0 + 1.4, -7.5, 2]]) { planter(x, z, 1.6, 1.6); if (k === 0) treeAt(P, x, z, .55, .3 + x % .5); else if (k === 1) palmAt(P, x, z, .6, .4); else bushAt(P, x, z, .8); }
   for (let x = T.x0 + .6; x < T.x1 - .4; x += 1.1) { if (Math.abs(x - ex) < 1.2 || Math.abs(x - ent) < .7) continue; planter(x, T.z1 - .5, 1, .6); P.add(SPH, ['#f4d35e', '#ef8fa8', '#e85d5d', '#ffffff', '#b48ef0'][Math.floor(rnd() * 5)], x, .78, T.z1 - .5, 0, .5, .3, .35); P.add(ICO, '#5aa548', x + .25, .72, T.z1 - .5, x, .5, .35, .4); }
   for (const [x0, x1] of [[T.x0 + .3, W / 2 - .5], [W / 2 + 3.5, T.x1 - .3]]) { P.box(.1, 3, .1, '#3a3f4a', x0, .05, T.z1 - 1.1); P.box(.1, 3, .1, '#3a3f4a', x1, .05, T.z1 - 1.1);
     for (let k = 0; k <= 12; k++) { const u = k / 12, x = x0 + (x1 - x0) * u, y = 3 - Math.sin(Math.PI * u) * .7; PL.add(SPH, '#ffd98a', x, y, T.z1 - 1.1, 0, .16, .2, .16); } lamps.push({x:(x0 + x1) / 2, z:T.z1 - 1.6, r:3.4}); }
   const rail = (x, z, w, d) => { const m = new THREE.Mesh(BOX, GLASS); m.scale.set(w, 1.1, d); m.position.set(x, .6, z); m.renderOrder = 3; up.add(m); P.box(w + .06, .07, d + .06, '#8a8f99', x, 1.12, z); };
   rail(tcx, T.z0 - .1, tw, .05); rail(T.x0 - .1, tcz, .05, td); rail(T.x1 + .1, tcz, .05, td); rail((T.x0 + ex - 1) / 2, T.z1 + .1, ex - 1 - T.x0, .05); rail((ex + 1 + T.x1) / 2, T.z1 + .1, T.x1 - ex - 1, .05);
   for (let k = n0; k < lamps.length; k++) lamps[k].y = TOP;
-  callL = addLabel('call', '', boss.x, TOP + 3.4, boss.z - 1.1, 'tag'); addLabel('room', 'Penthouse CEO', W * .3, TOP + 3.1, D, 'tag'); addLabel('tower', 'DIEUPHOI TOWER', ent, FH + .5, T.z1 + 2.4, 'tag');
+  callL = addLabel('call', '', boss.x, TOP + 3.4, boss.z - 1.1, 'tag'); addLabel('room', 'Penthouse CEO', W * .3, TOP + 3.1, D, 'tag'); addLabel('chair-room', 'Phòng Chủ tịch', W / 2, TOP + 4.2, T.z0 + 1, 'tag'); chairL = addLabel('chair', '', chair.x, TOP + 3.3, chair.z, 'tag'); addLabel('tower', 'DIEUPHOI TOWER', ent, FH + .5, T.z1 + 2.4, 'tag');
   // the garden below: a stone path from the gate to the lobby, a pond with a bench, trees, palms, rocks, lamps
   for (let z = T.z1 + 2.8; z < isle.z1 - 1; z += 1.1) S.add(CYL, '#d9c7a3', ent + Math.sin(z * .7) * .3, .02, z, z, 1.1, .06, .8);
   for (let x = ent + .8; x < ex - .5; x += 1.1) S.add(CYL, '#d9c7a3', x, .02, T.z1 + 2.6, x, 1, .06, .8);
@@ -123,7 +123,8 @@ function build(s) {
   const N = 900, rp = new Float32Array(N * 6); rain = new THREE.LineSegments(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({color:0xdde8f6, transparent:true, opacity:.55}));
   rain.geometry.setAttribute('position', new THREE.BufferAttribute(rp, 3)); rain.userData.d = Array.from({length:N}, () => ({x:isle.x0 + Math.random() * iw, z:isle.z0 + Math.random() * id, y:Math.random() * (TOP + 8)})); rain.frustumCulled = false; world.add(rain);
   const sc = sun.shadow.camera, half = Math.max(iw, id, TOP * 1.6) * .62; sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.near = 1; sc.far = 200; sc.updateProjectionMatrix(); sun.shadow.mapSize.set(2048, 2048);
-  boss.m = person('#2f4f7a', 77, 1.05); boss.m.position.set(boss.x, .34, boss.z - 1.1); up.add(boss.m);
+  boss.m = vip({suit:'#1f2a44', pants:'#1b2030', tie:'#c0392b', hair:'#3a2a20', skin:'#f0c8a0', glasses:false}); boss.m.position.set(boss.x, .34, boss.z - 1.1); up.add(boss.m);
+  chair.m = vip({suit:'#2b2b30', pants:'#222226', tie:'#8c2f39', hair:'#1d1a18', skin:'#e8bb92', glasses:true}); chair.m.position.set(chair.x, .5, chair.z - 1.15); up.add(chair.m);
   phoneS = sign('☎', COL.ready); phoneS.visible = false; up.add(phoneS); return true; }
 
 let PT = null; function poolTex() { if (PT) return PT; const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), g = x.createRadialGradient(64, 64, 2, 64, 64, 63); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.45, 'rgba(255,255,255,.45)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); return PT = new THREE.CanvasTexture(c); }
@@ -150,11 +151,20 @@ function managerOffice(S, L) { const x1 = W, x0 = 0, z0 = 0, z1 = D, cx = (x0 + 
   // the desk: walnut top, modesty panel, a return on the right; monitors, lamp, phone, nameplate, papers, mug
   const dk = '#4a3426'; S.box(3.8, .12, 1.5, dk, bx, 1.0, bz); S.box(3.6, .66, .1, '#3a281d', bx, .34, bz + .62); S.box(.12, .66, 1.4, '#3a281d', bx - 1.8, .34, bz); S.box(1.3, .12, 2.1, dk, bx + 2.45, 1.0, bz - .3); S.box(1.2, .66, .1, '#3a281d', bx + 2.45, .34, bz + .72);
   S.box(3.8, .03, 1.5, '#5d4232', bx, 1.12, bz); S.box(1.6, .02, .7, '#2d4a3a', bx - .2, 1.14, bz + .2);
-  for (const [mx, ry] of [[-.65, .35], [.65, -.35]]) { S.box(.12, .35, .12, '#222', bx + mx, 1.12, bz - .35); S.add(BOX, '#1d1f25', bx + mx, 1.7, bz - .4, ry, 1.15, .7, .06); L.add(BOX, '#9fd2ff', bx + mx + Math.sin(ry) * .04, 1.7, bz - .36, ry, 1.05, .6, .01); }
+  for (const [mx, ry] of [[-.62, -.3], [.62, .3]]) { const mz = bz + .2; S.box(.1, .4, .1, '#2b2f38', bx + mx, 1.12, mz + .05); S.add(BOX, '#2b2f38', bx + mx, 1.13, mz + .05, ry, .35, .03, .25);
+    S.add(BOX, '#3a3f4a', bx + mx, 1.72, mz, ry, 1.15, .7, .06); L.add(BOX, '#9fd2ff', bx + mx - Math.sin(ry) * .035, 1.72, mz - Math.cos(ry) * .035, ry, 1.05, .6, .01); L.add(BOX, '#ffffff', bx + mx + Math.sin(ry) * .035, 1.95, mz + Math.cos(ry) * .035, ry, .08, .08, .01); }
+  S.box(.95, .03, .3, '#2b2f38', bx, 1.12, bz - .42); S.box(.88, .012, .24, '#5a606c', bx, 1.15, bz - .42); S.add(SPH, '#2b2f38', bx + .7, 1.14, bz - .42, 0, .1, .06, .15); S.box(.4, .01, .3, '#1d1f25', bx + .7, 1.12, bz - .42);
+  S.add(CYL, '#c9a65a', bx - 1.05, 1.18, bz - .1, 0, .16, .22, .16); for (const [a, c] of [[-.03, '#2b2f38'], [.04, '#c0392b'], [0, '#3f73a8']]) S.box(.025, .22, .025, c, bx - 1.05 + a, 1.22, bz - .1 + a);
+  S.add(CYL, '#e8e2d4', bx + 1.6, 1.18, bz + .35, 0, .26, .18, .26); for (let i = 0; i < 5; i++) S.add(ICO, '#5aa548', bx + 1.6 + Math.cos(i * 1.3) * .08, 1.36 + i * .015, bz + .35 + Math.sin(i * 1.3) * .08, i, .14, .1, .14);
+  S.add(BOX, '#c9a65a', bx - 1.15, 1.3, bz + .45, .5, .32, .26, .03); S.add(BOX, '#a7c4d8', bx - 1.15, 1.31, bz + .465, .5, .26, .2, .01);
+  S.box(3.8, .72, .5, '#3a281d', bx, .34, .45); S.box(3.9, .05, .55, '#c9a65a', bx, 1.06, .45); for (let i = 0; i < 4; i++) S.box(.85, .55, .02, '#4a3426', bx - 1.4 + i * .93, .42, .71);
+  S.add(CYL, '#1f3a5a', bx - 1.3, 1.25, .45, 0, .34, .34, .34); S.add(SPH, '#3f73a8', bx - 1.3, 1.55, .45, 0, .42, .42, .42); S.add(CYL, '#c9a65a', bx - 1.3, 1.55, .45, 0, .5, .03, .5, .4);
+  S.add(CYL, '#c9a65a', bx + 1.3, 1.2, .45, 0, .2, .3, .2); S.add(CONE, '#e3c48c', bx + 1.3, 1.5, .45, 0, .3, .35, .3); S.add(SPH, '#c9a65a', bx + 1.3, 1.75, .45, 0, .22, .22, .22);
+  for (let i = 0; i < 6; i++) S.box(.14, .4 - (i % 3) * .05, .3, ['#7c3030', '#1f3a5a', '#2e5d3a', '#c9a65a', '#5a1414', '#3b2a20'][i], bx - .5 + i * .17, 1.1, .45);
   S.add(CYL, '#c9a65a', bx - 1.5, 1.15, bz - .3, 0, .22, .06, .22); S.box(.04, .38, .04, '#c9a65a', bx - 1.5, 1.15, bz - .3); S.add(CYL, '#2e7d4f', bx - 1.5, 1.6, bz - .25, 0, .6, .18, .3, Math.PI / 2 * 0); L.box(.5, .04, .22, '#ffe7a8', bx - 1.5, 1.5, bz - .25); lamps.push({x:bx - 1.5, z:bz, r:1.8});
-  S.box(.45, .12, .3, '#1f2228', bx + 1.25, 1.13, bz + .15); S.box(.42, .08, .12, '#2b2f38', bx + 1.25, 1.25, bz + .1); L.box(.12, .02, .08, '#7fe08f', bx + 1.35, 1.26, bz + .24);
+  S.box(.45, .12, .3, '#1f2228', bx + 1.5, 1.13, bz - .3); S.box(.42, .08, .12, '#2b2f38', bx + 1.5, 1.25, bz - .35); L.box(.12, .02, .08, '#7fe08f', bx + 1.6, 1.26, bz - .21);
   S.box(1.1, .2, .12, '#c9a65a', bx, 1.13, bz + .62); S.box(.5, .02, .7, '#f7f5ef', bx + .55, 1.14, bz + .35, .2); S.box(.5, .02, .7, '#ffffff', bx + .62, 1.16, bz + .32, .35); S.add(CYL, '#d2553d', bx - .9, 1.13, bz + .45, 0, .2, .22, .2);
-  S.add(BOX, '#1f2228', bx + 2.45, 1.4, bz - .9, -.6, .9, .55, .05); L.add(BOX, '#b8f0c8', bx + 2.43, 1.4, bz - .87, -.6, .8, .45, .01);
+  S.add(BOX, '#3a3f4a', bx + 2.5, 1.45, bz - .9, 1.3, .9, .55, .05); L.add(BOX, '#b8f0c8', bx + 2.5 - Math.sin(1.3) * .035, 1.45, bz - .9 - Math.cos(1.3) * .035, 1.3, .8, .45, .01); S.box(.08, .3, .08, '#2b2f38', bx + 2.5, 1.12, bz - .9);
   // the executive chair behind, two guest chairs in front
   S.box(1.0, .14, .95, '#1f2024', bx, .62, bz - 1.15); S.box(1.0, 1.25, .16, '#1f2024', bx, .7, bz - 1.65); S.box(.12, .3, .8, '#2a2b30', bx - .55, .76, bz - 1.15); S.box(.12, .3, .8, '#2a2b30', bx + .55, .76, bz - 1.15); S.add(CYL, '#555', bx, .34, bz - 1.15, 0, .14, .3, .14); S.add(CYL, '#444', bx, .36, bz - 1.15, 0, .8, .04, .8);
   for (const gx of [-.95, .95]) { const x = bx + gx, z = visit.z; S.box(.85, .14, .8, '#c89b6d', x, .6, z); S.box(.85, .7, .14, '#b5875a', x, .74, z + .38); S.box(.1, .3, .7, '#8a6447', x - .45, .7, z); S.box(.1, .3, .7, '#8a6447', x + .45, .7, z); for (const lx of [-.35, .35]) for (const lz of [-.3, .3]) S.box(.07, .28, .07, '#5a3d2a', x + lx, .34, z + lz); }
@@ -166,6 +176,57 @@ function managerOffice(S, L) { const x1 = W, x0 = 0, z0 = 0, z1 = D, cx = (x0 + 
   S.box(.7, 1.0, 2.4, '#3b2a20', x1 - .45, .36, z0 + 2.2); S.box(.75, .06, 2.5, '#c9a65a', x1 - .45, 1.36, z0 + 2.2); S.box(.45, .5, .4, '#1d1f25', x1 - .45, 1.4, z0 + 1.6); L.box(.06, .06, .02, '#ff5050', x1 - .66, 1.75, z0 + 1.6); S.add(CYL, '#ffffff', x1 - .45, 1.42, z0 + 2.3, 0, .14, .16, .14); S.add(CYL, '#3f73a8', x1 - .45, 1.42, z0 + 2.6, 0, .14, .16, .14);
   bigPlant(S, x0 + .8, z0 + .9); bigPlant(S, x1 - .8, z0 + 4.2); bigPlant(S, x0 + .9, z1 - 2.9);
   lamps.push({x:bx, z:bz + 1.2, r:3.4, office:true}); }
+// ---- the two bosses get a finer figure: a suit with lapels and a tie, shirt cuffs, hands on the desk, a rounder head
+// with ears, eyes with whites, brows, nose, mouth, styled hair, glasses for the chairman
+const HEAD = new THREE.SphereGeometry(.5, 16, 12);
+function vip(o) { const b = Baker(), sk = o.skin, y0 = .55, wh = '#f7f7f2';
+  b.box(.44, .16, .52, o.pants, 0, .44, .18); for (const s of [-1, 1]) { b.box(.17, .45, .17, o.pants, s * .11, 0, .4); b.box(.18, .08, .32, '#111', s * .11, 0, .5); }
+  b.add(new THREE.CapsuleGeometry(.25, .32, 4, 12), o.suit, 0, y0 + .32, 0);
+  b.add(BOX, wh, 0, y0 + .5, .19, 0, .17, .32, .08); b.add(BOX, o.tie, 0, y0 + .44, .235, 0, .065, .3, .02); b.add(BOX, shade(o.tie, .8), 0, y0 + .62, .236, 0, .085, .055, .025);
+  b.add(BOX, shade(o.suit, .78), -.1, y0 + .5, .222, 0, .055, .34, .02, 0, .32); b.add(BOX, shade(o.suit, .78), .1, y0 + .5, .222, 0, .055, .34, .02, 0, -.32);
+  b.add(SPH, '#d9d2c3', .1, y0 + .5, .232, 0, .04, .04, .01);
+  for (const s of [-1, 1]) { b.box(.14, .36, .14, o.suit, s * .31, y0 + .2, .03); b.add(BOX, o.suit, s * .27, y0 + .18, .28, 0, .13, .13, .38); b.add(BOX, wh, s * .26, y0 + .18, .49, 0, .135, .135, .05); b.add(SPH, sk, s * .25, y0 + .18, .57, 0, .13, .1, .17); }
+  b.add(CYL, sk, 0, y0 + .66, 0, 0, .17, .14, .17);
+  b.add(HEAD, sk, 0, y0 + .88, 0, 0, .44, .5, .44); for (const s of [-1, 1]) b.add(SPH, shade(sk, .95), s * .215, y0 + .88, -.01, 0, .07, .11, .06);
+  b.add(HEAD, o.hair, 0, y0 + 1.02, -.04, 0, .47, .26, .47); b.add(HEAD, o.hair, -.05, y0 + 1.08, .02, 0, .36, .16, .34); b.add(BOX, o.hair, 0, y0 + .87, -.16, 0, .42, .3, .14); for (const s of [-1, 1]) b.box(.04, .12, .08, o.hair, s * .21, y0 + .82, .04);
+  for (const s of [-1, 1]) { b.add(BOX, shade(o.hair, 1.1), s * .085, y0 + .962, .203, 0, .075, .013, .015, 0, s * -.1); b.add(SPH, wh, s * .08, y0 + .9, .2, 0, .08, .055, .04); b.add(SPH, '#3a2a20', s * .08, y0 + .9, .217, 0, .042, .048, .02); b.add(SPH, wh, s * .07, y0 + .91, .226, 0, .012, .012, .006); }
+  b.add(SPH, shade(sk, .97), 0, y0 + .845, .215, 0, .045, .06, .04); b.add(SPH, shade(sk, .86), 0, y0 + .825, .222, 0, .035, .02, .02); for (const s of [-1, 0, 1]) b.add(BOX, '#8a4a40', s * .028, y0 + .78 + Math.abs(s) * .008, .203, 0, .03, .011, .012, 0, s * .35); for (const s of [-1, 1]) b.add(SPH, '#f0a090', s * .12, y0 + .83, .19, 0, .05, .03, .02);
+  if (o.glasses) { const g = '#22252c'; for (const s of [-1, 1]) { b.add(BOX, g, s * .08, y0 + .945, .232, 0, .12, .014, .01); b.add(BOX, g, s * .08, y0 + .858, .232, 0, .12, .014, .01); b.add(BOX, g, s * .14, y0 + .9, .23, 0, .014, .09, .01); b.add(BOX, g, s * .02, y0 + .9, .232, 0, .014, .09, .01); b.add(BOX, g, s * .18, y0 + .93, .1, 0, .012, .012, .24); }
+    b.add(BOX, g, 0, y0 + .92, .234, 0, .04, .012, .01); }
+  const m = b.mesh(MSOLID); m.castShadow = true; m.scale.setScalar(1.05); return m; }
+
+// ---- the chairman's office, behind the CEO's: a raised marble floor with gold lines, a panelled wall with a lacquer
+// painting, bookcases, a rosewood desk with two monitors, a bonsai and a gold nameplate, a red leather chair, a
+// sofa corner with a tea table, an aquarium, orchids and tall vases; glass walls at the sides
+function chairmanOffice(P, PL) { const x0 = .2, x1 = W - .2, z0 = T.z0 + .6, z1 = -.4, cx = (x0 + x1) / 2, F = .55; chair = {x:cx, z:z0 + 4.4};
+  P.box(x1 - x0, F - .05, z1 - z0, '#34353c', cx, .05, (z0 + z1) / 2); for (let x = x0 + 2; x < x1 - .5; x += 2) P.box(.04, .012, z1 - z0 - .4, '#c9a65a', x, F, (z0 + z1) / 2); for (let z = z0 + 2; z < z1 - .5; z += 2) P.box(x1 - x0 - .4, .012, .04, '#c9a65a', cx, F, z);
+  P.box(1.4, .27, 1.4, '#3a3b42', x0 - .8, .05, -2.2); P.box(1.4, .13, .7, '#3a3b42', x0 - .8, .32, -2.55);
+  P.box(x1 - x0, 3.2, .3, '#5b3a29', cx, F, z0 - .15); for (let x = x0 + .8; x < x1; x += 1.6) P.box(.06, 3, .05, '#7a5038', x, F, z0 + .02); P.box(x1 - x0, .1, .12, '#c9a65a', cx, F + 3.1, z0 + .02); P.box(x1 - x0, .07, .08, '#c9a65a', cx, F + .9, z0 + .03);
+  P.box(4.6, 2.1, .06, '#c9a65a', cx, F + 1.05, z0 + .06); P.box(4.4, 1.9, .04, '#5a1414', cx, F + 1.15, z0 + .1);
+  for (const [x, y, w, r] of [[-1.3, 1.6, 1.6, .5], [-.4, 1.45, 1.3, -.45], [.6, 1.7, 1.8, .38], [1.5, 1.5, 1, -.5]]) P.add(BOX, '#d8b26a', cx + x, F + y, z0 + .13, 0, w, .05, .01, 0, r);
+  P.add(CYL, '#f2d27a', cx + 1.4, F + 2.5, z0 + .13, 0, .55, .02, .55, Math.PI / 2); P.add(BOX, '#e3c48c', cx - .2, F + 1.3, z0 + .13, 0, 3.8, .03, .01);
+  for (const sx of [cx - 4.2, cx + 4.2]) { P.box(2.4, 2.9, .5, '#3b2418', sx, F, z0 + .3); P.box(2.5, .08, .55, '#c9a65a', sx, F + 2.9, z0 + .3); const B = ['#7c3030', '#1f3a5a', '#2e5d3a', '#c9a65a', '#5a1414', '#e7dcc4'];
+    for (let r = 0; r < 4; r++) for (let c = 0; c < 8; c++) P.box(.22, .5 - ((r + c) % 3) * .06, .32, B[(r * 8 + c + Math.round(sx)) % 6], sx - .95 + c * .27, F + .15 + r * .68, z0 + .42); }
+  for (const vx of [x0 + .8, x1 - .8]) { P.add(CYL, '#1f3a5a', vx, F + .7, z0 + .8, 0, .7, 1.4, .7); P.add(CYL, '#e8e2d4', vx, F + 1.4, z0 + .8, 0, .45, .08, .45); for (let i = 0; i < 5; i++) P.box(.03, .9, .03, '#6b4a2e', vx - .2 + i * .1, F + 1.4, z0 + .8); }
+  const dx = cx, dz = chair.z; P.box(1.2, .82, 1.5, '#4a2418', dx - 1.6, F, dz); P.box(1.2, .82, 1.5, '#4a2418', dx + 1.6, F, dz); P.box(4.4, .76, .08, '#4a2418', dx, F + .06, dz + .72); P.box(4.2, .03, .02, '#c9a65a', dx, F + .5, dz + .77);
+  P.box(4.6, .14, 1.8, '#5a2e1e', dx, F + .82, dz); P.box(4.66, .03, 1.86, '#c9a65a', dx, F + .8, dz); P.box(1.8, .015, .8, '#2e5d3a', dx, F + .97, dz - .2);
+  for (const [mx, ry] of [[-.62, -.3], [.62, .3]]) { const mz = dz + .2; P.box(.1, .4, .1, '#2b2f38', dx + mx, F + .96, mz + .05); P.add(BOX, '#3a3f4a', dx + mx, F + 1.56, mz, ry, 1.15, .7, .06); PL.add(BOX, '#9fd2ff', dx + mx - Math.sin(ry) * .035, F + 1.56, mz - Math.cos(ry) * .035, ry, 1.05, .6, .01); }
+  P.box(.95, .03, .3, '#2b2f38', dx, F + .96, dz - .42); P.box(1.3, .22, .12, '#c9a65a', dx, F + .97, dz + .8); P.box(1.2, .14, .02, '#5a1414', dx, F + 1.02, dz + .87);
+  P.add(CYL, '#3a2a20', dx + 1.75, F + 1.0, dz + .3, 0, .5, .12, .3); P.box(.06, .3, .06, '#5b3d26', dx + 1.75, F + 1.05, dz + .3); for (let i = 0; i < 4; i++) P.add(SPH, i % 2 ? '#3f7a3a' : '#2f6a33', dx + 1.6 + i * .1, F + 1.38 + (i % 2) * .1, dz + .3, 0, .3, .13, .22);
+  for (let i = 0; i < 3; i++) P.box(.42, .05 + i * .03, .55, '#f7f5ef', dx - 1.5 + i * .02, F + .97 + i * .06, dz + .2);
+  P.add(CYL, '#c9a65a', dx - 1.9, F + 1.0, dz - .3, 0, .22, .06, .22); P.box(.04, .45, .04, '#c9a65a', dx - 1.9, F + 1.0, dz - .3); P.add(CYL, '#2e7d4f', dx - 1.9, F + 1.5, dz - .25, 0, .6, .18, .3); PL.box(.5, .04, .22, '#ffe7a8', dx - 1.9, F + 1.38, dz - .25);
+  P.add(CYL, '#f4f0e6', dx + .95, F + .97, dz + .45, 0, .16, .12, .16);
+  P.box(1.2, .16, 1.05, '#6b1f2a', dx, F + .45, dz - 1.2); P.box(1.2, 1.8, .2, '#6b1f2a', dx, F + .5, dz - 1.75); for (let r = 0; r < 3; r++) for (let c = 0; c < 3; c++) P.add(SPH, '#4f1620', dx - .35 + c * .35, F + .95 + r * .45, dz - 1.64, 0, .05, .05, .02);
+  P.box(.14, .35, .9, '#5a1820', dx - .62, F + .6, dz - 1.2); P.box(.14, .35, .9, '#5a1820', dx + .62, F + .6, dz - 1.2); P.add(CYL, '#c9a65a', dx, F + .05, dz - 1.2, 0, .9, .04, .9);
+  const tz = z1 - 2.9; P.box(2.2, .06, 1.2, '#4a2418', cx, F + .42, tz); P.box(2, .4, 1, '#3b2418', cx, F, tz);
+  P.add(SPH, '#7a4a2a', cx - .2, F + .6, tz, 0, .3, .24, .3); P.box(.2, .04, .04, '#7a4a2a', cx - .02, F + .62, tz); for (let i = 0; i < 4; i++) P.add(CYL, '#f4f0e6', cx + .25 + (i % 2) * .22, F + .52, tz - .2 + Math.floor(i / 2) * .4, 0, .12, .08, .12);
+  for (const s of [-1, 1]) { const sx = cx + s * 2.2; P.box(1, .45, 2.6, '#efe3c8', sx, F, tz); P.box(.3, .9, 2.6, '#e3d4b2', sx + s * .4, F, tz); P.box(1, .55, .3, '#e3d4b2', sx, F, tz - 1.3); P.box(1, .55, .3, '#e3d4b2', sx, F, tz + 1.3); P.box(.7, .4, .14, '#8c2f39', sx + s * .25, F + .7, tz - .5, s * .2); }
+  P.box(5.4, .02, 3.6, '#1f3a5a', cx, F + .01, tz); P.box(5, .022, 3.2, '#c9a65a', cx, F + .012, tz); P.box(4.8, .024, 3, '#1f3a5a', cx, F + .014, tz);
+  P.box(.6, 1.6, 3.4, '#2b2f38', x0 + .4, F, z0 + 7.5); PL.box(.5, 1.25, 3.2, '#5fb7e0', x0 + .41, F + .2, z0 + 7.5); for (let i = 0; i < 6; i++) PL.box(.06, .08, .18, i % 2 ? '#ff9a3c' : '#ffd23c', x0 + .7, F + .5 + (i * .37) % 1, z0 + 6.1 + i * .5); P.box(.62, .1, 3.45, '#c9a65a', x0 + .4, F + 1.6, z0 + 7.5);
+  for (const [ox, oz] of [[x1 - .9, z0 + 6], [x1 - .9, z1 - .9], [x0 + .9, z1 - .9]]) { P.add(CYL, '#f4f0e6', ox, F + .3, oz, 0, .45, .6, .45); P.box(.04, .9, .04, '#3f7a3a', ox, F + .6, oz); for (let i = 0; i < 5; i++) P.add(SPH, i % 2 ? '#ffffff' : '#f3d1e6', ox + .1 + Math.sin(i) * .08, F + 1.15 + i * .1, oz + .12, 0, .16, .12, .1); P.add(SPH, '#3f7a3a', ox, F + .65, oz, 0, .45, .1, .2); }
+  const glass = (x, z, w, d) => { const m = new THREE.Mesh(BOX, GLASS); m.scale.set(w, 2.6, d); m.position.set(x, F + 1.3, z); m.renderOrder = 3; up.add(m); };
+  glass(x0, (z0 + z1) / 2 - 1.2, .06, z1 - z0 - 2.4); glass(x1, (z0 + z1) / 2, .06, z1 - z0); for (const xx of [x0, x1]) { P.box(.1, .1, z1 - z0, '#c9a65a', xx, F + 2.6, (z0 + z1) / 2); P.box(.1, 2.6, .1, '#c9a65a', xx, F, z1); P.box(.1, 2.6, .1, '#c9a65a', xx, F, z0); }
+  lamps.push({x:dx, z:dz + .4, r:3.6}, {x:cx, z:tz, r:3.4}); }
 function bigPlant(S, x, z) { S.add(CYL, '#e8e2d4', x, .34 + .35, z, 0, .55, .7, .55); S.add(CYL, '#4a3426', x, .34 + .72, z, 0, .5, .04, .5); S.box(.06, 1.2, .06, '#5b3d26', x, 1.05, z);
   for (let i = 0; i < 9; i++) { const a = i * 2.4, h = 1.3 + i * .14; S.add(SPH, i % 2 ? '#3f8a3a' : '#5aa548', x + Math.cos(a) * .3, h, z + Math.sin(a) * .3, a, .42, .12, .3, .5, .3); } }
 function plantAt(S, x, z, s) { S.add(CYL, '#b5563c', x, .34 + .25 * s, z, 0, .55 * s, .5 * s, .55 * s); for (let j = 0; j < 4; j++) S.add(ICO, j % 2 ? '#4f9a45' : '#6dbb57', x + Math.cos(j * 1.6) * .18 * s, .34 + (.75 + j * .12) * s, z + Math.sin(j * 1.6) * .18 * s, j, .55 * s, .6 * s, .55 * s); }
@@ -248,6 +309,7 @@ $('back').addEventListener('click', () => { if (VIEW3) { touched = -1e9; focus(n
 $('camb').addEventListener('click', () => { try { auto = localStorage.getItem('dp-cam') !== '0'; } catch (e) {} touched = -1e9; });
 function overview() { const o = fit(T.x0 - 4, T.z0 - 2, T.x1 + 4, T.z1 + 6, .38, 0, TOP + 3); fitZ = o.z; return o; }
 function officeView(yaw = cam.yaw) { return fit(T.x0 - .5, T.z0 - .5, T.x1 + .5, T.z1 + .8, yaw, TOP, TOP + 3); }
+function chairView() { return fit(-.5, T.z0 - 1, W + .5, 0, .25, TOP, TOP + 3.5); }
 function talkView() { return fit(-1, -5.5, W + 1, D + 2, cam.yaw, TOP, TOP + 3); }
 function clampCam() { if (!isle) return; cam.z = Math.max(fitZ * .45, Math.min(fitZ * 5, cam.z)); cam.tx = Math.max(isle.x0, Math.min(isle.x1, cam.tx)); cam.tz = Math.max(isle.z0, Math.min(isle.z1, cam.tz)); cam.ty = Math.max(0, Math.min(TOP + 3, cam.ty)); }
 function tapAt(x, z) { if (x > T.x0 - 1 && x < T.x1 + 1 && z > T.z0 - 1 && z < T.z1 + 2) { Object.assign(goal, cam.ty > TOP / 2 && cam.z > fitZ * 1.5 ? talkView() : officeView()); touched = performance.now(); return; } if (focusId) focus(null); }
@@ -255,7 +317,7 @@ function director(ms) { if (!auto || moving || ms - touched < 9000) return null;
   if (meet && meet.a) { const q = meet.a.g.position; return fit(q.x - 7, q.z - 6, q.x + 7, q.z + 6, cam.yaw, q.y - 1, q.y + 3); }
   if (meet && meet.ph === 'talk') return talkView();
   if (call || CHATS.busy) return officeView();
-  const sl = Math.floor(ms / 14000) % 3; return sl === 0 ? overview() : officeView(sl === 1 ? .1 : .7); }
+  const sl = Math.floor(ms / 12000) % 4; return sl === 0 ? overview() : sl === 2 ? chairView() : officeView(sl === 1 ? .1 : .7); }
 
 // ---- calls and meetings. Triggers: a new letter from the manager in a project's INBOX (he reads what he asked,
 // the orchestra acknowledges), a letter marked done with a result (the orchestra reads the result line it wrote),
@@ -302,6 +364,7 @@ function populate() { const s = STATE, gm = (ACT.game || {}).on, gi = Object.fro
   orchs = s.projects.filter(p => !stored(p)).map(p => { const o = old[p.id] || {seed:hsh(p.id)}; Object.assign(o, {p, tint:GC[gi[p.group] % GC.length], st:gm ? 'sleep' : stateOf(p)}); byId[p.id] = o; return o; });
   if (meet && !byId[meet.o.p.id]) meet.o = {p:meet.o.p, tint:meet.o.tint, seed:meet.o.seed, floor:meet.o.floor};
   orchs.forEach(o => { o.floor = 1 + o.seed % (FL - 1); });
+  if (chairL) { const nq = s.inbox.questions + s.inbox.person + pendingDel().length; chairL.e.textContent = nq ? '📋 ' + nq + ' việc chờ Chủ tịch' : ''; chairL.w = null; }
   drawList(); scheduleMeetings(); }
 
 function along(path, d) { for (let i = 1; i < path.length; i++) { const p = path[i - 1], q = path[i], l = Math.hypot(q.x - p.x, (q.y || 0) - (p.y || 0), q.z - p.z); if (d <= l && l > 0) { const u = d / l; return {x:p.x + (q.x - p.x) * u, y:(p.y || 0) + ((q.y || 0) - (p.y || 0)) * u, z:p.z + (q.z - p.z) * u, dx:q.x - p.x, dz:q.z - p.z}; } d -= l; } const e = path[path.length - 1]; return {x:e.x, y:e.y || 0, z:e.z, dx:0, dz:0}; }
@@ -334,13 +397,13 @@ let VIEW3 = false, running = false, last = 0, zoomIn = false;
 function frame(ms) { if (!running) return; requestAnimationFrame(frame); const wet = WX.now().wet, busy = moving || Object.keys(goal).length || meet || meetQ.length; if (ms - last < (busy || wet ? 30 : 60)) return; const dt = Math.min(.1, (ms - last) / 1000); last = ms; const t = ms / 1000;
   const dg = director(ms); if (dg) Object.assign(goal, dg); if (goal.z && !moving) { const a = 1 - Math.exp(-dt * 2.4); cam.tx += (goal.tx - cam.tx) * a; cam.tz += (goal.tz - cam.tz) * a; cam.z += (goal.z - cam.z) * a; cam.yaw += (goal.yaw - cam.yaw) * a; if (goal.ty != null) cam.ty += (goal.ty - cam.ty) * a; if (Math.abs(goal.z - cam.z) < .002 && Math.hypot(goal.tx - cam.tx, goal.tz - cam.tz) < .02) Object.keys(goal).forEach(k => delete goal[k]); applyCam(); }
   const zin = cam.z > fitZ * 1.6; if (zin !== zoomIn) { zoomIn = zin; stage.classList.toggle('zoomin', zin); }
-  if (!(meet && meet.ph === 'talk')) { boss.m.position.y = .34 + (CHATS.busy ? Math.abs(Math.sin(t * 8)) * .05 : 0); boss.m.rotation.y = CHATS.busy ? Math.sin(t * 1.2) * .3 : Math.sin(t * .3) * .1; }
+  if (!(meet && meet.ph === 'talk')) { boss.m.position.y = .34 + (CHATS.busy ? Math.abs(Math.sin(t * 8)) * .05 : 0); boss.m.rotation.y = CHATS.busy ? Math.sin(t * 1.2) * .3 : Math.sin(t * .3) * .1; } if (chair.m) chair.m.rotation.y = Math.sin(t * .22 + 1) * .12;
   meetTick(t, dt); weather(t, dt); placeLabels(cam.z / fitZ); R.render(scene, camera); }
 function size() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return false; R.setSize(w, h, false); applyCam(); return true; }
 function wake() { const on = VIEW3 && cur === 'office' && !document.hidden && STATE; if (on && !running) { if (!size()) return; if (!world) set(STATE); running = true; last = performance.now(); requestAnimationFrame(frame); } else if (!on) running = false; }
 function set(s) { if (!s || !VIEW3) return; if (!stage.clientWidth) return; const fresh = build(s); populate(); if (fresh) { size(); const o = overview(); Object.assign(cam, o); clampCam(); applyCam(); skyKey = ''; } }
 function show(on) { VIEW3 = on; stage.classList.toggle('v3', on); if (on) { set(STATE); wake(); } else { running = false; stage.classList.remove('zoomin'); } }
 addEventListener('resize', () => { if (VIEW3 && size()) { overview(); } });
-window.O3Dd = () => ({cam, goal});
+
 document.addEventListener('visibilitychange', wake);
 window.O3D = {set, note() {}, boss() {}, focus, wake, sky() { skyKey = ''; }, show};
