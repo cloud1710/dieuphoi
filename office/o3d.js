@@ -376,7 +376,7 @@ const skyNow = () => { const d = new Date(), h = d.getHours() + d.getMinutes() /
   return {k, h, w, top:P[0], bot:P[1], u:(h - w.rise) / (w.set - w.rise), v:((h - w.set + 24) % 24) / (24 - w.set + w.rise)}; };
 let skyKey = '', flash = 0;
 function weather(t, dt) { const s = skyNow(), w = s.w, key = s.k + w.kind + Math.round(s.h * 20);
-  if (key !== skyKey) { skyKey = key; cv.style.background = 'linear-gradient(' + s.top + ',' + s.bot + ' 70%)'; const night = s.k === 'night', low = s.k !== 'day';
+  if (key !== skyKey) { skyKey = key; setDecor(seasonOf(new Date())); cv.style.background = 'linear-gradient(' + s.top + ',' + s.bot + ' 70%)'; const night = s.k === 'night', low = s.k !== 'day';
     const u = Math.max(.02, Math.min(.98, night ? s.v : s.u)), az = Math.PI * (1 - u), el = (night ? .7 : 1.15) * Math.sin(Math.PI * u) + .12, cx = (isle.x0 + isle.x1) / 2, cz = (isle.z0 + isle.z1) / 2;
     sun.position.set(cx + Math.cos(az) * Math.cos(el) * 70, Math.sin(el) * 70 + 10, cz + Math.sin(az) * Math.cos(el) * 30 + 10); sun.target.position.set(cx, 0, cz);
     sun.castShadow = !night; sun.color.set(night ? '#c4ccf0' : low ? '#ffb27a' : '#fff2d8'); sun.intensity = (night ? .55 : low ? 1.4 : 2.3) * (w.wet || w.cloud > 85 ? .45 : 1);
@@ -392,13 +392,95 @@ function weather(t, dt) { const s = skyNow(), w = s.w, key = s.k + w.kind + Math
       a.set([q.x, q.y, q.z, q.x - wx * len, q.y + len, q.z], i * 6); }); rain.geometry.attributes.position.needsUpdate = true; }
   if (w.kind === 'storm') { const ph = t % 9; flash = ph < .15 || (ph > .3 && ph < .36) ? 1 : 0; hemi.intensity = flash ? 3 : 1.25; } }
 
+// ---- seasons: decorations by the phone's date (Tết, Christmas, New Year, Mid-Autumn, Halloween, Valentine, 20/11,
+// women's days, Pi Day, Programmers' Day). The weather box on the map can force one (localStorage dp-season).
+const TET = {2026:'02-17', 2027:'02-06', 2028:'01-26', 2029:'02-13', 2030:'02-03', 2031:'01-23', 2032:'02-11', 2033:'01-31', 2034:'02-19', 2035:'02-08'};
+const MOON = {2026:'09-25', 2027:'09-15', 2028:'10-03', 2029:'09-22', 2030:'09-12', 2031:'10-01', 2032:'09-19', 2033:'09-08', 2034:'09-27', 2035:'09-16'};
+function seasonOf(d) { try { const o = localStorage.getItem('dp-season'); if (o) return o; } catch (e) {}
+  const y = d.getFullYear(), md = (d.getMonth() + 1) * 100 + d.getDate(), near = (x, before, after) => { if (!x) return false; const [m, dd] = x.split('-').map(Number), t = (new Date(y, d.getMonth(), d.getDate()) - new Date(y, m - 1, dd)) / 864e5; return t >= -before && t <= after; };
+  if (near(TET[y], 10, 7)) return 'tet';
+  if (md >= 1231 || md <= 102) return 'newyear';
+  if (md >= 1201 && md <= 1226) return 'christmas';
+  if (near(MOON[y], 5, 1)) return 'moon';
+  if (md >= 1024 && md <= 1031) return 'halloween';
+  if (md >= 212 && md <= 214) return 'valentine';
+  if (md >= 1118 && md <= 1120) return 'teacher';
+  if ((md >= 306 && md <= 308) || (md >= 1018 && md <= 1020)) return 'women';
+  if (md === 314) return 'pi';
+  if (Math.round((new Date(y, d.getMonth(), d.getDate()) - new Date(y, 0, 0)) / 864e5) === 256) return 'dev';
+  return ''; }
+const CAN = ['Giáp', 'Ất', 'Bính', 'Đinh', 'Mậu', 'Kỷ', 'Canh', 'Tân', 'Nhâm', 'Quý'], CHI = ['Tý', 'Sửu', 'Dần', 'Mão', 'Thìn', 'Tỵ', 'Ngọ', 'Mùi', 'Thân', 'Dậu', 'Tuất', 'Hợi'];
+const MTA = new THREE.MeshBasicMaterial({vertexColors:true}), MTB = new THREE.MeshBasicMaterial({vertexColors:true});
+let decor = null, decorKey = null, fwOn = false, fw = [], flakes = null, moonM = null, hats = [];
+function bannerMesh(top, sub, bg, fg, w) { const c = document.createElement('canvas'); c.width = 1024; c.height = 150; const x = c.getContext('2d');
+  x.fillStyle = bg; x.fillRect(0, 0, 1024, 150); x.strokeStyle = fg; x.lineWidth = 6; x.strokeRect(10, 10, 1004, 130); x.fillStyle = fg; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.font = '800 62px system-ui,sans-serif'; x.fillText(top, 512, sub ? 60 : 75); if (sub) { x.font = '600 30px system-ui,sans-serif'; x.fillText(sub, 512, 115); }
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return new THREE.Mesh(new THREE.PlaneGeometry(w, w * 150 / 1024), new THREE.MeshBasicMaterial({map:t})); }
+function xmasTree(S, A, B, x, y, z, h) { S.add(CYL, '#5b3d26', x, y + .3 * h, z, 0, .25 * h, .6 * h, .25 * h);
+  for (let k = 0; k < 4; k++) S.add(CONE, k % 2 ? '#1f6b3a' : '#2a7d45', x, y + (.9 + k * .55) * h, z, k, (1.9 - k * .4) * h, 1.1 * h, (1.9 - k * .4) * h);
+  const C = ['#e53935', '#fdd835', '#1e88e5', '#ffffff', '#ff7043', '#ab47bc']; for (let i = 0; i < 26; i++) { const k = i % 4, a = i * 2.4, r = (.85 - k * .19) * h, yy = y + (.75 + k * .55) * h; (i % 2 ? A : B).add(SPH, C[i % 6], x + Math.cos(a) * r, yy, z + Math.sin(a) * r, 0, .17 * h, .17 * h, .17 * h); }
+  A.add(ICO, '#ffd54f', x, y + 3.05 * h, z, 0, .45 * h, .45 * h, .2 * h); }
+function gifts(S, x, y, z) { [['#e53935', '#fdd835'], ['#1e88e5', '#ffffff'], ['#43a047', '#e53935']].forEach(([c, r], i) => { const gx = x + (i - 1) * .55, s = .45 - i * .06; S.box(s, s, s, c, gx, y, z + (i % 2) * .3); S.box(s + .02, s + .01, .08, r, gx, y, z + (i % 2) * .3); S.box(.08, s + .01, s + .02, r, gx, y, z + (i % 2) * .3); }); }
+function lantern(S, L, x, y, z, col) { S.box(.03, .5, .03, '#3a3f4a', x, y + .35, z); S.add(CYL, '#d4a017', x, y + .32, z, 0, .26, .06, .26); L.add(SPH, col, x, y, z, 0, .45, .55, .45); S.add(CYL, '#d4a017', x, y - .3, z, 0, .26, .06, .26); S.box(.04, .3, .04, '#d4a017', x, y - .6, z); }
+function blossom(S, x, y, z, col, s = 1) { S.add(CYL, '#b5563c', x, y + .35 * s, z, 0, .7 * s, .7 * s, .7 * s); S.add(CYL, '#3a2a20', x, y + .72 * s, z, 0, .62 * s, .04, .62 * s);
+  S.add(CYL, '#5b3d26', x, y + 1.3 * s, z, 0, .12 * s, 1.3 * s, .12 * s); for (let i = 0; i < 6; i++) { const a = i * 1.05, l = (.6 + (i % 3) * .2) * s; S.add(CYL, '#5b3d26', x + Math.cos(a) * l * .45, y + (1.7 + (i % 2) * .4) * s, z + Math.sin(a) * l * .45, a, .05 * s, l, .05 * s, .9, 0); }
+  for (let i = 0; i < 46; i++) { const a = i * 2.39, r = (.25 + (i % 5) * .15) * s; S.add(SPH, i % 7 ? col : '#ffffff', x + Math.cos(a) * r, y + (1.6 + ((i * 37) % 11) / 11 * 1.1) * s, z + Math.sin(a) * r, 0, .14 * s, .12 * s, .14 * s); } }
+function starLantern(L, S, x, y, z, col) { const sh = new THREE.Shape(); for (let i = 0; i < 10; i++) { const r = i % 2 ? .22 : .5, a = Math.PI / 2 + i * Math.PI / 5; i ? sh.lineTo(Math.cos(a) * r, Math.sin(a) * r) : sh.moveTo(Math.cos(a) * r, Math.sin(a) * r); }
+  const g = new THREE.ExtrudeGeometry(sh, {depth:.14, bevelEnabled:false}); g.translate(0, 0, -.07); L.add(g, col, x, y, z, .4); S.box(.03, .6, .03, '#3a3f4a', x, y + .45, z); S.box(.04, .9, .04, '#c9a65a', x + .45, y - .3, z, 0); }
+function pumpkin(S, L, x, y, z, s = 1) { for (let i = 0; i < 5; i++) S.add(SPH, i % 2 ? '#ef6c00' : '#f57c00', x + (i - 2) * .12 * s, y + .35 * s, z, 0, .42 * s, .6 * s, .7 * s); S.box(.08 * s, .25 * s, .08 * s, '#4e6b2a', x, y + .62 * s, z);
+  L.add(BOX, '#ffcc66', x - .15 * s, y + .45 * s, z + .34 * s, 0, .1 * s, .1 * s, .02); L.add(BOX, '#ffcc66', x + .15 * s, y + .45 * s, z + .34 * s, 0, .1 * s, .1 * s, .02); L.add(BOX, '#ffcc66', x, y + .27 * s, z + .35 * s, 0, .3 * s, .06 * s, .02); }
+function heart(S, x, y, z, col) { S.add(SPH, col, x - .17, y + .1, z, 0, .4, .4, .3); S.add(SPH, col, x + .17, y + .1, z, 0, .4, .4, .3); S.add(CONE, col, x, y - .2, z, 0, .62, .45, .3, Math.PI); S.box(.015, 1.4, .015, '#dddddd', x, y - 1.8, z); }
+function bouquet(S, x, y, z, cols) { S.add(CYL, '#e8e2d4', x, y + .3, z, 0, .3, .6, .3); for (let i = 0; i < 9; i++) { const a = i * 2.2, r = .08 + (i % 3) * .08; S.add(SPH, cols[i % cols.length], x + Math.cos(a) * r, y + .75 + (i % 3) * .08, z + Math.sin(a) * r, 0, .17, .14, .17); } S.add(SPH, '#3f7a3a', x, y + .62, z, 0, .4, .12, .4); }
+function setDecor(key) { if (key === decorKey || !world) return; decorKey = key;
+  if (decor) { world.remove(decor[0]); up.remove(decor[1]); } hats.forEach(h => h.parent && h.parent.remove(h)); hats = []; fw.forEach(f => world.remove(f.p)); fw = []; fwOn = false; if (flakes) { world.remove(flakes); flakes = null; } if (moonM) { world.remove(moonM); moonM = null; }
+  const g = new THREE.Group(), u = new THREE.Group(); decor = [g, u]; world.add(g); up.add(u); if (!key) return;
+  const S = Baker(), A = Baker(), B = Baker(), US = Baker(), UA = Baker(), UB = Baker(), y0 = new Date().getFullYear();
+  const lob = [ent - 4.9, T.z1 + 1.6], lob2 = [ent + 4.9, T.z1 + 1.6], ter = [T.x0 + 1.9, T.z1 - 2.4], ter2 = [W + 2.3, T.z1 - 2.6], strings = [[T.x0 + .3, W / 2 - .5], [W / 2 + 3.5, T.x1 - .3]];
+  const hangLanterns = (Bk, Lk, cols) => { for (const [a, b] of strings) for (let k = 1; k < 6; k++) { const x = a + (b - a) * k / 6; lantern(Bk, Lk, x, 2.1 - Math.sin(Math.PI * k / 6) * .55, T.z1 - 1.1, cols[k % cols.length]); }
+    for (let k = -1; k <= 1; k++) lantern(S, A, ent + k * 1.5, 2.2, T.z1 + 1.9, cols[(k + 3) % cols.length]); };
+  let ban = null, banCol = ['#b71c1c', '#ffd54f'];
+  if (key === 'christmas') { xmasTree(US, UA, UB, ter[0], .05, ter[1], 1.3); gifts(US, ter[0] + .2, .05, ter[1] + 1.4); xmasTree(S, A, B, ent - 7.5, 0, T.z1 + 4.5, 1.5); gifts(S, ent - 7.3, 0, T.z1 + 6.4);
+    for (const [x0, x1] of strings) for (let k = 0; k <= 16; k++) { const u2 = k / 16; (k % 2 ? UA : UB).add(SPH, ['#e53935', '#43a047', '#fdd835', '#1e88e5'][k % 4], x0 + (x1 - x0) * u2, 2.95 - Math.sin(Math.PI * u2) * .7, T.z1 - 1.1, 0, .2, .24, .2); }
+    for (const sx of [-1.6, 1.6]) { S.add(new THREE.TorusGeometry(.45, .14, 6, 14), '#2a7d45', ent + sx, 2.2, T.z1 + .2); A.add(SPH, '#e53935', ent + sx, 1.8, T.z1 + .3, 0, .16, .16, .16); }
+    ban = ['MERRY CHRISTMAS', 'Giáng sinh an lành · Mùa đông ấm áp']; banCol = ['#1f5c33', '#ffffff'];
+    for (const m of [boss.m, chair.m]) { if (!m) continue; const h = new THREE.Group(), hb = Baker(); hb.add(CONE, '#d32f2f', 0, 1.82, -.02, 0, .44, .42, .44, -.25); hb.add(CYL, '#ffffff', 0, 1.6, 0, 0, .5, .08, .5); hb.add(SPH, '#ffffff', 0, 2.0, -.12, 0, .12, .12, .12); h.add(hb.mesh(MSOLID)); m.add(h); hats.push(h); }
+    const N = 500, pos = new Float32Array(N * 3); for (let i = 0; i < N; i++) { pos[i * 3] = isle.x0 + Math.random() * (isle.x1 - isle.x0); pos[i * 3 + 1] = Math.random() * (TOP + 12); pos[i * 3 + 2] = isle.z0 + Math.random() * (isle.z1 - isle.z0); }
+    flakes = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({color:0xffffff, size:3, sizeAttenuation:false, transparent:true, opacity:.85, depthWrite:false})); flakes.geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3)); flakes.frustumCulled = false; world.add(flakes); }
+  else if (key === 'tet' || key === 'newyear') { const ly = key === 'tet' ? (new Date().getMonth() > 6 ? y0 + 1 : y0) : (new Date().getMonth() === 11 ? y0 + 1 : y0);
+    hangLanterns(US, UA, ['#e53935', '#d32f2f', '#ff7043']); fwOn = true;
+    if (key === 'tet') { blossom(S, lob[0], 0, lob[1], '#f48fb1', 1.6); blossom(S, lob2[0], 0, lob2[1], '#ffd54f', 1.6); blossom(US, ter[0], .05, ter[1], '#f48fb1', 1.3); blossom(US, ter2[0], .05, ter2[1], '#ffd54f', 1.3); blossom(US, chair.x + 3, .55, -1.3, '#ffd54f', .8);
+      for (let i = 0; i < 2; i++) { US.box(.4, .3, .4, '#2e7d32', chair.x - .3 + i * .5, 1.03, -3.3); US.box(.42, .04, .08, '#c62828', chair.x - .3 + i * .5, 1.34, -3.3); }
+      ban = ['CHÚC MỪNG NĂM MỚI ' + ly, 'Xuân ' + CAN[(ly - 4) % 10] + ' ' + CHI[(ly - 4) % 12] + ' · An khang thịnh vượng']; banCol = ['#b71c1c', '#ffd54f']; }
+    else { for (const [x, z, bk] of [[...lob, S], [...lob2, S], [...ter, US], [...ter2, US]]) for (let i = 0; i < 3; i++) { bk.add(SPH, ['#ffd54f', '#c0c0c0', '#e53935'][i], x + (i - 1) * .55, 2.4 + i * .3, z, 0, .5, .6, .5); bk.box(.015, 2.3 + i * .3, .015, '#dddddd', x + (i - 1) * .55, 0, z); }
+      ban = ['HAPPY NEW YEAR ' + ly, 'Chúc mừng năm mới ' + ly]; banCol = ['#14213d', '#ffd54f']; } }
+  else if (key === 'moon') { for (const [a, b] of strings) for (let k = 1; k < 6; k++) starLantern(UA, US, a + (b - a) * k / 6, 2.0 - Math.sin(Math.PI * k / 6) * .5, T.z1 - 1.1, ['#ff5252', '#ffd740', '#ff9100'][k % 3]);
+    for (const [x, z] of [lob, lob2]) starLantern(A, S, x, 2.2, z, '#ffd740'); US.add(CYL, '#d7a447', chair.x, 1.06, -3.3, 0, .35, .12, .35); US.add(CYL, '#d7a447', chair.x + .5, 1.06, -3.1, 0, .3, .1, .3);
+    moonM = new THREE.Mesh(new THREE.SphereGeometry(5, 24, 16), new THREE.MeshBasicMaterial({color:0xfff1b8})); moonM.position.set(T.x0 - 30, TOP + 26, T.z0 - 40); world.add(moonM);
+    ban = ['TẾT TRUNG THU', 'Rằm tháng Tám · Trăng tròn đoàn viên']; banCol = ['#4a148c', '#ffd740']; }
+  else if (key === 'halloween') { for (const [x, z] of [lob, lob2, [lob[0] + 1.2, lob[1] + .6]]) pumpkin(S, A, x, 0, z, 1.3); for (const [x, z] of [ter, ter2, [chair.x - 3, -1.3]]) pumpkin(US, UA, x, .05, z, 1);
+    ban = ['HAPPY HALLOWEEN', 'Bí ngô, kẹo và một chút rùng rợn']; banCol = ['#1b1b1b', '#ff9100']; }
+  else if (key === 'valentine') { for (const [x, z, bk] of [[...lob, S], [...lob2, S], [...ter, US], [...ter2, US]]) for (let i = 0; i < 3; i++) heart(bk, x + (i - 1) * .7, 3 + i * .25, z, ['#e53935', '#f06292', '#ff8a80'][i]);
+    ban = ['HAPPY VALENTINE', 'Ngày lễ tình nhân 14/2']; banCol = ['#ad1457', '#ffffff']; }
+  else if (key === 'teacher' || key === 'women') { for (const [x, z] of [lob, lob2]) bouquet(S, x, 0, z, key === 'women' ? ['#e91e63', '#f48fb1', '#ffffff'] : ['#ffeb3b', '#ff7043', '#ffffff']); for (const [x, z] of [ter, ter2]) bouquet(US, x, .05, z, ['#e91e63', '#ffeb3b', '#ffffff']);
+    bouquet(US, boss.x - 1.7, 1.12, boss.z + .4, ['#e91e63', '#ffffff']); ban = key === 'teacher' ? ['NGÀY NHÀ GIÁO VIỆT NAM', '20/11 · Tri ân thầy cô'] : ['NGÀY PHỤ NỮ', 'Chúc mừng một nửa thế giới']; banCol = ['#880e4f', '#ffffff']; }
+  else if (key === 'pi') { ban = ['π = 3,14159 26535…', 'Pi Day 14/3 · có bánh pie trên bàn CEO']; banCol = ['#0d47a1', '#ffffff']; US.add(CYL, '#d7a447', boss.x + .2, 1.16, boss.z - .05, 0, .5, .08, .5); US.add(CONE, '#b5563c', boss.x + .2, 1.2, boss.z - .05, 0, .5, .04, .5); }
+  else if (key === 'dev') { ban = ['Hello, World!', 'Ngày Lập trình viên · ngày thứ 256 của năm']; banCol = ['#0b0f14', '#3ddc84']; }
+  if (ban) { const bw = ex - 1.4 - (T.x0 + .8), m = bannerMesh(ban[0], ban[1], banCol[0], banCol[1], bw); m.position.set(T.x0 + .8 + bw / 2, TOP - 2.6, T.z1 + .3); g.add(m); }
+  for (const [bk, mat, grp] of [[S, MSOLID, g], [A, MTA, g], [B, MTB, g], [US, MSOLID, u], [UA, MTA, u], [UB, MTB, u]]) { const m = bk.mesh(mat); if (mat === MSOLID) m.castShadow = true; grp.add(m); } }
+function seasonTick(t, dt, night) { MTA.color.setScalar(.6 + .4 * Math.sin(t * 3)); MTB.color.setScalar(.6 - .4 * Math.sin(t * 3));
+  if (flakes) { const a = flakes.geometry.attributes.position.array; for (let i = 0; i < a.length; i += 3) { a[i + 1] -= dt * (.8 + (i % 7) * .1); a[i] += Math.sin(t + i) * dt * .2; if (a[i + 1] < 0) a[i + 1] = TOP + 12; } flakes.geometry.attributes.position.needsUpdate = true; }
+  if (fwOn && night && Math.random() < dt * 1.2 && fw.length < 6) { const n = 70, pos = new Float32Array(n * 3), vel = [], c = new THREE.Color().setHSL(Math.random(), .9, .6), x = T.x0 - 6 + Math.random() * (T.x1 - T.x0 + 12), y = TOP + 9 + Math.random() * 9, z = T.z0 + Math.random() * (T.z1 - T.z0);
+    for (let i = 0; i < n; i++) { const th = Math.random() * 6.28, ph = Math.acos(2 * Math.random() - 1), sp = 4 + Math.random() * 2; vel.push([Math.sin(ph) * Math.cos(th) * sp, Math.cos(ph) * sp, Math.sin(ph) * Math.sin(th) * sp]); pos.set([x, y, z], i * 3); }
+    const pt = new THREE.Points(new THREE.BufferGeometry(), new THREE.PointsMaterial({color:c, size:4, sizeAttenuation:false, transparent:true, opacity:1, depthWrite:false, blending:THREE.AdditiveBlending})); pt.geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3)); pt.frustumCulled = false; world.add(pt); fw.push({p:pt, vel, t:0}); }
+  fw = fw.filter(f => { f.t += dt; const a = f.p.geometry.attributes.position.array; f.vel.forEach((v, i) => { v[1] -= 3.5 * dt; a[i * 3] += v[0] * dt; a[i * 3 + 1] += v[1] * dt; a[i * 3 + 2] += v[2] * dt; v[0] *= .985; v[2] *= .985; }); f.p.geometry.attributes.position.needsUpdate = true; f.p.material.opacity = Math.max(0, 1 - f.t / 1.8); if (f.t > 1.8) { world.remove(f.p); f.p.geometry.dispose(); return false; } return true; }); }
+
 // ---- the loop
 let VIEW3 = false, running = false, last = 0, zoomIn = false;
-function frame(ms) { if (!running) return; requestAnimationFrame(frame); const wet = WX.now().wet, busy = moving || Object.keys(goal).length || meet || meetQ.length; if (ms - last < (busy || wet ? 30 : 60)) return; const dt = Math.min(.1, (ms - last) / 1000); last = ms; const t = ms / 1000;
+function frame(ms) { if (!running) return; requestAnimationFrame(frame); const wet = WX.now().wet || flakes || fw.length, busy = moving || Object.keys(goal).length || meet || meetQ.length; if (ms - last < (busy || wet ? 30 : 60)) return; const dt = Math.min(.1, (ms - last) / 1000); last = ms; const t = ms / 1000;
   const dg = director(ms); if (dg) Object.assign(goal, dg); if (goal.z && !moving) { const a = 1 - Math.exp(-dt * 2.4); cam.tx += (goal.tx - cam.tx) * a; cam.tz += (goal.tz - cam.tz) * a; cam.z += (goal.z - cam.z) * a; cam.yaw += (goal.yaw - cam.yaw) * a; if (goal.ty != null) cam.ty += (goal.ty - cam.ty) * a; if (Math.abs(goal.z - cam.z) < .002 && Math.hypot(goal.tx - cam.tx, goal.tz - cam.tz) < .02) Object.keys(goal).forEach(k => delete goal[k]); applyCam(); }
   const zin = cam.z > fitZ * 1.6; if (zin !== zoomIn) { zoomIn = zin; stage.classList.toggle('zoomin', zin); }
   if (!(meet && meet.ph === 'talk')) { boss.m.position.y = .34 + (CHATS.busy ? Math.abs(Math.sin(t * 8)) * .05 : 0); boss.m.rotation.y = CHATS.busy ? Math.sin(t * 1.2) * .3 : Math.sin(t * .3) * .1; } if (chair.m) chair.m.rotation.y = Math.sin(t * .22 + 1) * .12;
-  meetTick(t, dt); weather(t, dt); placeLabels(cam.z / fitZ); R.render(scene, camera); }
+  meetTick(t, dt); weather(t, dt); seasonTick(t, dt, litNow); placeLabels(cam.z / fitZ); R.render(scene, camera); }
 function size() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return false; R.setSize(w, h, false); applyCam(); return true; }
 function wake() { const on = VIEW3 && cur === 'office' && !document.hidden && STATE; if (on && !running) { if (!size()) return; if (!world) set(STATE); running = true; last = performance.now(); requestAnimationFrame(frame); } else if (!on) running = false; }
 function set(s) { if (!s || !VIEW3) return; if (!stage.clientWidth) return; const fresh = build(s); populate(); if (fresh) { size(); const o = overview(); Object.assign(cam, o); clampCam(); applyCam(); skyKey = ''; } }
@@ -406,4 +488,4 @@ function show(on) { VIEW3 = on; stage.classList.toggle('v3', on); if (on) { set(
 addEventListener('resize', () => { if (VIEW3 && size()) { overview(); } });
 
 document.addEventListener('visibilitychange', wake);
-window.O3D = {set, note() {}, boss() {}, focus, wake, sky() { skyKey = ''; }, show};
+window.O3D = {set, note() {}, boss() {}, focus, wake, sky() { skyKey = ''; }, season() { decorKey = null; skyKey = ''; }, show};
