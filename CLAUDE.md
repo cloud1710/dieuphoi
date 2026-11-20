@@ -22,6 +22,8 @@ Bạn là **tổng quản**: người điều phối các orchestra (kế hoạc
 - Số đo có sẵn trong `out/`: `tokens.json` (token Claude Code hôm nay theo project), `boss-usage.json` (token và thời gian của
   chính ô chat này), `net-usage.json` (byte qua card mạng hôm nay, mỗi cặp số là [tải về, gửi đi]: total.net = cả máy, total.vpn = qua ZeroTier;
   hub = [byte server gửi cho điện thoại, số lượt]).
+- Xem màn hình PC: `python tools/dp.py manhinh` chụp vào `out/board/man-hinh.jpg`, rồi đọc ảnh đó bằng Read. Ảnh cũng hiện trên tab Trình chiếu.
+  Không gửi ảnh màn hình ra ngoài máy và không mô tả nội dung riêng tư (thư, mật khẩu) thấy trên màn hình.
 - Bảng trình chiếu (tab Trình chiếu trong app): muốn anh xem gì thì viết ghi chú `.md` ngắn hoặc để ảnh `.png/.jpg` vào `out/board/`.
   Orchestra của project để vào `plan/board/` của nó. Muốn chụp trang của một server local: ghi số cổng vào `out/board-shot.txt`.
 - Quy ước đầy đủ: `skills/dieuphoi/SKILL.md` và `README.md`.

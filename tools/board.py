@@ -9,6 +9,7 @@ What the owner can look at from the phone: the web servers that run on this PC (
 Only base names leave this module, never a full path.
 """
 import os
+import re
 import shutil
 import subprocess
 import time
@@ -254,3 +255,48 @@ def sunshine():
         if (p.info['name'] or '').lower() in ('sunshine.exe', 'sunshine', 'apollo.exe'):
             return p.info['name']
     return None
+
+
+# ---- MoonlightWeb (browser client for streaming this PC): read its state with `moonlightweb --status`
+MW_EXE = r'C:\Program Files\MoonlightWeb\moonlightweb.exe'
+_MW = {'t': 0.0, 'info': None}
+
+
+def moonlightweb(hub, force=False):
+    """{'installed', 'link', 'internet', 'pin', 'raw'} from `moonlightweb --status`, refreshed at most every
+    10 minutes. The raw text stays in out/mw-status.txt (not on GitHub); the app shows the PIN only behind the key."""
+    if not force and time.time() - _MW['t'] < 600 and _MW['info'] is not None:
+        return _MW['info']
+    info = {'installed': os.path.isfile(MW_EXE), 'link': None, 'internet': None, 'pin': None, 'local': 'https://localhost/'}
+    if info['installed']:
+        try:
+            r = subprocess.run([MW_EXE, '--status'], capture_output=True, text=True, encoding='utf-8', errors='replace',
+                               timeout=30, stdin=subprocess.DEVNULL, creationflags=NOWIN)
+            raw = (r.stdout or '') + (r.stderr or '')
+        except Exception as e:
+            raw = 'error: %s' % e
+        if re.search(r'(?im)^\s*Access PIN\s+none set', raw) and not _MW.get('pin_tried'):
+            _MW['pin_tried'] = True                  # the link must never be open without a PIN: make one, once
+            try:
+                r2 = subprocess.run([MW_EXE, '--new-pin'], capture_output=True, text=True, encoding='utf-8', errors='replace',
+                                    timeout=30, stdin=subprocess.DEVNULL, creationflags=NOWIN)
+                (Path(hub) / 'out' / 'mw-newpin.txt').write_text((r2.stdout or '') + (r2.stderr or ''), encoding='utf-8')
+                r = subprocess.run([MW_EXE, '--status'], capture_output=True, text=True, encoding='utf-8', errors='replace',
+                                   timeout=30, stdin=subprocess.DEVNULL, creationflags=NOWIN)
+                raw = (r.stdout or '') + (r.stderr or '')
+            except Exception as e:
+                raw += '\nnew-pin error: %s' % e
+        (Path(hub) / 'out' / 'mw-status.txt').write_text(raw, encoding='utf-8')
+        m = re.search(r'https://stream\.moonlightweb\.top/[A-Za-z0-9_-]+|https://[a-z0-9-]+\.moonlightweb\.top/?', raw)
+        info['link'] = m.group(0) if m else None
+        m = re.search(r'(?im)^\s*Access PIN\s+([0-9]{4,10})', raw)
+        if not m:
+            try:
+                m = re.search(r'([0-9]{4,10})', (Path(hub) / 'out' / 'mw-newpin.txt').read_text(encoding='utf-8'))
+            except OSError:
+                m = None
+        info['pin'] = m.group(1) if m else None
+        m = re.search(r'(?im)^.*internet[^\n]*', raw)
+        info['internet'] = m.group(0).strip()[:120] if m else None
+    _MW.update(t=time.time(), info=info)
+    return info

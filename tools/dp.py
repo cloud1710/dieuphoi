@@ -463,7 +463,7 @@ class Handler(SimpleHTTPRequestHandler):
         if path == '/api/board':
             b = _board()
             body = json.dumps({'servers': b.servers(_pairs(), {self.server.server_address[1]}), 'items': b.items(HUB, _pairs(True)),
-                               'can_shot': bool(b.browser()), 'sunshine': b.sunshine()}, ensure_ascii=False).encode('utf-8')
+                               'can_shot': bool(b.browser()), 'sunshine': b.sunshine(), 'mw': b.moonlightweb(HUB)}, ensure_ascii=False).encode('utf-8')
             self.send_response(200)
             self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.send_header('Cache-Control', 'no-store')
@@ -1993,6 +1993,7 @@ def cmd_serve(args):
         except Exception as e:
             (HUB / 'out' / 'hw.json').write_text(json.dumps({'error': '%s: %s' % (type(e).__name__, e)}), encoding='utf-8')
     threading.Timer(15, _dump_hw).start()
+    threading.Timer(20, lambda: _board().moonlightweb(HUB, True)).start()
     threading.Timer(25, lambda: net_diag()).start()
     threading.Timer(240, lambda: net_diag()).start()         # again once a phone has had time to connect          # leaves out/net.txt for whoever looks after this PC
     links = ['http://%s:%d/m.html#k=%s' % (h, args.port, Handler.key) for h in hosts]
@@ -2047,6 +2048,8 @@ def main(argv=None):
     x.add_argument('--why', required=True)
     x.add_argument('--by', default='tổng quản')
     x.set_defaults(fn=cmd_xoa)
+    mh = sub.add_parser('manhinh', help='chụp màn hình PC vào out/board/man-hinh.jpg (tổng quản đọc ảnh này để xem PC)')
+    mh.set_defaults(fn=lambda a: (lambda j: ((HUB / 'out' / 'board').mkdir(parents=True, exist_ok=True), (HUB / 'out' / 'board' / 'man-hinh.jpg').write_bytes(j or b''), print(str(HUB / 'out' / 'board' / 'man-hinh.jpg') if j else 'chưa chụp được (đang cài Pillow?)'))[-1])(_board().screen_jpeg(1600)) or 0)
     hq = sub.add_parser('hoi', help='hỏi anh Vinh bằng nút bấm trên bong bóng chat')
     hq.add_argument('question')
     hq.add_argument('--options', default='Đồng ý|Không', help='các lựa chọn, ngăn bằng |')
