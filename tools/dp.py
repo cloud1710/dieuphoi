@@ -867,7 +867,7 @@ def token_loop():
 
 def reload_on_change():
     """A hidden server cannot be restarted by hand: leave when its own code changes, the start script runs it again."""
-    files = [Path(__file__).resolve(), Path(__file__).resolve().parent / 'hw.py', Path(__file__).resolve().parent / 'board.py']
+    files = [Path(__file__).resolve(), Path(__file__).resolve().parent / 'hw.py', Path(__file__).resolve().parent / 'board.py']      # guard.py is run fresh each time
     seen = [f.stat().st_mtime_ns if f.is_file() else 0 for f in files]
     while True:
         time.sleep(20)
@@ -1099,14 +1099,30 @@ def chat_turn(text, model, session=None):
     cmd = claude_cmd()
     if not cmd:
         raise RuntimeError('PC không tìm thấy lệnh claude (Claude Code) trên PATH của server')
-    cmd += ['-p', '--output-format', 'stream-json', '--verbose', '--max-turns', '25', '--model', model, '--permission-mode', 'acceptEdits',
-            '--allowedTools', 'Read,Grep,Glob,Edit,Write,TodoWrite,Bash(python tools/dp.py:*)']
+    # what the manager may do is the owner's file quyen-tong-quan.json; tools/guard.py checks every tool call against it
+    try:
+        full = json.loads((HUB / 'quyen-tong-quan.json').read_text(encoding='utf-8')).get('toan_quyen') is True
+    except (OSError, ValueError, AttributeError):
+        full = False
+    py = sys.executable.replace('\\', '/')
+    if py.lower().endswith('pythonw.exe') and Path(py[:-5] + '.exe').is_file():
+        py = py[:-5] + '.exe'
+    hook = {'hooks': {'PreToolUse': [{'matcher': '', 'hooks': [{'type': 'command', 'command': '"%s" "%s"' % (py, str(HUB / 'tools' / 'guard.py').replace('\\', '/'))}]}]}}
+    sfile = HUB / 'out' / 'chat-settings.json'
+    sfile.write_text(json.dumps(hook), encoding='utf-8')
+    cmd += ['-p', '--output-format', 'stream-json', '--verbose', '--max-turns', '40' if full else '25', '--model', model, '--permission-mode', 'acceptEdits',
+            '--settings', str(sfile)]
+    if full:
+        cmd += ['--allowedTools', 'Read,Grep,Glob,Edit,Write,MultiEdit,NotebookEdit,TodoWrite,Bash,WebSearch,WebFetch,Task,Agent',
+                '--add-dir', str(HUB.anchor or HUB.parent)]
+    else:
+        cmd += ['--allowedTools', 'Read,Grep,Glob,Edit,Write,TodoWrite,Bash(python tools/dp.py:*)']
     CHAT['session'] = None
     if session:
         cmd += ['--resume', session]
     pr = subprocess.Popen(cmd, cwd=str(HUB), stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                           creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
-    killer = threading.Timer(420, pr.kill)
+    killer = threading.Timer(900 if full else 420, pr.kill)
     killer.start()
     reply, result = None, {}
     try:

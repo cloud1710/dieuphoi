@@ -1,0 +1,15 @@
+{
+  "_huong_dan": [
+    "Tệp quyền của tổng quản (ô chat trong app). Anh Vinh là người duy nhất quyết định nội dung tệp này.",
+    "toan_quyen: true  = tổng quản được chạy mọi lệnh, sửa tệp ở mọi project, tra web, giao việc cho nhân viên phụ.",
+    "toan_quyen: false = như trước: chỉ đọc, sửa tệp trong thư mục hub và chạy python tools/dp.py.",
+    "Dù true hay false, lệnh XOÁ hoặc phá dữ liệu luôn bị chặn (danh sách trong tools/guard.py): tổng quản phải hỏi anh trước.",
+    "chi_doc: thư mục chỉ được đọc, không sửa, không chạy lệnh ghi. cam_vao: thư mục riêng tư, không đọc, không đụng.",
+    "cam_them: thêm mẫu lệnh (regex, chữ thường) anh muốn chặn, ví dụ \"shutdown\" hoặc \"git\\\\s+push\".",
+    "Đổi xong lưu tệp là có hiệu lực ngay ở tin nhắn kế tiếp, không cần khởi động lại gì."
+  ],
+  "toan_quyen": true,
+  "chi_doc": ["D:/CLOUD"],
+  "cam_vao": ["D:/thesis_private"],
+  "cam_them": []
+}
