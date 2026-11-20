@@ -174,6 +174,7 @@ function room(p, gi, x, z, state) {
   }
   const nq = (p.questions || []).length, bits = [T('span', p.name)];
   if (nq) bits.push(T('em', nq + ' ?'));
+  if (p.mail) bits.push(T('em', '✉ ' + p.mail));
   if (p.error === 'no plan') bits.push(T('em', 'chưa có orchestra'));
   label(bits, 'plate' + (dim ? ' dim' : ''), new THREE.Vector3(x, H + .55, z - RD/2), () => showRoom(p, state));
   return {x, z}; }
@@ -248,6 +249,8 @@ function showRoom(p, s) {
     ...list('Câu hỏi chờ anh', (p.questions || []).map(q => q.id + ': ' + q.text)),
     ...list('Việc của người', (p.person || []).map(i => i.id + ' (' + i.owner + '): ' + i.title)));
   if (p.waiting) pbody.append(T('p', p.waiting + ' mục đang bị chặn.', 'meta'));
+  if (p.mail) pbody.append(T('p', p.mail + ' thư mới trong hộp thư, chưa phiên nào đọc.', 'meta'));
+  pbody.append(T('p', 'Nhắn orchestra này: @' + p.id, 'meta'));
   panel.classList.add('on'); }
 function showInbox(s) {
   pbody.textContent = ''; pbody.append(T('h2', 'Việc chờ anh Vinh'));
