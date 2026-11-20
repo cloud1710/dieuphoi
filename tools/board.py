@@ -135,7 +135,18 @@ def items(hub, projects, limit=40):
         except OSError:
             continue
     got.sort(key=lambda r: -r['t'])
-    return got[:limit]
+    out, seen = [], set()
+    for r in got:                                # an orchestra shows one picture and one note: what it works on now
+        key = (r['src'], r['kind'])
+        if r['src'] != 'hub':
+            if key in seen:
+                continue
+            seen.add(key)
+            if r['kind'] == 'image':             # several views saved together: the overview sheet stands for them
+                r = next((x for x in got if x['src'] == r['src'] and x['kind'] == 'image' and r['t'] - x['t'] < 600
+                          and 'sheet' in x['name'].lower()), r)
+        out.append(r)
+    return out[:limit]
 
 
 def image(hub, projects, src, name):
