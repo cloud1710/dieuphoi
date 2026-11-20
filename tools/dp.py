@@ -369,6 +369,11 @@ class Handler(SimpleHTTPRequestHandler):
                 if not re.fullmatch(r'[A-Z][0-9]-[0-9]{2,3}[a-z]?', str(data.get('item'))):
                     raise ValueError('need item')
                 out = {'ok': True, 'result': mark_done(p, data['item'], sender)}
+            elif path == '/api/stop':
+                if not re.fullmatch(r'[A-Z][0-9]-[0-9]{2,3}[a-z]?', str(data.get('item'))):
+                    raise ValueError('need item')
+                n = stop_session(p, data['item'])
+                out = {'ok': bool(n), 'result': 'đã dừng %d tiến trình' % n if n else 'không thấy phiên nào của %s đang chạy' % data['item']}
             elif path == '/api/open':
                 if GAME['on']:
                     raise ValueError('đang ở chế độ chơi game: không mở phiên mới')
@@ -941,13 +946,64 @@ def _pairs(kinds=False):
     return [(p['id'], real(p['path']), p.get('kind'), p.get('board')) for p in ps] if kinds else [(p['id'], real(p['path'])) for p in ps]
 
 
+def _session_procs(root, iid):
+    """The claude processes that run the projectplaner session of item iid in this project."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import hw
+    if hw.psutil is None:
+        return []
+    base, got = hw._norm(root), []
+    for pr in hw.psutil.process_iter(['name', 'cmdline', 'cwd']):
+        try:
+            if (pr.info['name'] or '').lower() not in ('claude', 'claude.exe'):
+                continue
+            cl = pr.info['cmdline'] or []
+            if ('--remote-control=' + iid) not in cl and not ('-n' in cl and cl[cl.index('-n') + 1:cl.index('-n') + 2] == [iid]):
+                continue
+            if hw._norm(pr.info['cwd'] or '').startswith(base):
+                got.append(pr)
+        except Exception:
+            continue
+    return got
+
+
+def stuck_sessions(claude, pairs):
+    """Sessions opened by projectplaner more than three minutes ago whose transcript has not moved since: in
+    practice a console on the PC waits for someone to press a key (the folder trust question, a login, an update)."""
+    out, now = {}, time.time()
+    for pid, root in pairs:
+        try:
+            stamps = [(f.stem, float(f.read_text(encoding='ascii').strip() or 0)) for f in (Path(root) / '.projectplaner' / 'launch').glob('*.stamp')]
+        except (OSError, ValueError):
+            continue
+        for iid, t in stamps:
+            age = now - t
+            if not 180 < age < 12 * 3600 or any(a['age'] < age - 30 for a in claude.get(pid) or []):
+                continue
+            if _session_procs(root, iid):
+                out.setdefault(pid, []).append({'item': iid, 'mins': int(age // 60)})
+    return out
+
+
+def stop_session(p, iid):
+    """Ends a stuck session (the process stops; no file is touched). Returns how many processes were stopped."""
+    procs = _session_procs(real(p['path']), iid)
+    for pr in procs:
+        try:
+            pr.terminate()
+        except Exception:
+            pass
+    return len(procs)
+
+
 def activity():
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import hw
     reg = registry()
     name = (reg.get('publish') or {}).get('pages_project')
     pairs = [(p['id'], real(p['path'])) for p in reg['projects']]
-    return {'claude': hw.claude_activity(pairs), 'programs': hw.project_programs(pairs), 'game': game_state(), 'tokens': hw._TOK['out'],
+    claude = hw.claude_activity(pairs)
+    return {'claude': claude, 'stuck': stuck_sessions(claude, pairs), 'programs': hw.project_programs(pairs), 'game': game_state(), 'tokens': hw._TOK['out'],
             'boss': {k: v for k, v in chat_state().items() if k != 'messages'}, 'boss_usage': boss_usage(), 'net': hw.net_today(),
             'todo_url': 'https://%s.pages.dev/' % name if name else None,
             'passphrase': (HUB / 'out' / 'pass.hash').is_file() and (HUB / 'out' / 'pass.hash').stat().st_size > 0}

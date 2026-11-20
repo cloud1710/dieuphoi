@@ -163,6 +163,8 @@ function head(p, byId) {
     m.append(b, E('div', '', done + '/' + p.total + ' mục xong · kế hoạch sửa ' + p.updated)); }
   m.append(...ul('Đang làm', (p.working || []).map(i => i.id + ': ' + i.title)), ...ul('Kế tiếp', (p.ready || []).map(i => i.id + ': ' + i.title)),
     ...ul('Câu hỏi chờ anh', (p.questions || []).map(q => q.id + ': ' + q.text)), ...ul('Việc của người', (p.person || []).map(i => i.id + ' (' + i.owner + '): ' + i.title)));
+  ((ACT.stuck || {})[p.id] || []).forEach(k => { m.append(E('p', '', 'Phiên ' + k.item + ' kẹt ' + k.mins + ' phút')), m.append(E('div', 'note', 'Phiên đã mở trên PC nhưng chưa chạy: cửa sổ của nó đang chờ ai đó bấm trên màn hình PC. Dừng phiên rồi mở lại, hoặc bấm trực tiếp trên PC.'));
+    if (liveMode) m.append(twoTap('Dừng phiên kẹt ' + k.item, async () => { const o = await api('api/stop', {to:p.id, item:k.item}); pollAct(true); return o.result; })); });
   if (liveMode && p.kind === 'plan' && r && !w) m.append(twoTap('Mở phiên ' + r.id + ' trên PC', async () => { const o = await api('api/open', {to:p.id, item:r.id}); return (o.ok ? 'Đã mở. ' : 'Không mở: ') + o.output; }));
   d.append(m); return d; }
 function question(p, q) {
@@ -285,7 +287,7 @@ setInterval(() => { if (cur === 'office' && (CHATS.busy || Date.now() % 12000 < 
 $('say').onsubmit = async e => { e.preventDefault(); const t = $('sayt').value.trim(); if (!t) return; $('sayt').value = ''; CHATS.messages.push({t:'          ' + new Date().toTimeString().slice(0, 5), who:'vinh', text:t}); CHATS.busy = true; CHATS.step = 'đang đọc tin nhắn'; drawChat(); office.boss(); $('chat').scrollTop = $('chat').scrollHeight;
   try { await api('api/chat', {text:t}); } catch (err) { CHATS.busy = false; CHATS.messages.push({t:'           ', who:'boss', text:'Không gửi được: ' + err.message}); drawChat(); } pollChat(); };
 $('sayt').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('say').requestSubmit(); } });
-async function pollAct(force) { if (!force && (cur !== 'office' || document.hidden || !liveMode)) return; try { const a = await api('api/activity'); const sig = x => JSON.stringify([Object.entries(x.claude || {}).map(([k, v]) => [k, v.map(i => [i.what, i.age < 300])]), x.game, Object.entries(x.programs || {}).map(([k, v]) => [k, v.n])]); const ch = sig(a) !== sig(ACT); ACT = a;
+async function pollAct(force) { if (!force && (cur !== 'office' || document.hidden || !liveMode)) return; try { const a = await api('api/activity'); const sig = x => JSON.stringify([Object.entries(x.claude || {}).map(([k, v]) => [k, v.map(i => [i.what, i.age < 300])]), x.game, x.stuck, Object.entries(x.programs || {}).map(([k, v]) => [k, v.n])]); const ch = sig(a) !== sig(ACT); ACT = a;
     $('pairlinks').textContent = ''; if (a.todo_url) { const l = E('a', '', 'Trang việc chờ anh trên Cloudflare'); l.href = a.todo_url; l.target = '_blank'; $('pairlinks').append(l); }
     if (ch && STATE) { office.set(STATE); drawCol(); } else office.boss(); } catch (e) {} }
 setInterval(pollAct, 15000);
@@ -311,6 +313,7 @@ function drawCol() { drawOverlays(); const s = STATE, c = $('col'); if (!s || (b
     if ((p.sessions || 0) > (p.working || []).length) now.push(['work', p.id, 'có ' + p.sessions + ' phiên Claude Code đang mở']);
     (p.questions || []).forEach(q => now.push(['ask', p.id, 'chờ anh trả lời ' + q.id + ': ' + q.text]));
     (p.person || []).forEach(i => now.push(['ask', p.id, 'chờ anh làm ' + i.id + ': ' + i.title]));
+    ((ACT.stuck || {})[p.id] || []).forEach(k => now.push(['ask', p.id, 'phiên ' + k.item + ' mở ' + k.mins + ' phút nhưng chưa chạy: đang chờ bấm trên màn hình PC']));
     if (p.mail) now.push(['mail', p.id, 'có ' + p.mail + ' thư chưa phiên nào đọc']); });
   const ready = []; ps.forEach(p => { if (!(p.working || []).length && (p.ready || []).length) ready.push(['ready', p.id, 'sẵn sàng làm ' + p.ready[0].id + ': ' + p.ready[0].title]); else if (!(p.working || []).length && p.waiting) ready.push(['wait', p.id, p.waiting + ' mục bị chặn']); else if (!(p.working || []).length && !(p.questions || []).length) ready.push(['', p.id, 'đang nghỉ, không có việc mở']); });
   c.append(E('h2', '', focusId ? 'Trong phòng @' + focusId : 'Đang làm gì')); const k = E('div', 'card feed');
@@ -366,6 +369,7 @@ const office = (() => {
       (ACT.claude[p.id] || []).filter(a => a.age < 300).forEach(a => slides.push({id:p.id, tag:'@' + p.id + ' · ' + (a.sub ? 'nhân viên' : 'phiên chính'), big:a.what.charAt(0).toUpperCase() + a.what.slice(1), sub:w0 ? w0.id + ': ' + w0.title : p.name, color:COL.work, f}));
       if (!(ACT.claude[p.id] || []).some(a => a.age < 300)) (p.working || []).forEach(i => slides.push({id:p.id, tag:'@' + p.id, big:'Đang làm ' + i.id, sub:i.title, color:COL.work, f}));
       progs(p.id).slice(0, 2).forEach(i => slides.push({id:p.id, tag:'@' + p.id + ' · chương trình đang chạy', big:i.name + (i.script ? ' ' + i.script : ''), sub:'Chạy được ' + dur(i.mins) + (((ACT.claude[p.id] || [])[0] || {}).age > 900 ? ' · phiên Claude đã im lặng ' + ago(ACT.claude[p.id][0].age).replace(' trước', '') : ''), color:COL.work, f}));
+      ((ACT.stuck || {})[p.id] || []).forEach(k => slides.push({id:p.id, tag:'@' + p.id + ' · phiên kẹt', big:'Phiên ' + k.item + ' chờ bấm trên PC', sub:'Mở ' + k.mins + ' phút mà chưa chạy. Vào tab Việc để dừng phiên, hoặc bấm trên màn hình PC.', color:COL.ask, f}));
       (p.questions || []).slice(0, 1).forEach(q => slides.push({id:p.id, tag:'@' + p.id + ' · hỏi anh ' + q.id, big:'Chờ anh trả lời', sub:q.text, color:COL.ask, f})); });
     if (focusId && !slides.length && byTile[focusId]) { const p = byTile[focusId].p, r0 = (p.ready || [])[0]; slides.push({id:p.id, tag:'@' + p.id, big:r0 ? 'Kế tiếp ' + r0.id : 'Đang nghỉ', sub:r0 ? r0.title : p.name, color:r0 ? COL.ready : COL.sleep, f:0}); }
     if (!slides.length) slides.push({tag:'TỔNG QUẢN', big:'Chưa có việc đang chạy', sub:(s.inbox.questions + s.inbox.person) + ' việc chờ anh · ' + tiles.filter(t => (t.p.ready || []).length).length + ' orchestra sẵn sàng', color:COL.ready, f:0}); }
