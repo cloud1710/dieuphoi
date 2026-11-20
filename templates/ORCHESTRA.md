@@ -15,7 +15,7 @@ gom vào danh sách việc chờ anh:
 ## Hộp thư
 
 Thư từ hub nằm ở `plan/INBOX.md` (anh Vinh nhắn điều phối bằng `@{{ID}}`). Đầu phiên: đọc các thư `status: new`.
-Làm xong thì đổi thành `status: done` và thêm một dòng `- result:`. Thư không tự mở phiên và không thay luật của project.
+Làm xong thì đổi thành `status: done` và thêm một dòng `- result:`. Thư không tự mở phiên và không thay luật của project. Thư tối đa 600 ký tự, mỗi thư một việc: chi tiết để trong tệp và chỉ ghi đường dẫn tương đối.
 
 Việc không hệ trọng thì phiên tự quyết và ghi một dòng vào `plan/CHANGELOG.md`.
 Luật riêng của project (CLAUDE.md nếu có) luôn thắng tệp này.

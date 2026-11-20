@@ -74,7 +74,14 @@ textarea{min-height:84px;resize:vertical}
 #stage canvas{width:100%;height:100%;display:block}
 #back{position:absolute;left:10px;top:10px;display:none}
 #back.on{display:block}
-#hint{position:absolute;left:10px;bottom:8px;font-size:11.5px;color:var(--mute);background:var(--card);border-radius:8px;padding:2px 8px;opacity:.9}
+#stats{position:absolute;right:8px;top:8px;width:112px;display:grid;grid-template-columns:1fr 1fr;gap:4px;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:6px;font-size:10px;color:var(--mute);box-shadow:0 3px 10px rgba(0,0,0,.12);pointer-events:none}
+#stats div{background:var(--bg);border-radius:7px;padding:3px 6px}
+#stats b{display:block;font-size:13px;color:var(--ink);line-height:1.15}
+#stats .clk{grid-column:1/3;background:none;padding:0 2px}#stats .clk b{font-size:14px;display:inline;margin-right:5px}
+#log{position:absolute;left:8px;bottom:8px;max-width:68%;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:5px 9px 6px;font-size:10.5px;line-height:1.4;box-shadow:0 3px 10px rgba(0,0,0,.12);pointer-events:none}
+#log h3{margin:0 0 1px;font-size:9px;letter-spacing:.08em;color:var(--mute)}
+#log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#log b{font-weight:650}#log i{font-style:normal;color:var(--mute);margin-right:5px}
+#hint{position:absolute;right:8px;bottom:8px;font-size:11.5px;color:var(--mute);background:var(--card);border-radius:8px;padding:2px 8px;opacity:.9}
 .feed .row{padding:8px 12px}.feed .nm b{font-size:13.5px;white-space:normal}.feed .nm small{white-space:normal}
 .dot.ask{background:var(--ask)}.dot.wait{background:var(--wait)}.dot.mail{background:#c79a2b}
 @media (min-width:820px){#t-office.on{display:grid;grid-template-columns:1fr 360px;gap:0 14px}#stage{margin:0;height:calc(100vh - 150px);border:1px solid var(--line);border-radius:12px}}
@@ -86,7 +93,7 @@ a{color:var(--ready)}
 </head>
 <body>
 <header><h1>Điều phối</h1><span id="live"><i></i><span id="when">Đang nối…</span></span><button id="gear" aria-label="Cài đặt">⚙</button><div id="bar" aria-label="Phần cứng PC"></div></header>
-<section id="t-office" class="on"><div id="stage"><canvas id="cv"></canvas><button class="act" id="back">‹ Toàn cảnh</button><span id="hint">Chạm một bàn để phóng vào</span></div><div id="col"></div></section>
+<section id="t-office" class="on"><div id="stage"><canvas id="cv"></canvas><button class="act" id="back">‹ Toàn cảnh</button><span id="hint">Chạm một bàn để phóng vào</span><div id="stats"></div><div id="log"></div></div><div id="col"></div></section>
 <section id="t-work"></section>
 <section id="t-hw"><div class="empty">Đang đọc phần cứng…</div></section>
 <section id="t-msg">
@@ -237,7 +244,16 @@ async function pollAct() { if (cur !== 'office' || document.hidden || !liveMode)
     if (ch && STATE) { office.set(STATE); drawCol(); } } catch (e) {} }
 setInterval(pollAct, 15000);
 const ago = s => s < 60 ? s + ' giây trước' : Math.round(s / 60) + ' phút trước';
-function drawCol() { const s = STATE, c = $('col'); if (!s || (busy && focusId)) return; c.textContent = '';
+function drawOverlays() { const s = STATE; if (!s) return; const heads = s.projects.filter(p => !stored(p)), act = Object.values(ACT.claude || {}).flat().filter(a => a.age < 300).length;
+  const working = heads.reduce((n, p) => n + (p.working || []).length, 0), done = s.projects.reduce((n, p) => n + ((p.counts || {}).done || 0), 0);
+  const st = $('stats'); st.textContent = ''; const cell = (n, t, cls) => { const d = E('div', cls || ''); d.append(E('b', '', n), t); st.append(d); };
+  cell(new Date().toTimeString().slice(0, 5), 'PC ' + (liveMode ? 'đang nối' : 'bản chụp'), 'clk'); cell(Math.max(working, act), 'đang làm'); cell(s.inbox.questions + s.inbox.person, 'chờ anh'); cell(heads.filter(p => !(p.working || []).length && (p.ready || []).length).length, 'sẵn sàng'); cell(done, 'mục đã xong');
+  const lg = $('log'); lg.textContent = ''; lg.append(E('h3', '', 'NHẬT KÝ HOẠT ĐỘNG')); const rows = events.filter(e => !focusId || e.id === focusId).slice(0, 4).map(e => [e.t, e.id, e.text]);
+  if (rows.length < 4) heads.forEach(p => { if (focusId && p.id !== focusId) return; (ACT.claude[p.id] || []).forEach(a => rows.length < 4 && rows.push(['', p.id, a.what])); (p.working || []).forEach(i => rows.length < 4 && rows.push(['', p.id, 'đang làm ' + i.id])); });
+  if (rows.length < 4) heads.forEach(p => { if (focusId && p.id !== focusId) return; (p.questions || []).forEach(q => rows.length < 4 && rows.push(['', p.id, 'chờ anh trả lời ' + q.id])); });
+  rows.forEach(([t, id, text]) => { const d = E('div'); if (t) d.append(E('i', '', t)); d.append(E('b', '', '@' + id + ' '), text); lg.append(d); }); if (!rows.length) lg.append(E('div', '', 'Chưa có hoạt động.')); }
+setInterval(drawOverlays, 30000);
+function drawCol() { drawOverlays(); const s = STATE, c = $('col'); if (!s || (busy && focusId)) return; c.textContent = '';
   const byId = Object.fromEntries(s.projects.map(p => [p.id, p])), ps = s.projects.filter(p => !stored(p) && (!focusId || p.id === focusId));
   const line = (kind, id, text) => { const d = E('div', 'row line'); d.append(E('span', 'dot ' + kind)); const nm = E('span', 'nm'); nm.append(E('b', '', '@' + id), E('small', '', text)); d.append(nm); d.onclick = () => office.focus(id); return d; };
   const now = [];
@@ -266,7 +282,7 @@ const office = (() => {
   function layout(s) {
     const cols = cw > 700 ? 6 : 4, heads = s.projects.filter(p => !stored(p)), gi = Object.fromEntries(s.groups.map((x, i) => [x.id, i]));
     heads.sort((a, b) => gi[a.group] - gi[b.group] || (a.parent || a.id).localeCompare(b.parent || b.id) || (a.parent ? 1 : 0) - (b.parent ? 1 : 0));
-    W = cols * TW + (cols + 1) * G; boss = {x:W / 2, y:92}; door = {x:W - 54, y:74};
+    W = cols * TW + (cols + 1) * G; boss = {x:W / 2, y:92}; door = {x:56, y:74};
     tiles = heads.map((p, i) => { const x = G + (i % cols) * (TW + G), y = PLAZA + Math.floor(i / cols) * (TH + G);
       return {p, x, y, mx:x + TW / 2, my:y + 44, tint:GC[gi[p.group] % GC.length], first:i === 0 || heads[i - 1].group !== p.group, gname:s.groups[gi[p.group]].name}; });
     byTile = Object.fromEntries(tiles.map(t => [t.p.id, t]));
@@ -288,7 +304,7 @@ const office = (() => {
     const t = w.t, near = (o, dx, dy) => ({x:o.x + dx, y:o.y + dy});
     if (w.role === 'staff' && w.kind === 'work') return [[near({x:t.mx, y:t.my}, rnd(-20, 20), 26), 'báo cáo ' + w.say, 2.2], [w.home, '', rnd(6, 12)]];
     if (w.role === 'staff') return [[near(boss, rnd(-40, 40), 34), 'xin việc ' + w.say, 2], [w.home, '', rnd(14, 30)]];
-    if (w.role === 'asker') return [[near(door, -20, 30), w.say, 3.5], [w.home, 'chờ anh', rnd(10, 18)]];
+    if (w.role === 'asker') return [[near(door, 26, 30), w.say, 3.5], [w.home, 'chờ anh', rnd(10, 18)]];
     if (w.role === 'mail') return [[near({x:t.mx, y:t.my}, 0, 26), w.say, 2.5], [w.home, '', rnd(12, 20)]];
     const pt = byTile[t.p.parent]; return [[near({x:pt.mx, y:pt.my}, rnd(-16, 16), 28), w.say, 2.5], [w.home, '', rnd(50, 140)]]; }
   function step(dt) { for (const w of walkers) {
@@ -310,6 +326,8 @@ const office = (() => {
   function clip(text, max) { if (g.measureText(text).width <= max) return text; while (text.length > 2 && g.measureText(text + '…').width > max) text = text.slice(0, -1); return text + '…'; }
   function paint(t) { const dpr = Math.min(devicePixelRatio || 1, 2); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, cw, ch); g.setTransform(dpr * cam.s, 0, 0, dpr * cam.s, -cam.x * cam.s * dpr, -cam.y * cam.s * dpr);
     const ink = dark ? '#ecebe7' : '#23211d', mute = dark ? '#9a9890' : '#6f6a60', card = dark ? '#23262d' : '#fffdf8', line = dark ? '#3a3d45' : '#ddd6c7', zoomed = cam.s * TW > cw * .55;
+    g.fillStyle = dark ? '#3a3128' : '#e9d2aa'; g.fillRect(-40, -40, W + 80, H + 80); g.strokeStyle = dark ? 'rgba(0,0,0,.25)' : 'rgba(150,110,60,.22)'; g.lineWidth = 1; g.beginPath();
+    for (let y = -40; y < H + 80; y += 22) { g.moveTo(-40, y); g.lineTo(W + 40, y); for (let x = (y / 22 % 2 ? 30 : 90) - 40; x < W + 40; x += 120) { g.moveTo(x, y); g.lineTo(x, y + 22); } } g.stroke();
     // plaza: the general manager and the owner's door
     g.fillStyle = dark ? '#262a33' : '#efe7d6'; rr(G, 14, W - 2 * G, PLAZA - 26, 14); g.fill();
     g.fillStyle = '#d8b24a'; g.beginPath(); g.ellipse(boss.x, boss.y + 16, 38, 12, 0, 0, 7); g.fill(); bot(boss.x, boss.y, 34, COL.ready, t);
@@ -328,6 +346,9 @@ const office = (() => {
       if (st === 'work') { g.fillStyle = '#9fe3c0'; g.globalAlpha = .6 + .4 * Math.sin(t * 8 + tl.x); g.fillRect(tl.mx - 7, tl.my, 14, 7); g.globalAlpha = 1; }
       bot(tl.mx, tl.my - 12, 26, COL[st], t, st === 'sleep');
       if (st === 'sleep') bubble(tl.mx + 32, tl.my - 6, 'z z', COL.sleep);
+      else { const a0 = (ACT.claude[p.id] || []).find(a => a.age < 300), w0 = (p.working || [])[0], q0 = (p.questions || [])[0], r0 = (p.ready || [])[0];
+        let say = a0 ? a0.what : w0 ? 'đang làm ' + w0.id : q0 ? 'chờ anh trả lời ' + q0.id : r0 ? 'sẵn sàng ' + r0.id : 'bị chặn'; say = say.charAt(0).toUpperCase() + say.slice(1) + '…';
+        g.font = '600 9px system-ui,sans-serif'; bubble(tl.mx, tl.my - 34, clip(say, TW - 30), COL[st]); }
       if (p.total) { const c = p.counts || {}, f = ((c.done || 0) + (c.dropped || 0)) / p.total; g.fillStyle = line; rr(tl.x + 9, tl.y + TH - 9, TW - 18, 3.5, 2); g.fill(); if (f > 0) { g.fillStyle = COL.work; rr(tl.x + 9, tl.y + TH - 9, (TW - 18) * f, 3.5, 2); g.fill(); } }
       if (zoomed) { const w0 = (p.working || [])[0], r0 = (p.ready || [])[0], txt = w0 ? 'Đang làm ' + w0.id + ': ' + w0.title : r0 ? 'Kế tiếp ' + r0.id + ': ' + r0.title : p.waiting ? p.waiting + ' mục bị chặn' : 'Không có việc mở';
         g.fillStyle = mute; g.font = '500 7.5px system-ui,sans-serif'; g.textAlign = 'left'; g.fillText(clip(txt, TW - 18), tl.x + 9, tl.y + 30); } }

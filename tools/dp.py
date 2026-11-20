@@ -336,7 +336,7 @@ class Handler(SimpleHTTPRequestHandler):
                 raise ValueError('which project? ' + ', '.join('@' + c['id'] for c in cands) if cands else 'unknown project')
             sender = 'Vinh qua điện thoại'
             if path == '/api/msg':
-                text = one_line(data.get('text'))
+                text = one_line(data.get('text'), 600)       # short mail: long messages between agents are what burns tokens
                 if not text:
                     raise ValueError('empty message')
                 out = {'ok': True, 'result': 'M-%03d -> %s' % send_msg(p, text, sender)}
@@ -520,7 +520,7 @@ def cmd_msg(args):
     p, _ = _pick(args.name)
     if p is None:
         return 1
-    text = one_line(' '.join(args.text))
+    text = one_line(' '.join(args.text), 600)
     if not text:
         print('dp msg: empty message')
         return 1

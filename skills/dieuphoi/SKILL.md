@@ -65,6 +65,9 @@ When the owner writes `@name ...`, the message is for that project's orchestra, 
 5. Several names in one message (`@a @b ...`): handle each project separately. `@all` is every project of kind plan.
 6. Reply with the project's name first, then what you did there.
 
+Keep every message to another orchestra or sub agent short (one task, at most 600 characters, details by file
+reference): long messages between agents cost more tokens than the work itself.
+
 A message without @ is for the hub itself.
 
 ## Agents office
