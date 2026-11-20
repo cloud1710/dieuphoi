@@ -59,6 +59,10 @@ summary{cursor:pointer}summary::-webkit-details-marker{display:none}
 .bar.hot span{background:var(--ask)}
 .q{padding:10px 12px;border-top:1px solid var(--line);font-size:14px}
 .q small{display:block;color:var(--ask);font-weight:650;font-size:12px;margin-bottom:2px}
+.del ul{margin:4px 0 6px;padding-left:16px;font-size:12.5px;overflow-wrap:anywhere}.del li{margin:2px 0}
+.del .btns{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}.del .btns .act{margin:0}
+.act.danger{background:var(--ask);color:#fff;border-color:var(--ask)}
+.msg .del{margin-top:6px;padding-top:6px;border-top:1px solid var(--line);white-space:normal}
 .empty{padding:12px;color:var(--mute);font-size:13.5px}
 button.act{font:inherit;font-size:13.5px;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:7px 12px;margin-top:8px}
 button.act.go{background:var(--ready);border-color:var(--ready);color:#fff}
@@ -177,20 +181,32 @@ function question(p, q) {
       catch (e) { res.className = 'res bad'; res.textContent = e.message; go.disabled = false; } };
     b.replaceWith(ta, go, res); ta.focus(); };
   d.append(b); return d; }
+const fbytes = n => n >= 1073741824 ? (n / 1073741824).toFixed(1) + ' GB' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : n >= 1024 ? Math.round(n / 1024) + ' KB' : (n || 0) + ' B';
+const pendingDel = () => ((STATE || {}).deletes || []).filter(r => r.status === 'pending');
+function delBody(r, inChat) { const d = E('div', 'del'); if (!inChat) d.append(E('small', '', 'Đề xuất xoá ' + r.id + ' · ' + r.by + ' · ' + r.when), document.createTextNode(r.why));
+  const u = E('ul'); r.items.slice(0, 8).forEach(i => u.append(E('li', '', (i.kind === 'branch' ? '🌿 ' : i.dir ? '📁 ' : '📄 ') + i.show + (i.kind === 'path' ? ' · ' + fbytes(i.bytes) + (i.dir ? ' · ' + i.files + ' tệp' : '') : '')))); if (r.items.length > 8) u.append(E('li', '', 'và ' + (r.items.length - 8) + ' mục nữa')); d.append(u);
+  if (!liveMode) return d; const bt = E('div', 'btns'), res = E('div', 'res');
+  if (r.status === 'pending') { const y = twoTap('Xoá', async () => { const o = await api('api/delete', {id:r.id, yes:true}); return o.result; }); y.classList.add('danger');
+    const n = E('button', 'act', 'Không xoá'); n.onclick = async () => { n.disabled = true; try { res.textContent = (await api('api/delete', {id:r.id, yes:false})).result; } catch (e) { res.className = 'res bad'; res.textContent = e.message; } }; bt.append(y, n); }
+  else if (r.status === 'trashed') { const b1 = twoTap('Khôi phục', async () => (await api('api/trash', {id:r.id, action:'restore'})).result), b2 = twoTap('Xoá hẳn', async () => (await api('api/trash', {id:r.id, action:'purge'})).result); b2.classList.add('danger'); bt.append(b1, b2); }
+  d.append(bt, res); return d; }
 function personItem(p, i) { const d = E('div', 'q'); d.append(E('small', '', '@' + p.id + ' · ' + i.id + ' · việc của ' + i.owner), document.createTextNode(i.title));
   if (liveMode) { const b = twoTap('Báo đã xong ' + i.id, async () => { const o = await api('api/done', {to:p.id, item:i.id}); return p.kind === 'plan' ? 'Đã ghi xong vào kế hoạch; việc sẽ tự biến mất.' : 'Đã gửi vào hộp thư của project: ' + o.result; }); b.style.display = 'block'; d.append(b); }
   return d; }
 function draw(s) {
-  feedDiff(STATE, s); STATE = s; office.set(s); drawCol(); if (busy) return;                              // do not redraw under an answer being typed
+  const delSig = JSON.stringify((s.deletes || []).map(r => [r.id, r.status])), delCh = !STATE || delSig !== JSON.stringify((STATE.deletes || []).map(r => [r.id, r.status])); feedDiff(STATE, s); STATE = s; if (delCh) drawChat(); office.set(s); drawCol(); if (busy) return;                              // do not redraw under an answer being typed
   const m = $('t-work'), y = scrollY; m.textContent = '';
   const byId = Object.fromEntries(s.projects.map(p => [p.id, p])), heads = s.projects.filter(p => !stored(p)), kho = s.projects.filter(stored);
   const working = heads.flatMap(p => [...(p.working || []).map(i => ({p, i})), ...Array(Math.max(0, (p.sessions || 0) - (p.working || []).length)).fill({p, i:{id:'phiên', title:'Phiên Claude Code đang mở'}})]);
-  const sum = E('div', 'sum'), nq = s.inbox.questions + s.inbox.person; $('nq').textContent = nq || '';
+  const sum = E('div', 'sum'), nq = s.inbox.questions + s.inbox.person + pendingDel().length; $('nq').textContent = nq || '';
   [[nq, 'chờ anh'], [working.length, 'đang làm'], [heads.length, 'orchestra'], [kho.length, 'trong kho']].forEach(([n, t]) => { const d = E('div'); d.append(E('b', '', n), document.createTextNode(t)); sum.append(d); });
   m.append(sum, E('h2', '', 'Chờ anh quyết')); const qc = E('div', 'card'); let n = 0;
+  pendingDel().forEach(r => { n++; const q = E('div', 'q'); q.append(delBody(r)); qc.append(q); });
   s.projects.forEach(p => { (p.questions || []).forEach(q => { n++; qc.append(question(p, q)); });
     (p.person || []).forEach(i => { n++; qc.append(personItem(p, i)); }); });
   if (!n) qc.append(E('div', 'empty', 'Không có việc nào chờ.')); m.append(qc);
+  const tr = (s.deletes || []).filter(r => r.status === 'trashed'); if (tr.length) { const tc = E('div', 'card'); tr.forEach(r => { const q = E('div', 'q'); q.append(delBody(r)); tc.append(q); });
+    m.append(sect('w-trash', 'Thùng rác (khôi phục được)', tc, false, tr.length + ' đợt · ' + fbytes(tr.reduce((a, r) => a + r.items.reduce((b, i) => b + (i.bytes || 0), 0), 0)))); }
   const wc = E('div', 'card');
   working.forEach(({p, i}) => { const d = E('div', 'row line'); d.append(E('span', 'dot work')); const nm = E('span', 'nm'); nm.append(E('b', '', i.id + ' · @' + p.id), E('small', '', i.title)); d.append(nm); wc.append(d); });
   if (!working.length) wc.append(E('div', 'empty', 'Chưa có việc nào đang chạy.')); m.append(sect('w-work', 'Nhân viên đang làm', wc, false, working.length + ' việc'));
@@ -278,7 +294,7 @@ let focusId = null, ACT = {claude:{}}, CHATS = {messages:[], busy:false, step:''
 function rich(el, text) { String(text).split('**').forEach((part, i) => el.append(i % 2 ? E('b', '', part) : document.createTextNode(part))); }
 function drawChat() { const c = $('chat'), near = c.scrollHeight - c.scrollTop - c.clientHeight < 90; c.textContent = ''; const ms = CHATS.messages.slice(-40);
   if (!ms.length && liveMode) { const d = E('div', 'msg boss'); d.append('Em là tổng quản. Anh nhắn ở ô bên dưới: hỏi việc, giao việc, hoặc gọi @tên-project.'); c.append(d); }
-  ms.forEach(m => { const d = E('div', 'msg ' + (m.who === 'vinh' ? 'vinh' : 'boss')); rich(d, m.text); const mt = m.meta && m.meta.model ? ' · ' + m.meta.model + ' · ' + m.meta.secs + ' giây · ' + Math.round((m.meta.in + m.meta.out + m.meta.cache_read + m.meta.cache_write) / 1000) + 'k token' : ''; d.append(E('small', '', m.t.slice(11) + mt)); c.append(d); });
+  ms.forEach(m => { const d = E('div', 'msg ' + (m.who === 'vinh' ? 'vinh' : 'boss')); rich(d, m.text); const dr = m.meta && m.meta.delete && ((STATE || {}).deletes || []).find(r => r.id === m.meta.delete); if (dr) d.append(delBody(dr, true)); const mt = m.meta && m.meta.model ? ' · ' + m.meta.model + ' · ' + m.meta.secs + ' giây · ' + Math.round((m.meta.in + m.meta.out + m.meta.cache_read + m.meta.cache_write) / 1000) + 'k token' : ''; d.append(E('small', '', m.t.slice(11) + mt)); c.append(d); });
   if (CHATS.busy) c.append(E('div', 'msg boss typing', 'Tổng quản ' + (CHATS.model ? '(' + CHATS.model + ') ' : '') + (CHATS.step || 'đang trả lời') + '…'));
   if (near) c.scrollTop = c.scrollHeight; }                // only the history scrolls, the page stays where it is
 let chatSig = '';
@@ -316,8 +332,8 @@ function drawCol() { drawOverlays(); const s = STATE, c = $('col'); if (!s || (b
     ((ACT.stuck || {})[p.id] || []).forEach(k => now.push(['ask', p.id, 'phiên ' + k.item + ' mở ' + k.mins + ' phút nhưng chưa chạy: đang chờ bấm trên màn hình PC']));
     if (p.mail) now.push(['mail', p.id, 'có ' + p.mail + ' thư chưa phiên nào đọc']); });
   const ready = []; ps.forEach(p => { if (!(p.working || []).length && (p.ready || []).length) ready.push(['ready', p.id, 'sẵn sàng làm ' + p.ready[0].id + ': ' + p.ready[0].title]); else if (!(p.working || []).length && p.waiting) ready.push(['wait', p.id, p.waiting + ' mục bị chặn']); else if (!(p.working || []).length && !(p.questions || []).length) ready.push(['', p.id, 'đang nghỉ, không có việc mở']); });
-  c.append(E('h2', '', focusId ? 'Trong phòng @' + focusId : 'Đang làm gì')); const k = E('div', 'card feed');
-  (focusId ? now.map(r => line(...r)) : grouped(now, line, open, 'col:')).forEach(x => k.append(x)); if (!now.length) k.append(E('div', 'empty', 'Chưa có việc nào đang chạy hay đang chờ anh.')); c.append(k);
+  const k = E('div', 'card feed');
+  (focusId ? now.map(r => line(...r)) : grouped(now, line, open, 'col:')).forEach(x => k.append(x)); if (!now.length) k.append(E('div', 'empty', 'Chưa có việc nào đang chạy hay đang chờ anh.')); if (focusId) c.append(E('h2', '', 'Trong phòng @' + focusId), k); else c.append(sect('c-now', 'Đang làm gì', k, false, new Set(now.map(r => r[1])).size + ' project · ' + now.length + ' việc'));
   if (focusId && byId[focusId]) { const k2 = E('div', 'card'); k2.style.marginTop = '10px'; open.add(focusId); k2.append(head(byId[focusId], byId)); c.append(k2); }
   const ev = events.filter(e => !focusId || e.id === focusId);
   if (ev.length) { const k3 = E('div', 'card feed'); ev.slice(0, 12).forEach(e => k3.append(line(e.kind, e.id, e.t + ' · ' + e.text))); c.append(sect('c-ev', 'Vừa xảy ra', k3, false, Math.min(12, ev.length) + ' việc')); }
@@ -372,6 +388,7 @@ const office = (() => {
       ((ACT.stuck || {})[p.id] || []).forEach(k => slides.push({id:p.id, tag:'@' + p.id + ' · phiên kẹt', big:'Phiên ' + k.item + ' chờ bấm trên PC', sub:'Mở ' + k.mins + ' phút mà chưa chạy. Vào tab Việc để dừng phiên, hoặc bấm trên màn hình PC.', color:COL.ask, f}));
       (p.questions || []).slice(0, 1).forEach(q => slides.push({id:p.id, tag:'@' + p.id + ' · hỏi anh ' + q.id, big:'Chờ anh trả lời', sub:q.text, color:COL.ask, f})); });
     if (focusId && !slides.length && byTile[focusId]) { const p = byTile[focusId].p, r0 = (p.ready || [])[0]; slides.push({id:p.id, tag:'@' + p.id, big:r0 ? 'Kế tiếp ' + r0.id : 'Đang nghỉ', sub:r0 ? r0.title : p.name, color:r0 ? COL.ready : COL.sleep, f:0}); }
+    pendingDel().slice(0, 2).forEach(r => slides.unshift({tag:'ĐỀ XUẤT XOÁ ' + r.id + ' · ' + r.by, big:'Chờ anh xác nhận xoá', sub:r.items.map(i => i.show).join(', ') + ' · ' + r.why, color:COL.ask, f:0}));
     if (!slides.length) slides.push({tag:'TỔNG QUẢN', big:'Chưa có việc đang chạy', sub:(s.inbox.questions + s.inbox.person) + ' việc chờ anh · ' + tiles.filter(t => (t.p.ready || []).length).length + ' orchestra sẵn sàng', color:COL.ready, f:0}); }
   function wrap(text, max, lines) { const out = []; let cur = ''; for (const w of String(text).split(' ')) { const t = cur ? cur + ' ' + w : w; if (g.measureText(t).width > max && cur) { out.push(cur); cur = w; if (out.length === lines) break; } else cur = t; } if (out.length < lines && cur) out.push(cur); else if (out.length === lines) out[lines - 1] = clip(out[lines - 1] + ' …', max); return out; }
   function screen(t) { const x = scr.x, y = scr.y, w = scr.w, h = scr.h; if (!slides.length) return; const i = CHATS.busy ? 0 : Math.floor(t / 6) % slides.length, sl = slides[i], a = CHATS.busy ? 1 : Math.min(1, (t % 6) / .45);
@@ -452,7 +469,7 @@ const office = (() => {
     g.fillStyle = 'rgba(0,0,0,.14)'; rr(door.x - 14, door.y - 38, 28, 20, 3); g.fill(); rr(door.x - 14, door.y - 12, 28, 22, 3); g.fill(); g.fillStyle = '#f2c94c'; g.beginPath(); g.arc(door.x + 13, door.y - 14, 2.6, 0, 7); g.fill();
     g.fillStyle = '#b5563c'; rr(door.x - 22, door.y + 18, 44, 7, 3); g.fill();
     g.fillStyle = ink; g.textAlign = 'center'; g.fillText('Anh Vinh', door.x, door.y + 40);
-    const nq = STATE ? STATE.inbox.questions + STATE.inbox.person : 0; if (nq) { g.fillStyle = COL.ask; g.beginPath(); g.arc(door.x + 20, door.y - 44, 9, 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = '700 10px system-ui,sans-serif'; g.textBaseline = 'middle'; g.fillText(nq, door.x + 20, door.y - 44); }
+    const nq = STATE ? STATE.inbox.questions + STATE.inbox.person + pendingDel().length : 0; if (nq) { g.fillStyle = COL.ask; g.beginPath(); g.arc(door.x + 20, door.y - 44, 9, 0, 7); g.fill(); g.fillStyle = '#fff'; g.font = '700 10px system-ui,sans-serif'; g.textBaseline = 'middle'; g.fillText(nq, door.x + 20, door.y - 44); }
     plant(door.x + 64, PLAZA - 24, 22, 1); plant(W - G - 18, PLAZA - 24, 24, 2);
     // the rooms: a wall strip with the name, a rug, a desk, and a few things that differ from room to room
     for (const tl of tiles) { const p = tl.p, sel = p.id === focusId, st = stateOf(p), seed = hsh(p.id), cx = tl.mx, cy = tl.my;

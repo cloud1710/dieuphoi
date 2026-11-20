@@ -210,6 +210,7 @@ def scan():
         'hub': reg['hub'], 'groups': reg['groups'], 'projects': projects,
         'inbox': {'questions': sum(len(p.get('questions', [])) for p in projects),
                   'person': sum(len(p.get('person', [])) for p in projects)},
+        'deletes': _xoa().listing(HUB),
     }
 
 
@@ -339,6 +340,18 @@ class Handler(SimpleHTTPRequestHandler):
             data = json.loads(self.rfile.read(n).decode('utf-8'))
             if path == '/api/chat':
                 return self.reply(200, chat_send(data.get('text')))
+            if path == '/api/delete':
+                out = {'ok': True, 'result': _xoa().decide(HUB, str(data.get('id')), data.get('yes') is True, 'Vinh qua app')}
+                chat_log('boss', out['result'])
+                Handler.cache = (0.0, b'')
+                return self.reply(200, out)
+            if path == '/api/trash':
+                if data.get('action') not in ('restore', 'purge'):
+                    raise ValueError('action')
+                out = {'ok': True, 'result': _xoa().trash_action(HUB, str(data.get('id')), data['action'], 'Vinh qua app')}
+                chat_log('boss', out['result'])
+                Handler.cache = (0.0, b'')
+                return self.reply(200, out)
             if path == '/api/board/shot':
                 b = _board()
                 port = int(data.get('port'))
@@ -885,7 +898,7 @@ def token_loop():
 
 def reload_on_change():
     """A hidden server cannot be restarted by hand: leave when its own code changes, the start script runs it again."""
-    files = [Path(__file__).resolve(), Path(__file__).resolve().parent / 'hw.py', Path(__file__).resolve().parent / 'board.py']      # guard.py is run fresh each time
+    files = [Path(__file__).resolve(), Path(__file__).resolve().parent / 'hw.py', Path(__file__).resolve().parent / 'board.py', Path(__file__).resolve().parent / 'xoa.py']      # guard.py is run fresh each time
     seen = [f.stat().st_mtime_ns if f.is_file() else 0 for f in files]
     while True:
         time.sleep(20)
@@ -1542,6 +1555,33 @@ def hw_state():
     return hw.snapshot([(p['id'], real(p['path'])) for p in registry()['projects']])
 
 
+def _xoa():
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import xoa
+    return xoa
+
+
+def _blocked():
+    try:
+        rules = json.loads((HUB / 'quyen-tong-quan.json').read_text(encoding='utf-8'))
+        return [str(x) for x in (rules.get('chi_doc') or []) + (rules.get('cam_vao') or [])]
+    except (OSError, ValueError, AttributeError):
+        return []
+
+
+def cmd_xoa(args):
+    """An agent proposes a deletion; the owner answers in the app."""
+    roots = [(p['id'], real(p['path'])) for p in registry()['projects']]
+    try:
+        row = _xoa().propose(HUB, real, roots, _blocked(), args.items, args.why, args.by)
+    except ValueError as e:
+        print('dp xoa: %s' % e)
+        return 1
+    chat_log('boss', 'Đề xuất xoá %s: %s. Lý do: %s' % (row['id'], '; '.join(i['show'] for i in row['items']), row['why']), {'delete': row['id']})
+    print('%s chờ anh Vinh xác nhận trong app (ô chat hoặc tab Việc)' % row['id'])
+    return 0
+
+
 def cmd_hw(args):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import hw
@@ -1742,6 +1782,11 @@ def cmd_serve(args):
 
 
 def main(argv=None):
+    for stream in (sys.stdout, sys.stderr):           # a Windows console is cp1252: Vietnamese must not crash a command
+        try:
+            stream.reconfigure(encoding='utf-8', errors='replace')
+        except (AttributeError, ValueError):
+            pass
     ap = argparse.ArgumentParser(prog='dp', description=__doc__.splitlines()[0])
     sub = ap.add_subparsers(dest='cmd', required=True)
     sub.add_parser('check').set_defaults(fn=cmd_check)
@@ -1767,6 +1812,11 @@ def main(argv=None):
     h = sub.add_parser('hw')
     h.add_argument('rest', nargs=argparse.REMAINDER)
     h.set_defaults(fn=cmd_hw)
+    x = sub.add_parser('xoa', help='đề xuất xoá: anh Vinh xác nhận trong app, hub làm')
+    x.add_argument('items', nargs='+', help='đường dẫn, hoặc repo#nhánh')
+    x.add_argument('--why', required=True)
+    x.add_argument('--by', default='tổng quản')
+    x.set_defaults(fn=cmd_xoa)
     i = sub.add_parser('init')
     i.add_argument('id')
     i.set_defaults(fn=cmd_init)

@@ -78,7 +78,7 @@ def verdict(event, rules):
     for pat in DELETE + [str(x) for x in rules.get('cam_them') or []]:
         try:
             if re.search(pat, low):
-                return 'Lệnh này xoá hoặc phá dữ liệu (khớp "%s"). Xoá là quyền anh Vinh giữ: nói rõ cần xoá gì và hỏi anh trước.' % pat
+                return 'Lệnh này xoá hoặc phá dữ liệu (khớp "%s"). Xoá là quyền anh Vinh giữ: đề xuất bằng python D:/dieuphoi/tools/dp.py xoa <đường dẫn | repo#nhánh> --why "lý do", anh bấm xác nhận trong app.' % pat
         except re.error:
             continue
     hit = _mentions(cmd, closed)
