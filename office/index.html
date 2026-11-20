@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Văn phòng agents</title>
+<style>
+:root{--bg:#f4f1ea;--ink:#23211d;--mute:#6f6a60;--wall:#fffdf8;--line:#d9d2c3;--floor:#e9e2d2;--desk:#b98b5e;
+--ok:#2f7d5b;--warn:#b7791f;--ask:#b4432f;--idle:#8a94a6;--accent:#2d5d8c}
+@media (prefers-color-scheme:dark){:root{--bg:#17181b;--ink:#ecebe7;--mute:#9a9890;--wall:#202226;--line:#34373d;
+--floor:#2a2c31;--desk:#7a5a3c;--ok:#5fbf93;--warn:#e0a94a;--ask:#ef7f6a;--idle:#6f7888;--accent:#7fb2e5}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,"Segoe UI",sans-serif}
+header{padding:18px 16px 8px;max-width:1200px;margin:auto;display:flex;flex-wrap:wrap;gap:8px 20px;align-items:baseline}
+h1{font-size:22px;margin:0}
+.meta{color:var(--mute);font-size:13px}
+main{max-width:1200px;margin:auto;padding:0 16px 40px}
+.boss{background:var(--wall);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin:10px 0 22px}
+.boss h2{font-size:16px;margin:0 0 6px}
+.boss details{border-top:1px solid var(--line);padding:6px 0}
+.boss summary{cursor:pointer;font-weight:600}
+.boss li{margin:4px 0}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:9px;border:1px solid var(--line);color:var(--mute);margin-left:6px;white-space:nowrap}
+.tag.ask{color:var(--ask);border-color:var(--ask)}
+.floorname{display:flex;align-items:center;gap:10px;margin:22px 0 8px;font-weight:700}
+.floorname:after{content:"";flex:1;border-top:2px solid var(--line)}
+.rooms{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.room{background:var(--wall);border:1px solid var(--line);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.room.archive,.room.tool{opacity:.62}
+.plate{padding:9px 12px 6px;border-bottom:1px solid var(--line)}
+.plate b{font-size:15px}
+.plate small{display:block;color:var(--mute);font-size:12px}
+.scene{background:var(--floor);min-height:104px;padding:10px 8px 6px;display:flex;flex-wrap:wrap;gap:6px 4px;align-items:flex-end}
+.seat{width:74px;text-align:center;font-size:11px;color:var(--mute)}
+.seat .lbl{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bot{width:34px;height:40px;margin:0 auto;position:relative}
+.bot i{position:absolute;left:5px;top:0;width:24px;height:20px;border-radius:7px;background:var(--c)}
+.bot i:before,.bot i:after{content:"";position:absolute;top:7px;width:4px;height:5px;border-radius:2px;background:var(--wall)}
+.bot i:before{left:5px}.bot i:after{right:5px}
+.bot u{position:absolute;left:8px;top:21px;width:18px;height:15px;border-radius:5px 5px 3px 3px;background:var(--c);opacity:.8}
+.desk{height:9px;border-radius:3px;background:var(--desk);margin:1px 6px 3px}
+.work .bot{--c:var(--ok);animation:type .7s infinite alternate}
+.ready .bot{--c:var(--accent)}
+.wait .bot{--c:var(--warn)}
+.ask .bot{--c:var(--ask);animation:hop 1.4s infinite}
+.sleep .bot{--c:var(--idle);transform:rotate(-12deg)}
+.sleep .bot i:before,.sleep .bot i:after{height:2px;top:10px}
+@keyframes type{to{transform:translateY(-3px)}}
+@keyframes hop{0%,70%,100%{transform:none}80%{transform:translateY(-6px)}}
+@media (prefers-reduced-motion:reduce){.bot{animation:none!important}}
+.foot{padding:7px 12px 10px;font-size:12px;color:var(--mute)}
+.bar{height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-bottom:5px}
+.bar span{display:block;height:100%;background:var(--ok)}
+.next{color:var(--ink)}
+.err{color:var(--ask)}
+</style>
+</head>
+<body>
+<header><h1>Văn phòng agents</h1><span class="meta" id="meta">Đang tải…</span></header>
+<main id="main"></main>
+<script>
+const $=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
+function seat(kind,label,title){const s=$('div','seat '+kind);const b=$('div','bot');b.append($('i'),$('u'));
+  s.append(b);if(kind==='work'||kind==='ready')s.append($('div','desk'));s.append($('span','lbl',label));if(title)s.title=title;return s}
+function room(p,byId){
+  const r=$('section','room '+p.kind);const pl=$('div','plate');pl.append($('b','',p.name));
+  const kind={plan:'projectplaner',seal:'orchestra SEAL',tool:'công cụ',archive:'bản lưu'}[p.kind];
+  pl.append($('span','tag',kind));
+  if((p.questions||[]).length)pl.append($('span','tag ask',p.questions.length+' câu hỏi'));
+  pl.append($('small','',(p.parent?'thuộc '+(byId[p.parent]||{}).name+' · ':'')+p.path));r.append(pl);
+  const sc=$('div','scene');
+  if(!p.exists)sc.append($('span','err','Không thấy thư mục'));
+  else if(p.error)sc.append($('span','err',p.error==='no plan'?'Chưa có orchestra':p.error));
+  else if(p.kind==='plan'||p.kind==='seal'){
+    (p.working||[]).forEach(i=>sc.append(seat('work',i.id,i.title)));
+    for(let n=(p.working||[]).length;n<(p.sessions||0);n++)sc.append(seat('work','phiên mở','Phiên Claude Code đang mở trong thư mục này'));
+    if(!(p.working||[]).length&&(p.ready||[]).length)sc.append(seat('ready',p.ready[0].id,'Sẵn sàng: '+p.ready[0].title));
+    (p.questions||[]).slice(0,3).forEach(q=>sc.append(seat('ask',q.id,q.text)));
+    if(p.waiting)sc.append(seat('wait',p.waiting+' mục chờ','Mục đang bị chặn'));
+    if(!sc.children.length)sc.append(seat('sleep','nghỉ','Không có mục nào đang mở'));
+  } else sc.append(seat('sleep',p.kind==='tool'?'công cụ':'kho lưu'));
+  r.append(sc);
+  if(p.total){const c=p.counts||{},done=(c.done||0)+(c.dropped||0);const f=$('div','foot');const b=$('div','bar');
+    const s=$('span');s.style.width=Math.round(100*done/p.total)+'%';b.append(s);f.append(b);
+    f.append($('div','',done+'/'+p.total+' mục xong · cập nhật '+p.updated));
+    if((p.ready||[]).length)f.append($('div','next','Kế tiếp: '+p.ready[0].id+' '+p.ready[0].title));r.append(f)}
+  return r}
+function draw(s){
+  const m=document.getElementById('main');m.textContent='';
+  if(s.error){m.append($('p','err',s.error));return}
+  document.getElementById('meta').textContent='Cập nhật '+s.generated+' · '+s.projects.length+' phòng · '+
+    s.inbox.questions+' câu hỏi mở · '+s.inbox.person+' việc của người';
+  const byId=Object.fromEntries(s.projects.map(p=>[p.id,p]));
+  const boss=$('section','boss');boss.append($('h2','','Phòng anh Vinh: việc chờ quyết'));let n=0;
+  s.projects.forEach(p=>{const qs=p.questions||[],ps=p.person||[];if(!qs.length&&!ps.length)return;n++;
+    const d=$('details');d.open=qs.length+ps.length<=3;d.append($('summary','',p.name+' ('+(qs.length+ps.length)+')'));const ul=$('ul');
+    qs.forEach(q=>ul.append($('li','',q.id+': '+q.text)));ps.forEach(i=>ul.append($('li','',i.id+' ('+i.owner+'): '+i.title)));
+    d.append(ul);boss.append(d)});
+  if(!n)boss.append($('p','meta','Không có việc nào chờ.'));m.append(boss);
+  s.groups.forEach(g=>{const ps=s.projects.filter(p=>p.group===g.id);if(!ps.length)return;
+    m.append($('div','floorname','Tầng '+g.name));const grid=$('div','rooms');
+    ps.sort((a,b)=>(a.parent?1:0)-(b.parent?1:0)).forEach(p=>grid.append(room(p,byId)));m.append(grid)})}
+async function tick(){try{const r=await fetch(window.STATE_URL||'/api/state',{cache:'no-store'});draw(await r.json())}
+  catch(e){document.getElementById('meta').textContent='Mất kết nối với server: '+e.message}}
+tick();setInterval(tick,10000);
+</script>
+</body>
+</html>

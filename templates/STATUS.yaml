@@ -1,0 +1,19 @@
+# plan/STATUS.yaml - kế hoạch của {{NAME}}. Định dạng projectplaner; chạy `pp check` sau mỗi lần sửa.
+# Mọi mục đang ở làn manual: không phiên nào tự mở. Chuyển id sang làn active khi anh muốn chuỗi tự chạy.
+schema: 1
+
+phases:
+  - id: P0
+    title: Dựng kế hoạch
+    state: active
+
+items:
+  - id: P0-01
+    title: Rà hiện trạng và chuyển việc còn dở thành các mục kế hoạch
+    status: todo
+    phase: P0
+    accept: mỗi việc còn dở trong ghi chú phiên cũ là một mục có tiêu đề nêu kết quả; pp check báo ok
+
+lanes:
+  active: []
+  manual: [P0-01]

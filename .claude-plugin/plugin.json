@@ -1,0 +1,8 @@
+{
+  "name": "dieuphoi",
+  "version": "0.1.0",
+  "description": "Hub that links the projectplaner plans of many projects, collects what waits for the owner and serves an agents office page.",
+  "author": {"name": "cloud1710"},
+  "repository": "https://github.com/cloud1710/dieuphoi",
+  "keywords": ["planning", "orchestration", "projects"]
+}

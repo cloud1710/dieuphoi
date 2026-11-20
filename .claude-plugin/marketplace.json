@@ -1,0 +1,6 @@
+{
+  "name": "dieuphoi",
+  "owner": {"name": "cloud1710"},
+  "description": "Marketplace for dieuphoi, a hub over projectplaner plans.",
+  "plugins": [{"name": "dieuphoi", "source": "./", "description": "Coordinate the orchestras of many projects from one hub."}]
+}

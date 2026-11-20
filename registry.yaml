@@ -1,0 +1,31 @@
+# registry.yaml - sổ đăng ký các orchestra. dieuphoi chỉ ĐỌC kế hoạch của từng project.
+# kind: plan    = orchestra kiểu projectplaner (plan/STATUS.yaml, plan/QUESTIONS.md)
+#       seal    = orchestra riêng của luận văn SEAL (STATUS.yaml, QUESTIONS.md ở gốc), chỉ đọc
+#       tool    = công cụ, không có kế hoạch
+#       archive = bản lưu, không sửa
+# parent: id của orchestra cấp trên (bỏ trống = trực thuộc nhóm).
+schema: 1
+hub: {id: dieuphoi, name: Điều phối, path: 'D:/dieuphoi'}
+groups:
+  - {id: luan-van, name: Luận văn SEAL}
+  - {id: benh-vien, name: Sản phẩm giải phẫu bệnh và bệnh viện}
+  - {id: nghien-cuu, name: Nghiên cứu khác}
+  - {id: ca-nhan, name: Cá nhân}
+  - {id: cong-cu, name: Công cụ}
+projects:
+  - {id: cloud, name: SEAL (hub luận văn), path: 'D:/CLOUD', group: luan-van, kind: seal}
+  - {id: reg2026, name: REG2026, path: 'D:/reg2_2026', group: luan-van, kind: plan, parent: cloud}
+  - {id: gastric-guideline, name: Đối chiếu guideline dạ dày, path: 'D:/gastric_guideline', group: luan-van, kind: plan}
+  - {id: modules, name: Module cũ (bản lưu), path: 'D:/modules', group: luan-van, kind: archive, parent: cloud}
+  - {id: phd-thesis, name: PhD Thesis (bản lưu), path: 'D:/PhD Thesis', group: luan-van, kind: archive, parent: cloud}
+  - {id: pathbrain, name: pathbrain, path: 'D:/pathbrain', group: benh-vien, kind: plan}
+  - {id: path2brain, name: path2brain, path: 'D:/path2brain', group: benh-vien, kind: plan}
+  - {id: umc-library, name: Thư Viện Sức Khỏe UMC, path: 'D:/UMC Library', group: benh-vien, kind: plan}
+  - {id: pcare, name: PCare, path: 'D:/PCare', group: benh-vien, kind: plan}
+  - {id: lab-manager, name: Lab manager, path: 'D:/Lab_manager', group: benh-vien, kind: plan}
+  - {id: toolgpt, name: GPB UMC Toolbox, path: 'D:/toolgpt', group: benh-vien, kind: plan}
+  - {id: owl, name: Owl, path: 'D:/Owl', group: nghien-cuu, kind: plan}
+  - {id: vitranslate, name: vitranslate, path: 'D:/vitranslate-distill', group: nghien-cuu, kind: plan}
+  - {id: stock, name: Chứng khoán (paper trading), path: 'D:/stock', group: ca-nhan, kind: plan}
+  - {id: games, name: Games, path: 'D:/Games', group: ca-nhan, kind: plan}
+  - {id: projectplaner, name: projectplaner, path: 'D:/projectplaner', group: cong-cu, kind: tool}
