@@ -46,7 +46,9 @@ Bốn tab:
 
 - **Văn phòng**: sơ đồ 2D, mỗi orchestra một bàn; robot đi lại theo trạng thái thật (báo cáo việc đang làm, mang câu hỏi
   tới cửa "Anh Vinh", đưa thư, project con sang báo project cha). Kéo để di chuyển, chụm để phóng, chạm một bàn để
-  phóng vào project đó. Cột bên dưới ghi ai đang làm gì và những gì vừa thay đổi, bằng tiếng Việt.
+  phóng vào project đó. Cột bên dưới ghi ai đang làm gì và những gì vừa thay đổi, bằng tiếng Việt. Dòng "phiên chính/nhân viên đang chạy
+  lệnh, đang đọc tệp..." lấy từ bản ghi phiên Claude Code trên PC (`~/.claude/projects`); chỉ loại bước được hiện,
+  không hiện tên tệp hay nội dung. Nút bánh răng mở cài đặt kết nối (ghép lại, quên máy, liên kết sang trang việc).
 - **Việc**: việc chờ anh (trả lời câu hỏi ngay trên app), nhân viên đang làm, từng trưởng phòng; nút "Mở phiên" chạy
   `pp open <ID>` của projectplaner trên PC, mọi kiểm tra an toàn của projectplaner vẫn áp dụng.
 - **Máy**: CPU, RAM, GPU, ổ đĩa và project nào đang chạy (xem `tools/hw.py`). Chỉ đo khi tab này đang mở. Có nút
@@ -77,9 +79,9 @@ Android chỉ tạo lối tắt, vì cài PWA đầy đủ và chạy ngoại tu
 `todo/` là một trang tĩnh liệt kê việc cần anh Vinh làm: câu hỏi đang mở và mục có `owner` là người trong mọi kế
 hoạch (ví dụ gắn nhãn). Việc biến mất khỏi trang khi đã xong trong kế hoạch.
 
-- Trang công khai, nên dữ liệu (`data.enc`) được mã hoá bằng khoá ngẫu nhiên trong `out/token.txt`; mở trang bằng đường
-  dẫn có `#k=…` ở `out/todo-link.txt`. Không dùng mật khẩu tự đặt cho trang này: tệp mã hoá ai cũng tải được nên mật
-  khẩu dễ đoán sẽ bị dò ngoại tuyến.
+- Trang công khai, nên dữ liệu được mã hoá. Mở bằng đường dẫn có `#k=…` ở `out/todo-link.txt`, hoặc bằng mật khẩu kết
+  nối nếu đã đặt (`dp passwd`). Lưu ý: tệp mã hoá ai cũng tải được, nên mật khẩu dễ đoán có thể bị dò ngoại tuyến;
+  bỏ đường mật khẩu bằng cách xoá mật khẩu (`dp passwd` với dòng trống) rồi đăng lại.
 - Lần đầu: bấm đúp `publish-todo.cmd` (cần `npx wrangler login`). Tên project lấy ở `publish.pages_project` trong
   `registry.yaml`.
 - Sau lần đầu, server tự đăng lại trong vòng 5 phút mỗi khi danh sách việc đổi (`publish.auto`); nhật ký ở

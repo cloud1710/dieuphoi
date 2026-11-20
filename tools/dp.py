@@ -397,6 +397,11 @@ class Handler(SimpleHTTPRequestHandler):
         path = self.path.split('?')[0]
         if path.startswith('/api/') and not self.local() and not pass_ok(self.given(), self.client_address[0]):
             return self.reply(401, {'error': 'key'})
+        if path == '/api/activity':
+            try:
+                return self.reply(200, activity())
+            except Exception as e:
+                return self.reply(500, {'error': '%s: %s' % (type(e).__name__, e)})
         if path == '/api/hw':
             try:
                 return self.reply(200, hw_state())
@@ -623,7 +628,18 @@ def todo_build():
         if (HUB / 'office' / icon).is_file():
             shutil.copy(HUB / 'office' / icon, site / icon)
     payload, digest = todo_payload()
-    (site / 'data.enc').write_bytes(seal(token(), json.dumps(payload, ensure_ascii=False).encode('utf-8')))
+    payload['app'] = (HUB / 'out' / 'phone-link.txt').read_text(encoding='ascii').split('#')[0].strip() if (HUB / 'out' / 'phone-link.txt').is_file() else None
+    blob = json.dumps(payload, ensure_ascii=False).encode('utf-8')
+    (site / 'data.enc').write_bytes(seal(token(), blob))
+    ph = HUB / 'out' / 'pass.hash'
+    for old in ('data-p.enc', 'pass.json'):
+        if (site / old).is_file():
+            (site / old).write_text('', encoding='ascii')
+    if ph.is_file() and ph.stat().st_size:           # the owner chose to let his passphrase open the public page too
+        salt, rounds, digest = ph.read_text(encoding='ascii').strip().split('$')
+        secret = hmac.new(bytes.fromhex(digest), b'todo', 'sha256').hexdigest()
+        (site / 'data-p.enc').write_bytes(seal(secret, blob))
+        (site / 'pass.json').write_text(json.dumps({'salt': salt, 'rounds': int(rounds)}), encoding='ascii')
     return site, digest, len(payload['tasks'])
 
 
@@ -704,6 +720,16 @@ def power(action):
     if r.returncode:
         raise ValueError(one_line((r.stdout or '') + (r.stderr or ''), 200) or 'command failed')
     return {'shutdown': 'shutdown in 60 seconds', 'restart': 'restart in 60 seconds', 'cancel': 'cancelled'}[action]
+
+
+def activity():
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import hw
+    reg = registry()
+    name = (reg.get('publish') or {}).get('pages_project')
+    return {'claude': hw.claude_activity([(p['id'], real(p['path'])) for p in reg['projects']]),
+            'todo_url': 'https://%s.pages.dev/' % name if name else None,
+            'passphrase': (HUB / 'out' / 'pass.hash').is_file() and (HUB / 'out' / 'pass.hash').stat().st_size > 0}
 
 
 def hw_state():

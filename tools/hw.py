@@ -77,6 +77,72 @@ def _last_change(root):
     return best
 
 
+TOOL_VI = {'Bash': 'đang chạy lệnh', 'Read': 'đang đọc tệp', 'Edit': 'đang sửa tệp', 'MultiEdit': 'đang sửa tệp',
+           'Write': 'đang viết tệp', 'Grep': 'đang tìm trong mã', 'Glob': 'đang tìm tệp', 'WebSearch': 'đang tra web',
+           'WebFetch': 'đang đọc trang web', 'Task': 'đang giao việc cho nhân viên', 'Agent': 'đang giao việc cho nhân viên',
+           'TodoWrite': 'đang cập nhật danh sách việc', 'NotebookEdit': 'đang sửa notebook', 'Skill': 'đang mở một skill'}
+
+
+def claude_activity(projects, window=900):
+    """What each Claude Code session did last, per project, read from the tail of its transcript in
+    ~/.claude/projects. Only the kind of step is reported (run a command, read a file, ...): never a file
+    name, a command or any text, because names inside private folders can be identifiers."""
+    base = Path.home() / '.claude' / 'projects'
+    out = {}
+    if not base.is_dir():
+        return out
+    now = time.time()
+    roots = sorted(((_norm(root), pid) for pid, root in projects), key=lambda r: -len(r[0]))
+    recent = []
+    try:
+        for folder in base.iterdir():
+            if folder.is_dir() and now - folder.stat().st_mtime < 86400:
+                for f in folder.glob('*.jsonl'):
+                    age = now - f.stat().st_mtime
+                    if age < window:
+                        recent.append((age, f))
+    except OSError:
+        return out
+    for age, f in sorted(recent)[:40]:
+        try:
+            with open(f, 'rb') as fh:
+                fh.seek(max(0, f.stat().st_size - 65536))
+                lines = fh.read().decode('utf-8', 'replace').splitlines()
+        except OSError:
+            continue
+        cwd = what = None
+        sub = False
+        for line in reversed(lines[-150:]):
+            try:
+                e = json.loads(line)
+            except ValueError:
+                continue
+            if not isinstance(e, dict):
+                continue
+            cwd = cwd or e.get('cwd')
+            sub = sub or bool(e.get('isSidechain'))
+            if what is None:
+                msg = e.get('message') if isinstance(e.get('message'), dict) else {}
+                parts = msg.get('content') if isinstance(msg.get('content'), list) else []
+                tools = [c.get('name') for c in parts if isinstance(c, dict) and c.get('type') == 'tool_use']
+                if e.get('type') == 'assistant' and tools:
+                    name = str(tools[-1])
+                    what = TOOL_VI.get(name) or ('đang dùng công cụ nối ngoài' if name.startswith('mcp__') else 'đang dùng một công cụ')
+                elif e.get('type') == 'assistant' and parts:
+                    what = 'vừa trả lời xong, chờ lệnh tiếp'
+                elif e.get('type') == 'user':
+                    what = 'đang suy nghĩ'
+            if cwd and what:
+                break
+        if not cwd:
+            continue
+        place = _norm(cwd)
+        owner = next((pid for root, pid in roots if place.startswith(root)), None)
+        if owner and len(out.setdefault(owner, [])) < 5:
+            out[owner].append({'what': what or 'đang chạy', 'age': int(age), 'sub': sub})
+    return out
+
+
 def snapshot(projects):
     """projects: [(id, folder)]. Returns the machine totals and one row per project."""
     out = {'time': time.strftime('%Y-%m-%d %H:%M:%S'), 'psutil': psutil is not None}
@@ -130,13 +196,16 @@ def snapshot(projects):
                 row['names'].append(short)
         for key in set(_seen) - alive:
             del _seen[key]
+    acts = claude_activity(projects)
+    out['claude'] = acts
     now = time.time()
     for pid, root in projects:
         row = rows[pid]
+        row['agents'] = acts.get(pid, [])
         changed = _last_change(Path(root))
         row['cpu'], row['ram_mb'] = round(row['cpu'], 1), round(row['ram_mb'])
         row['changed'] = time.strftime('%Y-%m-%d %H:%M', time.localtime(changed)) if changed else None
-        row['state'] = 'running' if row['procs'] else 'recent' if now - changed < 86400 else 'idle'
+        row['state'] = 'running' if row['procs'] or any(a['age'] < 180 for a in row['agents']) else 'recent' if now - changed < 86400 else 'idle'
     order = {'running': 0, 'recent': 1, 'idle': 2}
     out['projects'] = sorted(rows.values(), key=lambda r: (order[r['state']], -r['cpu'], -r['ram_mb'], r['id']))
     out['other'] = sorted(other, key=lambda r: -(r['ram_mb'] or 0))[:6]

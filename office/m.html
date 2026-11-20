@@ -73,13 +73,14 @@ textarea{min-height:84px;resize:vertical}
 .feed .row{padding:8px 12px}.feed .nm b{font-size:13.5px;white-space:normal}.feed .nm small{white-space:normal}
 .dot.ask{background:var(--ask)}.dot.wait{background:var(--wait)}.dot.mail{background:#c79a2b}
 @media (min-width:820px){#t-office.on{display:grid;grid-template-columns:1fr 360px;gap:0 14px}#stage{margin:0;height:calc(100vh - 150px);border:1px solid var(--line);border-radius:12px}}
+#gear{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:9px;font-size:17px;line-height:1;padding:5px 8px}
 #pair{position:fixed;inset:0;z-index:9;background:var(--bg);padding:calc(40px + env(safe-area-inset-top)) 18px;display:none}
 #pair.on{display:block}
 a{color:var(--ready)}
 </style>
 </head>
 <body>
-<header><h1>Điều phối</h1><span id="live"><i></i><span id="when">Đang nối…</span></span></header>
+<header><h1>Điều phối</h1><span id="live"><i></i><span id="when">Đang nối…</span></span><button id="gear" aria-label="Cài đặt">⚙</button></header>
 <section id="t-office" class="on"><div id="stage"><canvas id="cv"></canvas><button class="act" id="back">‹ Toàn cảnh</button><span id="hint">Chạm một bàn để phóng vào</span></div><div id="col"></div></section>
 <section id="t-work"></section>
 <section id="t-hw"><div class="empty">Đang đọc phần cứng…</div></section>
@@ -94,8 +95,8 @@ a{color:var(--ready)}
   <p class="note"><a href="index.html?3d=1">Xem diorama 3D</a></p>
 </section>
 <nav><button data-t="office" class="on">Văn phòng</button><button data-t="work">Việc <b id="nq"></b></button><button data-t="hw">Máy</button><button data-t="msg">Nhắn</button></nav>
-<div id="pair"><h1>Ghép với máy</h1><p class="note">Nhập mật khẩu kết nối của anh, hoặc mở đường dẫn ghép có đoạn <code>#k=…</code> mà PC ghi ở <code>out/phone-link.txt</code>.</p>
-  <input id="key" type="password" placeholder="Mật khẩu kết nối" autocomplete="current-password" autocapitalize="off"><button class="act go" id="savekey">Kết nối</button><div class="res bad" id="pairerr"></div></div>
+<div id="pair"><h1>Cài đặt kết nối</h1><p class="note" id="pairinfo"></p><p class="note">Nhập mật khẩu kết nối của anh, hoặc mở đường dẫn ghép có đoạn <code>#k=…</code> mà PC ghi ở <code>out/phone-link.txt</code>.</p>
+  <input id="key" type="password" placeholder="Mật khẩu kết nối" autocomplete="current-password" autocapitalize="off"><button class="act go" id="savekey">Kết nối</button> <button class="act" id="forget">Quên máy này</button> <button class="act" id="closepair">Đóng</button><div class="res bad" id="pairerr"></div><p class="note" id="pairlinks"></p></div>
 <script>
 const E = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
 const $ = id => document.getElementById(id);
@@ -103,7 +104,10 @@ const $ = id => document.getElementById(id);
 let KEY = '';
 try { KEY = localStorage.getItem('dp-key') || ''; } catch (e) {}
 if (location.hash.startsWith('#k=')) { KEY = decodeURIComponent(location.hash.slice(3)); try { localStorage.setItem('dp-key', KEY); } catch (e) {} history.replaceState(null, '', location.pathname); }
-$('savekey').onclick = () => { KEY = $('key').value.trim(); try { localStorage.setItem('dp-key', KEY); } catch (e) {} $('pair').classList.remove('on'); connect(); };
+$('gear').onclick = () => { $('pairinfo').textContent = (liveMode ? 'Đang nối trực tiếp với PC tại ' : 'Chưa nối với PC tại ') + location.host + '. App trên màn hình chính của iPhone giữ mật khẩu riêng, nên ghép lại ở đây một lần.'; $('pair').classList.add('on'); };
+$('closepair').onclick = () => $('pair').classList.remove('on');
+$('forget').onclick = () => { KEY = ''; try { localStorage.removeItem('dp-key'); } catch (e) {} $('key').value = ''; $('pairerr').textContent = 'Đã quên mật khẩu trên thiết bị này.'; connect(); };
+$('savekey').onclick = () => { if (!$('key').value.trim()) return; KEY = $('key').value.trim(); try { localStorage.setItem('dp-key', KEY); } catch (e) {} $('pair').classList.remove('on'); connect(); };
 async function api(path, body) {
   const r = await fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json', 'X-DP-Key':KEY}, body:JSON.stringify(body)} : {headers:{'X-DP-Key':KEY}, cache:'no-store'});
   if (r.status === 401) { $('pair').classList.add('on'); throw new Error('Chưa ghép khoá'); }
@@ -197,7 +201,7 @@ function drawHw(h) {
     h.other.forEach(o => { const d = E('div', 'row line'); d.append(E('span', 'dot')); const nm = E('span', 'nm'); nm.append(E('b', '', o.name), E('small', '', 'CPU ' + o.cpu + '% · RAM ' + o.ram_mb + ' MB' + (o.gpu_mb ? ' · GPU ' + Math.round(o.gpu_mb) + ' MB' : ''))); d.append(nm); k.append(d); }); m.append(k); } }
 let hwTimer = null, cur = 'office';
 async function pollHw() { if (cur !== 'hw' || document.hidden) return; try { drawHw(await api('api/hw')); } catch (e) { $('t-hw').textContent = ''; $('t-hw').append(E('div', 'empty', liveMode ? e.message : 'Chỉ xem được khi nối trực tiếp với PC.')); } }
-function tab(t) { cur = t; document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === 't-' + t)); document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+function tab(t) { cur = t; if (t === 'office') pollAct(); document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === 't-' + t)); document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
   clearInterval(hwTimer); if (t === 'hw') { pollHw(); hwTimer = setInterval(pollHw, 10000); } if (t === 'office') office.wake(); scrollTo(0, 0); }
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => tab(b.dataset.t));
 $('send').onclick = async () => { const r = $('sent'), t = $('text').value.trim(); if (!t) return; $('send').disabled = true; r.className = 'res';
@@ -215,12 +219,18 @@ function feedDiff(a, b) { if (!a || !b) return; const old = Object.fromEntries(a
     (o.questions || []).forEach(q => { if (!nq.has(q.id)) add(p, 'ready', q.id + ' đã được trả lời'); });
     (o.person || []).forEach(i => { if (!np.has(i.id)) add(p, 'ready', 'việc ' + i.id + ' của anh đã xong'); });
     if ((p.mail || 0) > (o.mail || 0)) add(p, 'mail', 'nhận thư mới'); if ((p.mail || 0) < (o.mail || 0)) add(p, 'ready', 'đã đọc thư'); }); }
-let focusId = null;
+let focusId = null, ACT = {claude:{}};
+async function pollAct() { if (cur !== 'office' || document.hidden || !liveMode) return; try { const a = await api('api/activity'); const ch = JSON.stringify(a.claude) !== JSON.stringify(ACT.claude); ACT = a;
+    $('pairlinks').textContent = ''; if (a.todo_url) { const l = E('a', '', 'Trang việc chờ anh trên Cloudflare'); l.href = a.todo_url; l.target = '_blank'; $('pairlinks').append(l); }
+    if (ch && STATE) { office.set(STATE); drawCol(); } } catch (e) {} }
+setInterval(pollAct, 15000);
+const ago = s => s < 60 ? s + ' giây trước' : Math.round(s / 60) + ' phút trước';
 function drawCol() { const s = STATE, c = $('col'); if (!s || (busy && focusId)) return; c.textContent = '';
   const byId = Object.fromEntries(s.projects.map(p => [p.id, p])), ps = s.projects.filter(p => !stored(p) && (!focusId || p.id === focusId));
   const line = (kind, id, text) => { const d = E('div', 'row line'); d.append(E('span', 'dot ' + kind)); const nm = E('span', 'nm'); nm.append(E('b', '', '@' + id), E('small', '', text)); d.append(nm); d.onclick = () => office.focus(id); return d; };
   const now = [];
-  ps.forEach(p => { (p.working || []).forEach(i => now.push(['work', p.id, 'đang làm ' + i.id + ': ' + i.title]));
+  ps.forEach(p => { (ACT.claude[p.id] || []).forEach(a => now.push([a.age < 180 ? 'work' : 'wait', p.id, (a.sub ? 'nhân viên ' : 'phiên chính ') + a.what + ' · ' + ago(a.age)]));
+    (p.working || []).forEach(i => now.push(['work', p.id, 'đang làm ' + i.id + ': ' + i.title]));
     if ((p.sessions || 0) > (p.working || []).length) now.push(['work', p.id, 'có ' + p.sessions + ' phiên Claude Code đang mở']);
     (p.questions || []).forEach(q => now.push(['ask', p.id, 'chờ anh trả lời ' + q.id + ': ' + q.text]));
     (p.person || []).forEach(i => now.push(['ask', p.id, 'chờ anh làm ' + i.id + ': ' + i.title]));
@@ -257,6 +267,7 @@ const office = (() => {
       (p.working || []).forEach(i => st.push(['work', i.id]));
       for (let n = (p.working || []).length; n < (p.sessions || 0); n++) st.push(['work', 'phiên']);
       if (!(p.working || []).length && (p.ready || []).length) st.push(['ready', p.ready[0].id]);
+      (ACT.claude[p.id] || []).filter(a => a.age < 300).forEach((a, k) => st.push(['work', a.what.replace('đang ', '') + (k ? ' ' + (k + 1) : '')]));
       st.slice(0, 5).forEach(([kind, tag], k) => mk(p.id + ':' + tag, t, 'staff', kind, {x:t.x + 26 + k * 27, y:t.y + 92}, tag));
       if ((p.questions || []).length) mk(p.id + ':ask', t, 'asker', 'ask', {x:t.mx + 34, y:t.my + 6}, '? ' + p.questions[0].id);
       if (p.mail) mk(p.id + ':mail', t, 'mail', 'mail', {x:boss.x - 30, y:boss.y + 26}, '✉ @' + p.id);
@@ -344,7 +355,7 @@ const office = (() => {
 
 const live = $('live'), when = $('when');
 function show(s, mode) { if (s.error) { live.className = 'off'; when.textContent = s.error; return; }
-  liveMode = mode === 'live'; draw(s); live.className = liveMode ? 'on' : ''; when.textContent = (liveMode ? 'Trực tiếp · ' : 'Bản chụp · ') + s.generated.slice(5, 16); }
+  const was = liveMode; liveMode = mode === 'live'; draw(s); if (liveMode && !was) pollAct(); live.className = liveMode ? 'on' : ''; when.textContent = (liveMode ? 'Trực tiếp · ' : 'Bản chụp · ') + s.generated.slice(5, 16); }
 let got = false, es = null;
 function snapshot() { fetch('state.json', {cache:'no-cache'}).then(r => r.json()).then(s => show(s, 'snap')).catch(() => { live.className = 'off'; when.textContent = 'Không nối được với PC'; }); }
 async function connect() {
