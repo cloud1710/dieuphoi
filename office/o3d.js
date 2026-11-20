@@ -76,7 +76,7 @@ function build(s) {
   S.add(CYL, '#d8b24a', boss.x, .36, boss.z + .7, 0, 4.2, .03, 2.6); deskAt(S, L, boss.x, boss.z, '#7d5b3d');
   screen = mkScreen(); screen.position.set(W / 2 - 1.5, 1.85, G + .2); world.add(screen); S.box(7.4, .12, .12, '#7d8794', W / 2 - 1.5, 3.05, G + .15);
   plantAt(S, door.x + 2.4, G + 1, 1.1); plantAt(S, W - 1.4, G + 1, 1.2);
-  addLabel('door', 'Anh Vinh', door.x, 2.9, G + .2, 'tag'); addLabel('boss', 'Tổng quản', boss.x, .4, boss.z + 1.9, 'tag');
+  addLabel('door', 'Anh Vinh', door.x, 2.9, G + .2, 'tag'); callL = addLabel('call', '', boss.x, 3.3, boss.z - .9, 'tag'); addLabel('boss', 'Tổng quản', boss.x, .4, boss.z + 1.9, 'tag');
   // rooms
   rooms = []; byId = {};
   heads.forEach((p, i) => { const c = i % cols, rr = Math.floor(i / cols), x0 = G + c * (TW + G), z0 = HZ + G + rr * (TD + G), seed = hsh(p.id), tint = GC[gi[p.group] % GC.length];
@@ -86,7 +86,7 @@ function build(s) {
     deskAt(S, L, rm.cx, rm.cz, '#9a7350'); lamps.push({x:rm.cx, z:rm.cz, r:2.8, room:rm}); rm.light = new THREE.Mesh(BOX, STMAT.sleep); rm.light.scale.set(.18, .18, .18); rm.light.position.set(rm.cx + .95, 1.3, rm.cz + .15); world.add(rm.light);
     const k = seed % 4; if (k === 0) plantAt(S, x0 + TW - .8, z0 + .9, .9); else if (k === 1) shelfAt(S, x0 + TW - 1.3, z0 + .55, seed); else if (k === 2) { S.box(2, 1.1, .06, '#ffffff', rm.cx - 1.5, .9, z0 + .25); S.box(2.1, .08, .1, '#9aa3ad', rm.cx - 1.5, .86, z0 + .27); for (let j = 0; j < 3; j++) S.box(.9 - j * .2, .05, .02, ['#d2553d', '#3f73a8', '#3f9d74'][j], rm.cx - 1.9, 1.7 - j * .25, z0 + .29); } else plantAt(S, x0 + .8, z0 + TD - .8, .8);
     if ((seed >> 5) % 2) { S.box(.08, 1.6, .08, '#6b6f7a', x0 + .9, .34, z0 + .9); S.add(CONE, '#e9dcc0', x0 + .9, 2.05, z0 + .9, 0, .55, .45, .55); L.add(SPH, '#ffe1a0', x0 + .9, 1.88, z0 + .9, 0, .25, .2, .25); lamps.push({x:x0 + .9, z:z0 + .9, r:1.6, room:rm}); }
-    rm.head = person(tint, seed); rm.head.position.set(rm.cx, .34, rm.cz - .95); world.add(rm.head); rm.extra = [];
+    rm.head = person(tint, seed); rm.head.position.set(rm.cx, .34, rm.cz - .95); rm.head.visible = false; world.add(rm.head); rm.extra = []; rm.phase = null;
     rm.lab = addLabel(p.id, '', rm.cx, .45, z0 + TD - .25, 'room');
     if (rm.first) addLabel(p.id + ':g', rm.gname, x0 + .3, 1.95, z0 + .1, 'wing'); });
   // crates for finished or stored projects, at the front
@@ -95,7 +95,7 @@ function build(s) {
   if (box.length) addLabel('kho', 'KHO · ĐÃ XONG HOẶC BẢN LƯU', G, .5, cz - .9, 'wing');
   // garden: a stone path out of the front, a pond, trees and palms on the margin, bushes, flowers and rocks
   for (let z = D + .8; z < D + mz1 - .8; z += 1.1) S.add(CYL, '#d9c7a3', W / 2 + Math.sin(z) * .3, .02, z, z, 1.1, .06, .8);
-  S.box(1.6, .5, .5, '#cdbb98', W / 2, 0, D + .4);
+  S.box(1.6, .5, .5, '#cdbb98', W / 2, 0, D + .4); for (const sx of [-1.1, 1.1]) S.box(.3, 2.6, .3, '#7d5f43', W / 2 + sx, .3, D + .2); S.box(2.6, .3, .4, '#7d5f43', W / 2, 2.9, D + .2); S.box(2.2, .25, .3, '#3f73a8', W / 2, 2.55, D + .25);
   pond = {x:W + mx * .45, z:D + mz1 * .5}; S.add(CYL, '#6f8f6a', pond.x, -.02, pond.z, 0, 5.4, .06, 3.6); const water = new THREE.Mesh(new THREE.CylinderGeometry(2.5, 2.5, .05, 18), new THREE.MeshLambertMaterial({color:0x6fb2d6, transparent:true, opacity:.88}));
   water.scale.set(1, 1, .64); water.position.set(pond.x, .03, pond.z); water.receiveShadow = true; world.add(water); pond.mesh = water; for (let j = 0; j < 3; j++) S.add(CYL, '#4f9a45', pond.x - 1 + j * .9, .07, pond.z + (j % 2 ? .5 : -.4), 0, .5, .02, .5);
   let rs = 11; const rnd = () => (rs = (rs * 16807) % 2147483647) / 2147483647, free = (x, z, m = 1) => !(x > -m && x < W + m && z > -m && z < D + m) && Math.hypot(x - pond.x, (z - pond.z) * 1.5) > 3.6 && (z < D || Math.abs(x - W / 2) > 1.7);
@@ -113,7 +113,7 @@ function build(s) {
   rain.geometry.setAttribute('position', new THREE.BufferAttribute(rp, 3)); rain.userData.d = Array.from({length:N}, () => ({x:isle.x0 + Math.random() * iw, z:isle.z0 + Math.random() * id, y:Math.random() * 16})); rain.frustumCulled = false; world.add(rain);
   // shadows cover the island
   const sc = sun.shadow.camera, half = Math.max(iw, id) * .62; sc.left = -half; sc.right = half; sc.top = half; sc.bottom = -half; sc.near = 1; sc.far = 160; sc.updateProjectionMatrix();
-  walkers.forEach(w => world.remove(w.m)); walkers = []; return true; }
+  walkers.forEach(w => world.remove(w.m)); walkers = []; callQ = []; call = null; arc = null; return true; }
 let PT = null; function poolTex() { if (PT) return PT; const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'), g = x.createRadialGradient(64, 64, 2, 64, 64, 63); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(.45, 'rgba(255,255,255,.45)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); return PT = new THREE.CanvasTexture(c); }
 function shade(c, k) { const x = C(c); x.multiplyScalar(k); return '#' + x.getHexString(); }
 function deskAt(S, L, x, z, wood) { S.box(2.6, .1, 1.1, wood, x, .98, z); S.box(.12, .64, 1, shade(wood, .8), x - 1.2, .34, z); S.box(.12, .64, 1, shade(wood, .8), x + 1.2, .34, z); S.box(2.3, .4, .06, shade(wood, .85), x, .58, z - .4);
@@ -157,7 +157,7 @@ function addLabel(key, text, x, y, z, kind) { const e = document.createElement('
 const v3 = new THREE.Vector3();
 const PRI = {tag:0, ask:1, work:2, mail:3, wait:4, ready:5, sleep:6, wing:7, box:8};
 function placeLabels(zr) { const w = stage.clientWidth, h = stage.clientHeight, placed = [], near = zr > 1.9;
-  for (const l of labels) { let show = l.kind === 'tag' ? true : l.kind === 'room' ? zr > 1.35 || l.hot : l.kind === 'wing' ? zr > 1.35 : zr > 2.2;
+  for (const l of labels) { let show = !l.e.textContent ? false : l.kind === 'tag' ? true : l.kind === 'room' ? zr > 1.35 || l.hot : l.kind === 'wing' ? zr > 1.35 : zr > 2.2;
     let x = 0, y = 0; if (show) { v3.copy(l.p).project(camera); x = (v3.x + 1) / 2 * w; y = (1 - v3.y) / 2 * h; show = x > -60 && x < w + 60 && y > -10 && y < h + 40; }
     if (show && l.kind === 'room') { const full = near; if (l.full !== full) { l.full = full; l.e.classList.toggle('full', full); l.w = null; } }
     if (show) { if (l.on !== true) { l.e.style.display = ''; l.on = true; l.w = null; } if (l.w == null) { l.w = l.e.offsetWidth; l.h = l.e.offsetHeight; }
@@ -196,11 +196,41 @@ function focus(id) { const rm = byId[id]; focusId = rm ? id : null; $('back').cl
   Object.assign(goal, rm ? fit(rm.x0 - .5, rm.z0 - .5, rm.x0 + TW + .5, rm.z0 + TD + 1) : overview()); SL = slides(); paintScreen(performance.now() / 1000); drawCol(); }
 $('back').addEventListener('click', () => { if (VIEW3) { touched = -1e9; focus(null); } });
 $('camb').addEventListener('click', () => { try { auto = localStorage.getItem('dp-cam') !== '0'; } catch (e) {} touched = -1e9; });
-function director(ms) { if (!auto || focusId || moving || ms - touched < 9000 || (ACT.game || {}).on) return null;
+function director(ms) { if (!auto || focusId || moving || ms - touched < 9000) return null;
+  if (call) return fit(boss.x - 8, G - 2, Math.min(W + 2, boss.x + 6), G + HALL + 4);
+  const wr = rooms.find(r => r.wk && (r.phase === 'in' || r.phase === 'out')); if (wr) { const q = wr.wk.g.position; return fit(q.x - 7, q.z - 6, q.x + 7, q.z + 6); }
+  if ((ACT.game || {}).on) return null;
   if (CHATS.busy) return fit(W / 2 - 9, G - 1, W - 1, G + HALL + 1);
   const f = fly[fly.length - 1]; if (f && byId[f.to]) { const r = byId[f.to]; return fit(r.x0 - 4, r.z0 - 3.5, r.x0 + TW + 4, r.z0 + TD + 3.5); }
-  const act = rooms.filter(r => stateOf(r.p) === 'work'); if (act.length && Math.floor(ms / 9000) % 3) { const r = act[Math.floor(ms / 27000) % act.length]; return fit(r.x0 - 4, r.z0 - 3.5, r.x0 + TW + 4, r.z0 + TD + 3.5); }
+  const act = rooms.filter(r => r.phase === 'seated'); if (act.length && Math.floor(ms / 9000) % 3) { const r = act[Math.floor(ms / 27000) % act.length]; return fit(r.x0 - 4, r.z0 - 3.5, r.x0 + TW + 4, r.z0 + TD + 3.5); }
   return overview(); }
+
+// ---- the empty office: nobody sits until the manager phones them; then they walk in from the garden gate,
+// up the middle corridor, to their desk. When the work stops they get up and walk out again.
+const DOTM = new THREE.MeshBasicMaterial({color:0x5fd39a, depthTest:false, transparent:true}); let callL = null, litNow = false, callQ = [], call = null, arc = null, ringS = null, phoneS = null;
+function presence(rm, want) { const ph = rm.phase;
+  if (ph == null) { rm.phase = 'away'; if (want) { callQ.push(rm); rm.phase = 'queued'; } return; }
+  if (want) { if (ph === 'away') { callQ.push(rm); rm.phase = 'queued'; } else if (ph === 'out') rm.phase = 'in'; return; }
+  if (ph === 'queued') { callQ = callQ.filter(x => x !== rm); rm.phase = 'away'; } else if (ph === 'calling') { endCall(); rm.phase = 'away'; } else if (ph === 'seated' || ph === 'in') leave(rm); }
+function inPath(rm) { const zc = rm.z0 + TD + G / 2, sx = rm.cx + 1.75; return [{x:W / 2, z:isle.z1 - 1.2}, {x:W / 2, z:D + .4}, {x:W / 2, z:zc}, {x:sx, z:zc}, {x:sx, z:rm.cz - .95}, {x:rm.cx, z:rm.cz - .95}]; }
+function walker(rm) { const g = new THREE.Group(), b = person(rm.tint, hsh(rm.p.id), 1, false); g.add(b); world.add(g); return {g, b, path:inPath(rm), d:0}; }
+function leave(rm) { if (!rm.wk) { rm.wk = walker(rm); rm.wk.d = plen(rm.wk.path); } rm.phase = 'out'; rm.head.visible = false; rm.extra.forEach(m => m.visible = false); }
+function endCall() { if (callL) { callL.e.textContent = ''; } if (arc) { world.remove(arc); arc = null; } if (ringS) ringS.visible = false; if (phoneS) phoneS.visible = false; call = null; }
+function phones(t, dt) {
+  if (!ringS) { ringS = sign('☎', COL.work); phoneS = sign('☎', COL.ready); ringS.visible = phoneS.visible = false; world.add(ringS, phoneS); }
+  if (!call && callQ.length) { const rm = callQ.shift(); call = {rm, t:0}; rm.phase = 'calling';
+    const a = new THREE.Vector3(boss.x, 2.4, boss.z - .9), b = new THREE.Vector3(rm.cx, 1.7, rm.cz), m = a.clone().lerp(b, .5); m.y += 6 + a.distanceTo(b) * .12;
+    arc = new THREE.Group(); arc.userData.curve = new THREE.QuadraticBezierCurve3(a, m, b); for (let i = 0; i < 14; i++) { const d = new THREE.Mesh(SPH, DOTM); d.scale.setScalar(.32); d.renderOrder = 4; arc.add(d); } world.add(arc);
+    callL.e.textContent = '☎ Tổng quản gọi @' + rm.p.id; callL.w = null; ringS.position.copy(b).setY(2.1); phoneS.position.set(boss.x + .5, 2.5, boss.z - .9); ringS.visible = phoneS.visible = true; }
+  if (call) { call.t += dt; const k = call.t; phoneS.position.y = 2.5 + Math.abs(Math.sin(k * 10)) * .12; ringS.position.x = call.rm.cx + Math.sin(k * 40) * .08; ringS.material.rotation = Math.sin(k * 30) * .2;
+    if (arc) arc.children.forEach((d, i) => { const u = ((i / 14) + k * .35) % 1; arc.userData.curve.getPoint(u, d.position); d.scale.setScalar(.2 + .2 * Math.sin(u * Math.PI)); }); if (k > 3.2) { const rm = call.rm; endCall(); rm.wk = walker(rm); rm.phase = 'in'; } }
+  for (const rm of rooms) { const w = rm.wk; if (!w || (rm.phase !== 'in' && rm.phase !== 'out')) continue; const L = plen(w.path), dir = rm.phase === 'in' ? 1 : -1;
+    w.d = Math.max(0, Math.min(L, w.d + dir * 5.2 * dt)); const q = along(w.path, w.d); w.g.position.set(q.x, .34, q.z); w.g.rotation.y = Math.atan2(dir * q.dx, dir * q.dz); w.b.position.y = Math.abs(Math.sin(t * 11)) * .1;
+    if (dir > 0 && w.d >= L) { world.remove(w.g); rm.wk = null; rm.phase = 'seated'; rm.head.visible = true; rm.extra.forEach(m => m.visible = true); populateSoon(); }
+    else if (dir < 0 && w.d <= 0) { world.remove(w.g); rm.wk = null; rm.phase = 'away'; } }
+  for (const l of lamps) if (l.room) l.pool.material.opacity = litNow && l.room.phase === 'seated' ? .4 : 0;
+  for (const rm of rooms) { if (rm.sign) rm.sign.position.y = 2 + Math.sin(t * 2.5 + rm.x0) * .1; rm.extra.forEach(m => m.visible = rm.phase === 'seated'); } }
+let popT = 0; function populateSoon() { clearTimeout(popT); popT = setTimeout(() => { if (VIEW3 && STATE) populate(); }, 300); }
 
 // ---- life: who sits, who walks, what glows
 function populate() { const gm = (ACT.game || {}).on;
@@ -210,7 +240,8 @@ function populate() { const gm = (ACT.game || {}).on;
     { const l = rm.lab, e = l.e; l.hot = st === 'work' || st === 'ask' || !!p.mail; l.pri = PRI[st]; e.textContent = ''; e.style.borderTopColor = COL[st]; const b = document.createElement('b'); b.textContent = '@' + p.id; e.append(b);
       if ((p.questions || []).length) { const m = document.createElement('em'); m.textContent = p.questions.length + ' ?'; e.append(m); } if (p.mail) { const m = document.createElement('em'); m.className = 'm'; m.textContent = '✉' + p.mail; e.append(m); }
       const sm = document.createElement('small'); sm.textContent = say.charAt(0).toUpperCase() + say.slice(1); e.append(sm); l.w = null; }
-    if (rm.sign) { rm.head.remove(rm.sign); rm.sign = null; } if (st === 'ask' || st === 'sleep') { rm.sign = sign(st === 'ask' ? '?' : 'z', COL[st]); rm.sign.position.set(.5, 2.1, 0); rm.head.add(rm.sign); }
+    if (rm.sign) { world.remove(rm.sign); rm.sign = null; } const ds = st === 'ask' ? ['?', COL.ask] : p.mail ? ['✉', COL.mail] : null; if (ds) { rm.sign = sign(ds[0], ds[1]); rm.sign.position.set(rm.cx + .7, 2, rm.cz); world.add(rm.sign); }
+    presence(rm, st === 'work');
     const want = st === 'work' ? Math.min(2, Math.max(0, (p.working || []).length + (p.sessions || 0) - 1) + Math.max(0, (ACT.claude[p.id] || []).filter(a => a.age < 300).length - 1)) : 0;
     while (rm.extra.length > want) world.remove(rm.extra.pop()); while (rm.extra.length < want) { const k = rm.extra.length, m = person(rm.tint, hsh(p.id + k), .8); m.position.set(rm.x0 + (k ? TW - 1.3 : 1.3), .34, rm.z0 + TD - 1.4); m.rotation.y = k ? -.9 : .9; world.add(m); rm.extra.push(m); } }
   const nq = STATE ? STATE.inbox.questions + STATE.inbox.person + pendingDel().length : 0, dl = labels.find(l => l.key === 'door'); if (dl) { dl.e.textContent = 'Anh Vinh'; dl.w = null; if (nq) { const b = document.createElement('em'); b.textContent = nq; dl.e.append(b); } }
@@ -219,9 +250,10 @@ function populate() { const gm = (ACT.game || {}).on;
   const old = Object.fromEntries(walkers.map(w => [w.key, w])), keep = []; const mk = (key, rm, kind, glyph, a, b) => { let w = old[key]; if (!w) { w = {key, m:new THREE.Group(), t:Math.random() * 20, leg:0}; const body = person(COL[kind], hsh(key), .62, false); w.m.add(body); w.body = body; const s = sign(glyph, COL[kind]); s.position.set(0, 1.45, 0); s.scale.set(.6, .6, 1); w.m.add(s); world.add(w.m); w.m.position.set(a.x, .34, a.z); }
     w.path = route(a, b); w.rm = rm; keep.push(w); };
   if (!gm) for (const rm of rooms) { const p = rm.p, home = {x:rm.cx + 1.8, z:rm.z0 + TD - 1, zc:rm.z0 + TD + G / 2, vx:rm.x0 + TW + G / 2};
+    if (rm.phase !== 'seated') continue;
     if ((p.questions || []).length) mk(p.id + ':ask', rm, 'ask', '?', home, {x:door.x + 1, z:door.z + 1.6, zc:G + HALL + G / 2});
     if (p.mail) mk(p.id + ':mail', rm, 'mail', '✉', {x:boss.x - 1.6, z:boss.z + 1.2, zc:G + HALL + G / 2, vx:boss.x - 3}, {x:rm.cx - 1.5, z:rm.z0 + TD - 1.2, zc:rm.z0 + TD + G / 2});
-    if (p.parent && byId[p.parent]) { const pr = byId[p.parent]; mk(p.id + ':link', rm, 'link', '↑', {x:rm.cx - 2.2, z:rm.z0 + TD - 1, zc:rm.z0 + TD + G / 2, vx:rm.x0 - G / 2}, {x:pr.cx + 2, z:pr.z0 + TD - 1, zc:pr.z0 + TD + G / 2}); } }
+    if (p.parent && byId[p.parent] && byId[p.parent].phase === 'seated') { const pr = byId[p.parent]; mk(p.id + ':link', rm, 'link', '↑', {x:rm.cx - 2.2, z:rm.z0 + TD - 1, zc:rm.z0 + TD + G / 2, vx:rm.x0 - G / 2}, {x:pr.cx + 2, z:pr.z0 + TD - 1, zc:pr.z0 + TD + G / 2}); } }
   for (const w of walkers) if (!keep.includes(w)) world.remove(w.m); walkers = keep; SL = slides();
   for (const l of labels) if (l.pri == null) l.pri = PRI[l.kind] != null ? PRI[l.kind] : 6; labels.sort((a, b) => a.pri - b.pri); }
 function route(a, b) { const vx = a.vx != null ? a.vx : a.x; return [a, {x:a.x, z:a.zc}, {x:vx, z:a.zc}, {x:vx, z:b.zc}, {x:b.x, z:b.zc}, b]; }
@@ -243,7 +275,7 @@ function weather(t, dt) { const s = skyNow(), w = s.w, key = s.k + w.kind + Math
     sun.position.set(cx + Math.cos(az) * Math.cos(el) * 60, Math.sin(el) * 60, cz + Math.sin(az) * Math.cos(el) * 26 + 10); sun.target.position.set(cx, 0, cz);
     sun.castShadow = !night; sun.color.set(night ? '#c4ccf0' : low ? '#ffb27a' : '#fff2d8'); sun.intensity = (night ? .55 : low ? 1.4 : 2.3) * (w.wet || w.cloud > 85 ? .45 : 1);
     hemi.color.set(night ? '#b4b9d6' : '#dfefff'); hemi.groundColor.set(night ? '#5a5048' : '#6b7f4a'); hemi.intensity = night ? 1.45 : w.wet ? 1.25 : 1.05;
-    const lit = night || s.k === 'dusk'; MGLOW.color.set(lit ? '#ffd27a' : w.wet ? '#c7d3dc' : '#cfe8fb'); for (const l of lamps) l.pool.material.opacity = lit ? (l.post ? .5 : l.room ? (l.room.st === 'sleep' ? .12 : .4) : .35) : 0;
+    const lit = night || s.k === 'dusk'; litNow = lit; MGLOW.color.set(lit ? '#ffd27a' : w.wet ? '#c7d3dc' : '#cfe8fb'); for (const l of lamps) l.pool.material.opacity = lit ? (l.post ? .5 : l.room ? (l.room.phase === 'seated' ? .4 : 0) : .35) : 0;
     scene.fog = w.kind === 'fog' ? new THREE.Fog(s.bot, 40, 110) : null; if (pond) pond.mesh.material.color.set(night ? '#2a4660' : w.wet ? '#7d9db0' : '#6fb2d6');
     const cc = night ? '#5a6280' : w.wet || w.cloud > 80 ? '#c9d0d8' : '#ffffff'; clouds.forEach(c => { c.material.color.set(cc); c.material.opacity = night ? .55 : .92; }); }
   const nc = Math.min(9, Math.round((w.cloud || 0) / 11) + (w.wet ? 2 : 0)), span = isle.x1 - isle.x0 + 30;
@@ -261,13 +293,13 @@ function flights(ms) { fly = fly.filter(f => { const u = (ms - f.t0) / 1800; if 
 
 // ---- the loop
 let VIEW3 = false, running = false, last = 0, zoomIn = false;
-function frame(ms) { if (!running) return; requestAnimationFrame(frame); const wet = WX.now().wet, busy = moving || Object.keys(goal).length || fly.length; if (ms - last < (busy || wet ? 30 : 60)) return; const dt = Math.min(.1, (ms - last) / 1000); last = ms; const t = ms / 1000;
+function frame(ms) { if (!running) return; requestAnimationFrame(frame); const wet = WX.now().wet, busy = moving || Object.keys(goal).length || fly.length || call || callQ.length || rooms.some(r => r.wk); if (ms - last < (busy || wet ? 30 : 60)) return; const dt = Math.min(.1, (ms - last) / 1000); last = ms; const t = ms / 1000;
   const dg = director(ms); if (dg) Object.assign(goal, dg); if (goal.z && !moving) { const a = 1 - Math.exp(-dt * 2.4); cam.tx += (goal.tx - cam.tx) * a; cam.tz += (goal.tz - cam.tz) * a; cam.z += (goal.z - cam.z) * a; let dy = goal.yaw - cam.yaw; cam.yaw += dy * a; if (Math.abs(goal.z - cam.z) < .002 && Math.hypot(goal.tx - cam.tx, goal.tz - cam.tz) < .02) Object.keys(goal).forEach(k => delete goal[k]); applyCam(); }
   const zin = cam.z > fitZ * 1.3; if (zin !== zoomIn) { zoomIn = zin; stage.classList.toggle('zoomin', zin); }
   for (const rm of rooms) { const h = rm.head; if (rm.st === 'work') { h.position.y = .34 + Math.abs(Math.sin(t * 7 + rm.x0)) * .04; h.rotation.y = Math.sin(t * .7 + rm.z0) * .25; } else if (rm.st === 'sleep') { h.rotation.x = .25; h.position.y = .3; } else { h.rotation.x = 0; h.position.y = .34; h.rotation.y = Math.sin(t * .4 + rm.x0) * .15; }
     rm.extra.forEach((m, k) => { m.position.y = .34 + Math.abs(Math.sin(t * 8 + k)) * .03; }); if (rm.st === 'work') rm.light.scale.setScalar(.16 + Math.sin(t * 5) * .03); }
   if (boss.m) { boss.m.position.y = .34 + (CHATS.busy ? Math.abs(Math.sin(t * 8)) * .05 : 0); boss.m.rotation.y = CHATS.busy ? Math.sin(t * 1.2) * .3 : 0; }
-  for (const w of walkers) walk(w, dt); flights(ms); weather(t, dt); paintScreen(t); placeLabels(cam.z / fitZ); R.render(scene, camera); }
+  for (const w of walkers) walk(w, dt); phones(t, dt); flights(ms); weather(t, dt); paintScreen(t); placeLabels(cam.z / fitZ); R.render(scene, camera); }
 function size() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h) return false; R.setSize(w, h, false); applyCam(); return true; }
 function wake() { const on = VIEW3 && cur === 'office' && !document.hidden && STATE; if (on && !running) { if (!size()) return; if (!rooms.length) set(STATE); running = true; last = performance.now(); requestAnimationFrame(frame); } else if (!on) running = false; }
 function set(s) { if (!s || !VIEW3) return; if (!stage.clientWidth) return; const fresh = build(s); populate(); if (fresh) { const o = overview(); Object.assign(cam, o); clampCam(); applyCam(); skyKey = ''; } }
