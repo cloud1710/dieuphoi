@@ -166,7 +166,7 @@ def scan_project(p):
                        'unblocks': q.get('unblocks')} for q in qs if q.get('status') == 'open'],
         'updated': datetime.datetime.fromtimestamp(sfile.stat().st_mtime).strftime('%Y-%m-%d %H:%M'),
         'mail': mail_new(root / p['mailbox']) if p.get('mailbox') else mail_new(root / 'plan' / 'INBOX.md') if p['kind'] == 'plan' else mail_new(HUB / 'out' / 'mail' / (p['id'] + '.md')),
-        'talk': mail_talk(root / 'plan' / 'INBOX.md') if p['kind'] == 'plan' and not p.get('mailbox') else [],
+        'talk': mail_talk(root / p['mailbox']) if p.get('mailbox') else mail_talk(root / 'plan' / 'INBOX.md') if p['kind'] == 'plan' else [],
     })
     return out
 
@@ -682,7 +682,7 @@ def cmd_who(args):
     parent = next((x['id'] for x in reg['projects'] if x['id'] == p.get('parent')), None)
     print('@%s  %s' % (p['id'], p['name']))
     print('path: %s' % p['path'])
-    print('kind: %s%s' % (p['kind'], {'seal': ' (read only for the hub)', 'archive': ' (do not edit)'}.get(p['kind'], '')))
+    print('kind: %s%s' % (p['kind'], {'seal': ' (orchestra SEAL: its own STATUS.yaml at the root)', 'archive': ' (do not edit)'}.get(p['kind'], '')))
     print('parent: %s' % (parent or 'group ' + p['group']))
     print('rules: %s' % (', '.join(f for f in ('CLAUDE.md', 'plan/ORCHESTRA.md') if (root / f).is_file()) or 'none'))
     if p['kind'] in FILES:
@@ -780,7 +780,10 @@ def answer(p, qid, text, sender):
 
 
 def open_item(p, item, reg):
-    """Run projectplaner's own `open <ID>` (or `next`) inside the project; its safety checks decide."""
+    """Run projectplaner's own `open <ID>` (or `next`) inside the project; its safety checks decide.
+    The thesis hub (kind seal) keeps its own opener, tools/open_task.py, with its own checks; the hub calls that."""
+    if p['kind'] == 'seal':
+        return open_seal(p, item)
     if p['kind'] != 'plan':
         raise ValueError('@%s is %s: the hub opens no session there' % (p['id'], p['kind']))
     if item and not re.fullmatch(r'[A-Z][0-9]-[0-9]{2,3}[a-z]?', item):
@@ -797,6 +800,26 @@ def open_item(p, item, reg):
     r = subprocess.run(cmd, cwd=str(real(p['path'])), env=env, capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=90,
                        creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
     return {'ok': r.returncode == 0, 'output': one_line((r.stdout or '') + ' ' + (r.stderr or ''), 600)}
+
+
+def open_seal(p, item):
+    """Open a session in a seal orchestra through its own link handler (one item, or the first ready one)."""
+    root = real(p['path'])
+    opener = root / 'tools' / 'open_task.py'
+    if not opener.is_file():
+        raise ValueError('@%s has no tools/open_task.py' % p['id'])
+    if not item:
+        ready = scan_project(p).get('ready') or []
+        if not ready:
+            raise ValueError('@%s has no ready item to open' % p['id'])
+        item = ready[0]['id']
+    if not re.fullmatch(r'(P\d-\d{2,3}[a-z]?|Q-\d{3})', item):
+        raise ValueError('bad item id')
+    r = subprocess.run([os.environ.get('PP_PYTHON') or sys.executable, '-B', str(opener), 'seal-task://open?id=%s' % item], cwd=str(root),
+                       capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=90, creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+    log = root / '.claude' / 'tasks' / 'open_task.log'
+    tail = log.read_text(encoding='ascii', errors='replace').strip().split('\n')[-1] if log.is_file() else ''
+    return {'ok': r.returncode == 0, 'output': one_line('%s %s %s %s' % (item, r.stdout or '', r.stderr or '', tail), 600)}
 
 
 def mark_done(p, item, sender):

@@ -9,7 +9,9 @@
     "Đổi xong lưu tệp là có hiệu lực ngay ở tin nhắn kế tiếp, không cần khởi động lại gì."
   ],
   "toan_quyen": true,
-  "chi_doc": ["D:/CLOUD"],
-  "cam_vao": ["D:/thesis_private"],
+  "chi_doc": [],
+  "cam_vao": [
+    "D:/thesis_private"
+  ],
   "cam_them": []
 }
