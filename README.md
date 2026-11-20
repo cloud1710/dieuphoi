@@ -56,10 +56,15 @@ Bốn tab:
   câu trả lời gần nhất. Cảnh được vẽ hai lớp (lớp tĩnh giữ sẵn, lớp động vẽ lại) nên không giật.
 - **Việc**: việc chờ anh (trả lời câu hỏi ngay trên app), nhân viên đang làm, từng trưởng phòng; nút "Mở phiên" chạy
   `pp open <ID>` của projectplaner trên PC, mọi kiểm tra an toàn của projectplaner vẫn áp dụng.
-- **Máy**: CPU, RAM, GPU, ổ đĩa và project nào đang chạy (xem `tools/hw.py`). Chỉ đo khi tab này đang mở. Có nút
+- **Trình chiếu**: màn chiếu cho các server web đang chạy trên PC (hub chuyển tiếp trang, chỉ đọc, kể cả server chỉ nghe
+  ở 127.0.0.1), ảnh và ghi chú trong `out/board/` của tổng quản và `plan/board/` của từng orchestra (project khai thêm
+  `board: thư/mục/ảnh` trong `registry.yaml` thì loạt ảnh mới nhất của thư mục đó tự lên bảng; ảnh cũ rời bảng, tệp không
+  bị xoá). Nút "Chụp" cho Edge/Chrome không cửa sổ chụp trang của server (xem `tools/board.py`).
+  Mục gập **Máy** ở cuối: CPU, RAM, GPU, ổ đĩa, lưu lượng mạng, token, project nào đang chạy (`tools/hw.py`), chế độ chơi game. Có nút
   ngủ, khởi động lại, tắt máy (trễ 60 giây, huỷ được). Bật máy từ xa cần Wake-on-LAN và một thiết bị luôn bật trong
   mạng nhà; app này không làm được.
-- **Nhắn**: gửi thư vào hộp thư của một orchestra.
+- Camera của văn phòng tự đi theo việc (tổng quản đang trả lời, thư đang bay, robot đang đi giao việc, phòng đang làm);
+  chạm vào bản đồ là giành lại quyền điều khiển, nút 🎥 bật tắt. Muốn nhắn một orchestra thì nhắn tổng quản `@tên …`.
 
 Cài:
 

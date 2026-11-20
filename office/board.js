@@ -54,7 +54,7 @@ details.grp>summary{padding:10px 12px}details.grp>.in .row{padding-left:33px}
   };
 
   // ---- the board
-  let B = null, sel = null, timer = null, built = false, lastSig = '';
+  let B = null, sel = null, timer = null, built = false, lastSig = '', newest = null;
   const same = (a, b) => a && b && a.kind === b.kind && a.id === b.id;
   const dur = m => m >= 60 ? Math.floor(m / 60) + ' giờ ' + (m % 60) + ' phút' : m + ' phút';
   const imgUrl = it => 'api/board/file?src=' + encodeURIComponent(it.src) + '&name=' + encodeURIComponent(it.name) + '&t=' + it.t;
@@ -110,7 +110,11 @@ details.grp>summary{padding:10px 12px}details.grp>.in .row{padding-left:33px}
     if (!force && (cur !== 'hw' || document.hidden)) return; build();
     if (!liveMode) { $('bscreen').textContent = ''; $('bscreen').append(E('div', 'slide', 'Bảng trình chiếu chỉ xem được khi nối trực tiếp với PC.')); return; }
     try { B = await api('api/board'); } catch (e) { $('blists').textContent = ''; $('blists').append(E('div', 'empty', e.message)); return; }
-    if (sel && sel.kind === 'server' && B.servers && !B.servers.some(s => s.port === sel.port)) sel = null;
+    if (sel && sel.kind === 'server' && B.servers && !B.servers.some(s => s.port === sel.port)) { sel = null; screen(); }
+    const its = B.items || [], top = its.find(i => i.kind === 'image'), was = sel;
+    if (sel && sel.kind !== 'server' && !its.some(i => i.src === sel.src && i.name === sel.name && i.t === sel.t)) sel = null;      // the old picture is gone from the board
+    if (top && newest !== null && top.t > newest && (!sel || sel.kind !== 'server')) sel = {id:top.src + '/' + top.name, ...top};   // a new picture: present it
+    newest = top ? top.t : 0; if (sel !== was) { screen(); lists(); }
     const sig = JSON.stringify([B.servers, (B.items || []).map(i => [i.name, i.t]), B.can_shot]);
     if (sig !== lastSig) { lastSig = sig; lists(); }
     if (!sel || !$('bscreen').firstChild) screen();

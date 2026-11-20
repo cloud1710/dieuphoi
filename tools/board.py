@@ -137,6 +137,8 @@ def items(hub, projects, limit=40):
     got.sort(key=lambda r: -r['t'])
     out, newest = [], {}
     for r in got:                                # an orchestra shows what it works on now: the pictures of its
+        if r['src'] == 'hub' and time.time() - r['t'] > 86400:
+            continue                             # the manager's own: what is older than a day leaves the board
         if r['src'] != 'hub':                    # latest batch (saved within ten minutes of the newest), one note
             first = newest.setdefault((r['src'], r['kind']), r['t'])
             if r['kind'] == 'note' and r['t'] != first or first - r['t'] > 600:
