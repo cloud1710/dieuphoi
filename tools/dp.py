@@ -323,8 +323,15 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         """Remote control. Always needs the key, also from this PC, so no web page can post here on its own."""
         path = self.path.split('?')[0]
+        if path == '/api/pair':                           # the one door without a key: a short-lived code opens it once
+            try:
+                n = int(self.headers.get('Content-Length') or 0)
+                data = json.loads(self.rfile.read(n).decode('utf-8')) if 0 < n <= 200 else {}
+                return self.reply(200, pair_use(data.get('code'), self.client_address[0]))
+            except Exception as e:
+                return self.reply(400, {'error': short(e, 120)})
         if not pass_ok(self.headers.get('X-DP-Key'), self.client_address[0]):
-            return self.reply(401, {'error': 'key'})
+            return self.reply(401, {'error': 'key', 'why': _WHY.get(self.client_address[0], 'none')})
         try:
             n = int(self.headers.get('Content-Length') or 0)
             if not 0 < n <= 16384:
@@ -421,7 +428,9 @@ class Handler(SimpleHTTPRequestHandler):
         if path.startswith('/p/'):
             return self.proxy(path)
         if path.startswith('/api/') and not self.local() and not self.cookie_ok() and not pass_ok(self.given(), self.client_address[0]):
-            return self.reply(401, {'error': 'key'})
+            return self.reply(401, {'error': 'key', 'why': _WHY.get(self.client_address[0], 'none')})
+        if path == '/api/paircode':
+            return self.reply(200, pair_code())
         if path == '/api/board':
             b = _board()
             body = json.dumps({'servers': b.servers(_pairs(), {self.server.server_address[1]}), 'items': b.items(HUB, _pairs(True)),
@@ -1390,7 +1399,7 @@ def cmd_hw(args):
     return hw.main(args.rest)
 
 
-_GOOD, _FAILS = set(), {}
+_GOOD, _FAILS, _WHY = set(), {}, {}
 
 
 def pass_ok(given, ip='local'):
@@ -1398,9 +1407,11 @@ def pass_ok(given, ip='local'):
     Five wrong tries from one address lock that address out for a minute."""
     raw = str(given or '').encode('utf-8')
     if not raw:
+        _WHY[ip] = 'none'
         return False
     fails = _FAILS.get(ip, [0, 0.0])
     if fails[0] >= 5 and time.time() < fails[1]:
+        _WHY[ip] = 'locked'
         return False
     ok = hmac.compare_digest(raw, token().encode('ascii')) or hashlib.sha256(raw).digest() in _GOOD
     f = HUB / 'out' / 'pass.hash'
@@ -1414,9 +1425,47 @@ def pass_ok(given, ip='local'):
             _GOOD.add(hashlib.sha256(raw).digest())
     if ok:
         _FAILS.pop(ip, None)
+        _WHY.pop(ip, None)
     else:
-        _FAILS[ip] = [fails[0] + 1, time.time() + 60]
+        tried = hashlib.sha256(raw).digest()
+        again = len(fails) > 2 and fails[2] == tried           # an app that retries the same wrong key is one mistake, not many
+        _FAILS[ip] = [fails[0] + (0 if again else 1), time.time() + 60, tried]
+        _WHY[ip] = 'wrong'
+        if not again:
+            pair_log(ip, 'wrong key (%d chars, try %d)' % (len(raw.decode('utf-8', 'replace')), _FAILS[ip][0]))
     return ok
+
+
+def pair_log(ip, text):
+    try:
+        with open(HUB / 'out' / 'pair.log', 'a', encoding='utf-8') as f:
+            f.write('%s %s %s\n' % (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), ip, text))
+    except OSError:
+        pass
+
+
+PAIR = {'code': None, 'until': 0.0}
+
+
+def pair_code():
+    """A six digit code, good for ten minutes and for one use: a paired device asks for it, a new one types it."""
+    PAIR.update(code='%06d' % secrets.randbelow(10 ** 6), until=time.time() + 600)
+    return {'code': PAIR['code'], 'minutes': 10}
+
+
+def pair_use(code, ip):
+    fails = _FAILS.get(ip, [0, 0.0])
+    if fails[0] >= 5 and time.time() < fails[1]:
+        raise ValueError('nhập sai quá 5 lần, chờ 1 phút')
+    code = re.sub(r'\D', '', str(code or ''))
+    if PAIR['code'] and time.time() < PAIR['until'] and hmac.compare_digest(code.encode(), PAIR['code'].encode()):
+        PAIR.update(code=None, until=0.0)
+        _FAILS.pop(ip, None)
+        pair_log(ip, 'paired with a code')
+        return {'key': token()}
+    _FAILS[ip] = [fails[0] + 1, time.time() + 60]
+    pair_log(ip, 'wrong or expired code')
+    raise ValueError('mã ghép sai hoặc đã hết hạn')
 
 
 def cmd_passwd(_):

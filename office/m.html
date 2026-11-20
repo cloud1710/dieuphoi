@@ -101,7 +101,7 @@ textarea{min-height:84px;resize:vertical}
 #say button{flex:none;margin:0;border:0;border-radius:20px;background:var(--ready);color:#fff;font:inherit;font-weight:650;padding:0 16px}
 body.chatting{padding-bottom:calc(140px + env(safe-area-inset-bottom))}
 @media (max-width:819px){body.chatting #stage{height:42vh}}
-#pair{position:fixed;inset:0;z-index:9;background:var(--bg);padding:calc(40px + env(safe-area-inset-top)) 18px;display:none}
+#pair{position:fixed;inset:0;z-index:9;background:var(--bg);padding:calc(40px + env(safe-area-inset-top)) 18px 40px;display:none;overflow-y:auto}
 #pair.on{display:block}
 a{color:var(--ready)}
 </style>
@@ -114,7 +114,7 @@ a{color:var(--ready)}
 <form id="say"><textarea id="sayt" rows="1" placeholder="Nhắn tổng quản…" enterkeyhint="send"></textarea><button type="submit">Gửi</button></form>
 <nav><button data-t="office" class="on">Văn phòng</button><button data-t="hw">Trình chiếu</button><button data-t="work">Việc <b id="nq"></b></button></nav>
 <div id="pair"><h1>Cài đặt kết nối</h1><p class="note" id="pairinfo"></p><p class="note">Nhập mật khẩu kết nối của anh, hoặc mở đường dẫn ghép có đoạn <code>#k=…</code> mà PC ghi ở <code>out/phone-link.txt</code>.</p>
-  <input id="key" type="password" placeholder="Mật khẩu kết nối" autocomplete="current-password" autocapitalize="off"><button class="act go" id="savekey">Kết nối</button> <button class="act" id="forget">Quên máy này</button> <button class="act" id="closepair">Đóng</button><div class="res bad" id="pairerr"></div><p class="note" id="pairlinks"></p></div>
+  <input id="key" type="password" placeholder="Mật khẩu kết nối hoặc mã 6 số" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"><button class="act go" id="savekey">Kết nối</button> <button class="act" id="forget">Quên máy này</button> <button class="act" id="closepair">Đóng</button><p class="note" style="margin-top:12px">Ghép máy khác cho nhanh: trên máy đã nối, bấm nút dưới để lấy mã 6 số, rồi nhập mã đó vào ô mật khẩu của máy mới.</p><button class="act" id="mkcode">Tạo mã ghép 6 số</button><div class="res" id="code" style="font-size:22px;letter-spacing:.12em;font-weight:700"></div><label class="note" style="display:block;margin-top:8px"><input type="checkbox" id="showkey" style="width:auto;margin:0 6px 0 0">Hiện mật khẩu khi gõ</label><div class="res bad" id="pairerr"></div><p class="note" id="pairlinks"></p></div>
 <script src="board.js"></script>
 <script>
 const E = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
@@ -125,8 +125,15 @@ try { KEY = localStorage.getItem('dp-key') || ''; } catch (e) {}
 if (location.hash.startsWith('#k=')) { KEY = decodeURIComponent(location.hash.slice(3)); try { localStorage.setItem('dp-key', KEY); } catch (e) {} history.replaceState(null, '', location.pathname); }
 $('gear').onclick = () => { $('pairinfo').textContent = (liveMode ? 'Đang nối trực tiếp với PC tại ' : 'Chưa nối với PC tại ') + location.host + '. App trên màn hình chính của iPhone giữ mật khẩu riêng, nên ghép lại ở đây một lần.'; $('pair').classList.add('on'); };
 $('closepair').onclick = () => $('pair').classList.remove('on');
+$('showkey').onchange = () => { $('key').type = $('showkey').checked ? 'text' : 'password'; };
+$('mkcode').onclick = async () => { const c = $('code'); try { const j = await api('api/paircode'); c.textContent = j.code.slice(0, 3) + ' ' + j.code.slice(3); c.className = 'res'; setTimeout(() => { c.textContent = ''; }, j.minutes * 60000); } catch (e) { c.style.fontSize = ''; c.textContent = 'Máy này chưa nối nên chưa tạo được mã.'; } };
 $('forget').onclick = () => { KEY = ''; try { localStorage.removeItem('dp-key'); } catch (e) {} $('key').value = ''; $('pairerr').textContent = 'Đã quên mật khẩu trên thiết bị này.'; connect(); };
-$('savekey').onclick = () => { if (!$('key').value.trim()) return; KEY = $('key').value.trim(); try { localStorage.setItem('dp-key', KEY); } catch (e) {} $('pair').classList.remove('on'); connect(); };
+$('savekey').onclick = async () => { let v = $('key').value.trim(); if (!v) return; const err = $('pairerr'); err.textContent = 'Đang ghép…';
+  if (/^\d{3}\s?\d{3}$/.test(v)) { try { const r = await fetch('api/pair', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({code:v})}), j = await r.json(); if (!j.key) { err.textContent = 'Không ghép được: ' + (j.error || 'lỗi'); return; } v = j.key; } catch (e) { err.textContent = 'Không tới được PC tại ' + location.host + '. Kiểm tra ZeroTier trên điện thoại rồi thử lại.'; return; } }
+  try { const r = await fetch('api/hwlite', {headers:{'X-DP-Key':v}, cache:'no-store'}); if (r.status === 401) { const j = await r.json().catch(() => ({})); err.textContent = j.why === 'locked' ? 'Nhập sai quá 5 lần. Chờ 1 phút rồi thử lại.' : 'Mật khẩu chưa đúng (' + v.length + ' ký tự). Xem lại chữ hoa, chữ thường và ký tự cuối.'; return; } if (!r.ok) throw 0; }
+  catch (e) { err.textContent = 'Không tới được PC tại ' + location.host + '. Kiểm tra ZeroTier trên điện thoại rồi thử lại.'; return; }
+  KEY = v; let kept = true; try { localStorage.setItem('dp-key', KEY); kept = localStorage.getItem('dp-key') === KEY; } catch (e) { kept = false; }
+  $('key').value = ''; err.textContent = kept ? '' : 'Đã ghép, nhưng máy này không cho lưu khoá: lần mở sau phải ghép lại.'; if (kept) $('pair').classList.remove('on'); connect(); };
 async function api(path, body) {
   const r = await fetch(path, body ? {method:'POST', headers:{'Content-Type':'application/json', 'X-DP-Key':KEY}, body:JSON.stringify(body)} : {headers:{'X-DP-Key':KEY}, cache:'no-store'});
   if (r.status === 401) { $('pair').classList.add('on'); throw new Error('Chưa ghép khoá'); }
