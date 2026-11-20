@@ -250,6 +250,83 @@ def claude_activity(projects, window=6 * 3600):
     return out
 
 
+_TOK = {'day': None, 'files': {}, 'out': {}}
+
+
+def token_usage(projects):
+    """Tokens Claude Code used today, per project, from the `usage` field of its transcripts. Each file is read
+    from where the last pass stopped, and a message is counted once however many lines repeat it."""
+    import calendar
+    base = Path.home() / '.claude' / 'projects'
+    today = time.strftime('%Y-%m-%d')
+    if _TOK['day'] != today:
+        _TOK.update(day=today, files={})
+    midnight = time.mktime(time.strptime(today, '%Y-%m-%d'))
+    roots = sorted(((_norm(root), pid) for pid, root in projects), key=lambda r: -len(r[0]))
+    if base.is_dir():
+        for folder in base.iterdir():
+            if not folder.is_dir():
+                continue
+            for f in folder.glob('*.jsonl'):
+                try:
+                    st = f.stat()
+                except OSError:
+                    continue
+                if st.st_mtime < midnight:
+                    continue
+                rec = _TOK['files'].setdefault(str(f), {'pos': 0, 'owner': None, 'in': 0, 'out': 0, 'cache': 0, 'msgs': 0, 'seen': set()})
+                if st.st_size < rec['pos']:
+                    rec.update(pos=0)
+                if st.st_size == rec['pos']:
+                    continue
+                try:
+                    with open(f, 'rb') as fh:
+                        fh.seek(rec['pos'])
+                        chunk = fh.read(32 * 2 ** 20)
+                except OSError:
+                    continue
+                cut = chunk.rfind(b'\n')
+                if cut < 0:
+                    continue
+                rec['pos'] += cut + 1
+                for line in chunk[:cut].split(b'\n'):
+                    if b'"usage"' not in line and rec['owner']:
+                        continue
+                    try:
+                        e = json.loads(line)
+                    except ValueError:
+                        continue
+                    if not isinstance(e, dict):
+                        continue
+                    if not rec['owner'] and e.get('cwd'):
+                        place = _norm(e['cwd'])
+                        rec['owner'] = next((pid for root, pid in roots if place.startswith(root)), '?')
+                    msg = e.get('message') if isinstance(e.get('message'), dict) else {}
+                    use = msg.get('usage') if isinstance(msg.get('usage'), dict) else None
+                    if not use:
+                        continue
+                    try:
+                        when = calendar.timegm(time.strptime(str(e.get('timestamp'))[:19], '%Y-%m-%dT%H:%M:%S'))
+                    except ValueError:
+                        when = midnight
+                    mid = msg.get('id') or e.get('uuid')
+                    if when < midnight or mid in rec['seen']:
+                        continue
+                    rec['seen'].add(mid)
+                    rec['in'] += int(use.get('input_tokens') or 0)
+                    rec['out'] += int(use.get('output_tokens') or 0)
+                    rec['cache'] += int(use.get('cache_read_input_tokens') or 0) + int(use.get('cache_creation_input_tokens') or 0)
+                    rec['msgs'] += 1
+    out = {}
+    for rec in _TOK['files'].values():
+        if rec['msgs'] and rec['owner']:
+            row = out.setdefault(rec['owner'], {'in': 0, 'out': 0, 'cache': 0, 'msgs': 0})
+            for k in row:
+                row[k] += rec[k]
+    _TOK['out'] = out
+    return out
+
+
 def snapshot(projects):
     """projects: [(id, folder)]. Returns the machine totals and one row per project."""
     out = {'time': time.strftime('%Y-%m-%d %H:%M:%S'), 'psutil': psutil is not None}

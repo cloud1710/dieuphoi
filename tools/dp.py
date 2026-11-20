@@ -767,6 +767,20 @@ def bootstrap():
         note('first publish: %s %s' % ('OK' if ok else 'FAILED', msg))
 
 
+def token_loop():
+    """Counts today's tokens in the background, every 5 minutes, so no request waits for it."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import hw
+    time.sleep(20)
+    while True:
+        try:
+            got = hw.token_usage([(p['id'], real(p['path'])) for p in registry()['projects']])
+            (HUB / 'out' / 'tokens.json').write_text(json.dumps({'day': hw._TOK['day'], 'projects': got}, ensure_ascii=False, indent=1), encoding='utf-8')
+        except Exception as e:
+            (HUB / 'out' / 'tokens.json').write_text(json.dumps({'error': '%s: %s' % (type(e).__name__, e)}), encoding='utf-8')
+        time.sleep(300)
+
+
 def reload_on_change():
     """A hidden server cannot be restarted by hand: leave when its own code changes, the start script runs it again."""
     files = [Path(__file__).resolve(), Path(__file__).resolve().parent / 'hw.py']
@@ -829,7 +843,7 @@ def activity():
     reg = registry()
     name = (reg.get('publish') or {}).get('pages_project')
     pairs = [(p['id'], real(p['path'])) for p in reg['projects']]
-    return {'claude': hw.claude_activity(pairs), 'programs': hw.project_programs(pairs), 'game': game_state(),
+    return {'claude': hw.claude_activity(pairs), 'programs': hw.project_programs(pairs), 'game': game_state(), 'tokens': hw._TOK['out'],
             'todo_url': 'https://%s.pages.dev/' % name if name else None,
             'passphrase': (HUB / 'out' / 'pass.hash').is_file() and (HUB / 'out' / 'pass.hash').stat().st_size > 0}
 
@@ -1141,6 +1155,7 @@ def cmd_serve(args):
     if args.reload:
         threading.Thread(target=reload_on_change, daemon=True).start()
     threading.Thread(target=game_watch, daemon=True).start()
+    threading.Thread(target=token_loop, daemon=True).start()
     if args.reload:                                  # only the hidden, self-updating server settles things on its own
         threading.Thread(target=bootstrap, daemon=True).start()
     def _dump_hw():
