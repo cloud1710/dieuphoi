@@ -135,17 +135,14 @@ def items(hub, projects, limit=40):
         except OSError:
             continue
     got.sort(key=lambda r: -r['t'])
-    out, seen = [], set()
-    for r in got:                                # an orchestra shows one picture and one note: what it works on now
-        key = (r['src'], r['kind'])
-        if r['src'] != 'hub':
-            if key in seen:
+    out, newest = [], {}
+    for r in got:                                # an orchestra shows what it works on now: the pictures of its
+        if r['src'] != 'hub':                    # latest batch (saved within ten minutes of the newest), one note
+            first = newest.setdefault((r['src'], r['kind']), r['t'])
+            if r['kind'] == 'note' and r['t'] != first or first - r['t'] > 600:
                 continue
-            seen.add(key)
-            if r['kind'] == 'image':             # several views saved together: the overview sheet stands for them
-                r = next((x for x in got if x['src'] == r['src'] and x['kind'] == 'image' and r['t'] - x['t'] < 600
-                          and 'sheet' in x['name'].lower()), r)
         out.append(r)
+    out.sort(key=lambda r: (-(newest.get((r['src'], r['kind']), r['t'])), r['src'], 'sheet' not in r['name'].lower(), -r['t']))
     return out[:limit]
 
 
