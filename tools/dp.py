@@ -665,6 +665,10 @@ def open_item(p, item, reg):
         raise ValueError('@%s is %s: the hub opens no session there' % (p['id'], p['kind']))
     if item and not re.fullmatch(r'[A-Z][0-9]-[0-9]{2,3}[a-z]?', item):
         raise ValueError('bad item id')
+    try:
+        trust_projects()                          # a folder added since the server started
+    except Exception:
+        pass
     pp = next((x for x in reg['projects'] if x['id'] == 'projectplaner'), None)
     env = dict(os.environ)
     if pp:
@@ -996,6 +1000,82 @@ def stop_session(p, iid):
         except Exception:
             pass
     return len(procs)
+
+
+def trust_projects():
+    """Marks every registered project folder as trusted in Claude Code (~/.claude.json), under both spellings of
+    the drive letter, so a session opened from the phone never stops at the trust question. The owner asked for it
+    (20/11/2026). Returns the folders newly marked."""
+    f = Path.home() / '.claude.json'
+    try:
+        data = json.loads(f.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        return []
+    book = data.setdefault('projects', {})
+    if not isinstance(book, dict):
+        return []
+    added = []
+    for p in registry()['projects']:
+        root = str(real(p['path'])).replace('\\', '/').rstrip('/')
+        if not Path(root).is_dir():
+            continue
+        for key in dict.fromkeys([root, root[:1].upper() + root[1:], root[:1].lower() + root[1:]]):
+            row = book.get(key)
+            if isinstance(row, dict) and row.get('hasTrustDialogAccepted'):
+                continue
+            twin = next((v for k, v in book.items() if k.lower() == key.lower() and isinstance(v, dict)), None)
+            row = row if isinstance(row, dict) else dict(twin or {})
+            row['hasTrustDialogAccepted'] = True
+            book[key] = row
+            added.append(key)
+    if added:
+        tmp = f.with_name('.claude.json.dieuphoi-tmp')
+        tmp.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding='utf-8')
+        os.replace(tmp, f)                       # whole file at once: a running Claude never reads half of it
+        heal_log('trusted: ' + ', '.join(added))
+    return added
+
+
+HEAL = {}                                        # 'project:item' -> how many times it was restarted
+
+
+def heal_log(text):
+    try:
+        with open(HUB / 'out' / 'heal.log', 'a', encoding='utf-8') as f:
+            f.write('%s %s\n' % (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), text))
+    except OSError:
+        pass
+
+
+def heal_stuck():
+    """A session stuck for four minutes is settled by the hub without asking (the owner's standing wish): trust the
+    folders, stop the stuck session, open the same item again once. Stuck again: the owner is told, nothing more."""
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import hw
+    reg = registry()
+    pairs = [(p['id'], real(p['path'])) for p in reg['projects']]
+    stuck = stuck_sessions(hw.claude_activity(pairs), pairs)
+    by_id = {p['id']: p for p in reg['projects']}
+    for pid, rows in stuck.items():
+        for k in rows:
+            key = '%s:%s' % (pid, k['item'])
+            if k['mins'] < 4 or key in HEAL and HEAL[key] < 0:
+                continue
+            p = by_id[pid]
+            if HEAL.get(key, 0) >= 1:
+                HEAL[key] = -1
+                heal_log('%s still stuck after a restart: told the owner' % key)
+                chat_log('boss', 'Phiên %s của @%s mở lại rồi vẫn kẹt trên màn hình PC. Em để nguyên, khi anh ở PC xem cửa sổ đó giúp em.' % (k['item'], pid))
+                continue
+            trust_projects()
+            n = stop_session(p, k['item'])
+            time.sleep(3)
+            again = {'ok': False, 'output': 'chế độ chơi game: không mở lại'} if GAME['on'] else open_item(p, k['item'], reg)
+            HEAL[key] = HEAL.get(key, 0) + 1
+            heal_log('%s stuck %d min: stopped %d, reopened: %s' % (key, k['mins'], n, again.get('output')))
+            chat_log('boss', 'Tự gỡ: phiên %s của @%s kẹt %d phút trên PC (chờ bấm). Em đã dừng và %s.' % (
+                k['item'], pid, k['mins'], 'mở lại' if again.get('ok') else 'chưa mở lại được: ' + one_line(again.get('output'), 160)))
+            Handler.cache = (0.0, b'')
 
 
 def activity():
@@ -1403,8 +1483,19 @@ def game_watch():
         (HUB / 'out' / 'claude-check.txt').write_text('%s | %s' % (' '.join(c or []), v), encoding='utf-8')
     except Exception as e:
         (HUB / 'out' / 'claude-check.txt').write_text('error: %s' % e, encoding='utf-8')
+    tick = 0
+    try:
+        trust_projects()
+    except Exception as e:
+        heal_log('trust failed: %s' % e)
     while True:
         time.sleep(30)
+        tick += 1
+        if tick % 2 == 0:
+            try:
+                heal_stuck()
+            except Exception as e:
+                heal_log('heal failed: %s: %s' % (type(e).__name__, e))
         try:
             want_shot = HUB / 'out' / 'board-shot.txt'            # a port number left here: take a picture of that server
             if want_shot.is_file() and want_shot.stat().st_size:
