@@ -105,7 +105,8 @@ details.grp>summary{padding:10px 12px}details.grp>.in .row{padding-left:33px}
       nm.append(E('b', '', 'Màn hình PC mượt · MoonlightWeb'), E('small', '', B.mw.link ? 'xem và điều khiển, độ trễ thấp · mở trong trang riêng' : 'chưa bật truy cập qua Internet')); d.append(nm);
       if (B.mw.link) { const go = E('button', 'act go', 'Mở'); go.style.margin = '0'; go.onclick = () => window.open(B.mw.link, '_blank'); d.append(go); }
       ks.append(d);
-      if (B.mw.pin) { const p = E('div', 'row line'); const nm2 = E('span', 'nm'); const v = E('b', '', '••••••'); nm2.append(E('small', '', 'Mã PIN vào MoonlightWeb (chạm để hiện)'), v); p.append(E('span', 'dot'), nm2); p.onclick = () => { v.textContent = v.textContent.startsWith('•') ? B.mw.pin : '••••••'; }; ks.append(p); } }
+      if (B.mw.pin) { const p = E('div', 'row line'); const nm2 = E('span', 'nm'); const v = E('b', '', '••••••'); nm2.append(E('small', '', 'Mã PIN vào MoonlightWeb (chạm để hiện) · mỗi mã chỉ dùng cho một máy, một lần'), v); p.append(E('span', 'dot'), nm2); p.onclick = () => { v.textContent = v.textContent.startsWith('•') ? B.mw.pin : '••••••'; }; ks.append(p); }
+      { const n = E('div', 'row line'); const nb = twoTap('Tạo mã PIN mới cho máy khác', async () => { const o = await api('api/mw/newpin', {}); B.mw.pin = o.pin; lists(); return o.pin ? 'Mã mới: ' + o.pin + ' (dùng một lần, cho một máy)' : 'Chưa tạo được mã'; }); nb.style.margin = '0'; n.append(nb); ks.append(n); } }
     { const me = {kind:'pc', id:'pc'}, d = E('div', 'row line pick' + (same(sel, me) ? ' on' : '')); d.append(E('span', 'dot work')); const nm = E('span', 'nm');
       nm.append(E('b', '', 'Màn hình PC'), E('small', '', 'xem trực tiếp, khoảng 1 hình mỗi giây' + (B.sunshine ? ' · Sunshine đang chạy (Moonlight để điều khiển)' : ''))); d.append(nm, E('span', 'chip', 'Xem'));
       d.onclick = () => { sel = me; screen(); lists(); scrollTo(0, 0); }; ks.append(d); }

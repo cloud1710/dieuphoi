@@ -363,6 +363,9 @@ class Handler(SimpleHTTPRequestHandler):
                 chat_log('boss', out['result'])
                 Handler.cache = (0.0, b'')
                 return self.reply(200, out)
+            if path == '/api/mw/newpin':
+                info = _board().moonlightweb_new_pin(HUB)
+                return self.reply(200, {'ok': bool(info.get('pin')), 'pin': info.get('pin')})
             if path == '/api/board/shot':
                 b = _board()
                 port = int(data.get('port'))
@@ -1742,6 +1745,12 @@ def game_watch():
                     bubble_questions()
                 except Exception as e:
                     heal_log('questions: %s' % e)
+            if (HUB / 'out' / 'mw-newpin-req.txt').is_file():         # a new MoonlightWeb PIN asked for by a file (no secret in the file)
+                (HUB / 'out' / 'mw-newpin-req.txt').rename(HUB / 'out' / 'mw-newpin-req.done')
+                try:
+                    _board().moonlightweb_new_pin(HUB)
+                except Exception as e:
+                    heal_log('mw new pin: %s' % e)
             ask = HUB / 'out' / 'chat-in.txt'
             if ask.is_file() and ask.stat().st_size and not CHAT['busy']:
                 msg = ask.read_text(encoding='utf-8').strip()

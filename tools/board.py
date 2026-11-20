@@ -300,3 +300,13 @@ def moonlightweb(hub, force=False):
         info['internet'] = m.group(0).strip()[:120] if m else None
     _MW.update(t=time.time(), info=info)
     return info
+
+
+def moonlightweb_new_pin(hub):
+    """A fresh access PIN for one more device (each PIN lets one browser in, once). Returns the new state."""
+    if not os.path.isfile(MW_EXE):
+        raise RuntimeError('MoonlightWeb chưa cài')
+    r = subprocess.run([MW_EXE, '--new-pin'], capture_output=True, text=True, encoding='utf-8', errors='replace',
+                       timeout=30, stdin=subprocess.DEVNULL, creationflags=NOWIN)
+    (Path(hub) / 'out' / 'mw-newpin.txt').write_text((r.stdout or '') + (r.stderr or ''), encoding='utf-8')
+    return moonlightweb(hub, force=True)
