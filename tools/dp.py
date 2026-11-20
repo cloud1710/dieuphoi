@@ -332,6 +332,13 @@ class Handler(SimpleHTTPRequestHandler):
             data = json.loads(self.rfile.read(n).decode('utf-8'))
             if path == '/api/chat':
                 return self.reply(200, chat_send(data.get('text')))
+            if path == '/api/board/shot':
+                b = _board()
+                port = int(data.get('port'))
+                b.servers(_pairs(), {self.server.server_address[1]})
+                if port not in b.ports():
+                    raise ValueError('no such local server')
+                return self.reply(200, {'ok': True, 'name': b.shot(HUB, port)})
             if path == '/api/game':
                 return self.reply(200, {'ok': True, 'result': game_set(bool(data.get('on')), 'manual: app')})
             if path == '/api/power':
@@ -411,8 +418,32 @@ class Handler(SimpleHTTPRequestHandler):
         path = self.path.split('?')[0]
         if not self.local():
             Handler.seen.add(self.client_address[0])
-        if path.startswith('/api/') and not self.local() and not pass_ok(self.given(), self.client_address[0]):
+        if path.startswith('/p/'):
+            return self.proxy(path)
+        if path.startswith('/api/') and not self.local() and not self.cookie_ok() and not pass_ok(self.given(), self.client_address[0]):
             return self.reply(401, {'error': 'key'})
+        if path == '/api/board':
+            b = _board()
+            body = json.dumps({'servers': b.servers(_pairs(), {self.server.server_address[1]}), 'items': b.items(HUB, _pairs(True)),
+                               'can_shot': bool(b.browser())}, ensure_ascii=False).encode('utf-8')
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
+            self.send_header('Cache-Control', 'no-store')
+            self.send_header('Set-Cookie', 'dpk=%s; Path=/; HttpOnly; SameSite=Strict; Max-Age=2592000' % Handler.key)   # lets pictures and passed-on pages load without the key in their address
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            return self.wfile.write(body)
+        if path == '/api/board/file':
+            q = parse_qs(urlsplit(self.path).query)
+            got = _board().image(HUB, _pairs(True), q.get('src', [''])[0], q.get('name', [''])[0])
+            if not got:
+                return self.reply(404, {'error': 'no such picture'})
+            self.send_response(200)
+            self.send_header('Content-Type', got[1])
+            self.send_header('Cache-Control', 'private, max-age=86400')
+            self.send_header('Content-Length', str(len(got[0])))
+            self.end_headers()
+            return self.wfile.write(got[0])
         if path == '/api/activity':
             try:
                 return self.reply(200, activity())
@@ -423,7 +454,10 @@ class Handler(SimpleHTTPRequestHandler):
         if path == '/api/hwlite':
             sys.path.insert(0, str(Path(__file__).resolve().parent))
             import hw
-            return self.reply(200, hw.lite())
+            lite = hw.lite()
+            tk = list(hw._TOK['out'].values())
+            lite['tok'] = {'out': sum(r['out'] for r in tk), 'all': sum(r['in'] + r['out'] + r['cache'] for r in tk)} if tk else None
+            return self.reply(200, lite)
         if path == '/api/net':
             return self.reply(200, net_diag())
         if path == '/api/hw':
@@ -434,6 +468,12 @@ class Handler(SimpleHTTPRequestHandler):
         if path == '/api/events':
             return self.events()
         if path != '/api/state':
+            m = re.search(r'/p/(\d+)/', self.headers.get('Referer') or '')       # a passed-on page asked for /something: it means its own server
+            if m and not path.startswith('/api/') and not os.path.exists(self.translate_path(self.path)):
+                self.send_response(307)
+                self.send_header('Location', '/p/%s%s' % (m.group(1), self.path))
+                self.send_header('Content-Length', '0')
+                return self.end_headers()
             return super().do_GET()
         body, tag = self.current()
         if self.headers.get('If-None-Match') == tag:
@@ -457,6 +497,33 @@ class Handler(SimpleHTTPRequestHandler):
             except (KeyError, ValueError, AttributeError):
                 pass
         super().send_header(keyword, value)
+
+    def cookie_ok(self):
+        m = re.search(r'(?:^|;\s*)dpk=([^;\s]+)', self.headers.get('Cookie') or '')
+        return bool(m and Handler.key) and hmac.compare_digest(m.group(1).encode('utf-8'), Handler.key.encode('utf-8'))
+
+    def proxy(self, path):
+        """/p/<port>/... passes on a page of a web server of this PC, also one that only listens on 127.0.0.1.
+        Reading only (GET), and only ports the board lists."""
+        b = _board()
+        m = re.match(r'/p/(\d+)(/.*)?$', path)
+        if not (self.local() or self.cookie_ok() or (self.given() and pass_ok(self.given(), self.client_address[0]))):
+            return self.reply(401, {'error': 'key'})
+        if not m or (b.servers(_pairs(), {self.server.server_address[1]}) is None) or int(m.group(1)) not in b.ports():
+            return self.reply(404, {'error': 'no such local server'})
+        if not m.group(2):
+            self.send_response(307)
+            self.send_header('Location', path + '/')
+            self.send_header('Content-Length', '0')
+            return self.end_headers()
+        query = '&'.join(part for part in urlsplit(self.path).query.split('&') if part and not part.startswith('k='))
+        code, ctype, body = b.fetch(int(m.group(1)), m.group(2) + ('?' + query if query else ''))
+        self.send_response(code)
+        self.send_header('Content-Type', ctype)
+        self.send_header('Cache-Control', 'no-store')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def log_message(self, *a):
         pass
@@ -800,7 +867,7 @@ def token_loop():
 
 def reload_on_change():
     """A hidden server cannot be restarted by hand: leave when its own code changes, the start script runs it again."""
-    files = [Path(__file__).resolve(), Path(__file__).resolve().parent / 'hw.py']
+    files = [Path(__file__).resolve(), Path(__file__).resolve().parent / 'hw.py', Path(__file__).resolve().parent / 'board.py']
     seen = [f.stat().st_mtime_ns if f.is_file() else 0 for f in files]
     while True:
         time.sleep(20)
@@ -852,6 +919,17 @@ def power(action):
     if r.returncode:
         raise ValueError(one_line((r.stdout or '') + (r.stderr or ''), 200) or 'command failed')
     return {'shutdown': 'shutdown in 60 seconds', 'restart': 'restart in 60 seconds', 'cancel': 'cancelled'}[action]
+
+
+def _board():
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import board
+    return board
+
+
+def _pairs(kinds=False):
+    ps = registry()['projects']
+    return [(p['id'], real(p['path']), p.get('kind')) for p in ps] if kinds else [(p['id'], real(p['path'])) for p in ps]
 
 
 def activity():
@@ -1245,6 +1323,17 @@ def game_watch():
     while True:
         time.sleep(30)
         try:
+            want_shot = HUB / 'out' / 'board-shot.txt'            # a port number left here: take a picture of that server
+            if want_shot.is_file() and want_shot.stat().st_size:
+                port = want_shot.read_text(encoding='ascii', errors='replace').strip()
+                want_shot.write_text('', encoding='ascii')
+                b = _board()
+                b.servers(_pairs(), set())
+                try:
+                    note = b.shot(HUB, int(port)) if port.isdigit() and int(port) in b.ports() else 'no such local server: %s (have %s)' % (port, sorted(b.ports()))
+                except Exception as e:
+                    note = '%s: %s' % (type(e).__name__, e)
+                (HUB / 'out' / 'board-shot.log').write_text(str(note), encoding='utf-8')
             ask = HUB / 'out' / 'chat-in.txt'
             if ask.is_file() and ask.stat().st_size and not CHAT['busy']:
                 msg = ask.read_text(encoding='utf-8').strip()

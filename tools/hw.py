@@ -208,7 +208,8 @@ def net_today():
 
 def _net_lite():
     n = net_sample()
-    return None if n is None else {'down': round(n['rate']['net'][0]), 'up': round(n['rate']['net'][1])}
+    return None if n is None else {'down': round(n['rate']['net'][0]), 'up': round(n['rate']['net'][1]),
+                                   'day_down': n['total']['net'][0], 'day_up': n['total']['net'][1]}
 
 
 def _norm(path):

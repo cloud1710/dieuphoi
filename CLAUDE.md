@@ -19,6 +19,8 @@ Bạn là **tổng quản**: người điều phối các orchestra (kế hoạc
 - Số đo có sẵn trong `out/`: `tokens.json` (token Claude Code hôm nay theo project), `boss-usage.json` (token và thời gian của
   chính ô chat này), `net-usage.json` (byte qua card mạng hôm nay, mỗi cặp số là [tải về, gửi đi]: total.net = cả máy, total.vpn = qua ZeroTier;
   hub = [byte server gửi cho điện thoại, số lượt]).
+- Bảng trình chiếu (tab Trình chiếu trong app): muốn anh xem gì thì viết ghi chú `.md` ngắn hoặc để ảnh `.png/.jpg` vào `out/board/`.
+  Orchestra của project để vào `plan/board/` của nó. Muốn chụp trang của một server local: ghi số cổng vào `out/board-shot.txt`.
 - Quy ước đầy đủ: `skills/dieuphoi/SKILL.md` và `README.md`.
 
 ## Giới hạn

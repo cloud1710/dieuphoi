@@ -19,8 +19,9 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.42 system-ui,-apple-system,"Segoe UI",sans-serif;padding:0 12px calc(78px + env(safe-area-inset-bottom))}
 header{position:sticky;top:0;z-index:2;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 0 6px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
-#bar{flex-basis:100%;display:flex;gap:6px;font-size:11.5px;color:var(--mute);min-height:22px}
-#bar span{flex:1;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:2px 6px;white-space:nowrap;overflow:hidden;position:relative;text-align:center}
+#bar{flex-basis:100%;display:flex;flex-wrap:wrap;gap:4px 5px;font-size:11px;color:var(--mute);min-height:20px}
+#bar u{flex-basis:100%;height:0}
+#bar span{flex:1;background:var(--card);border:1px solid var(--line);border-radius:7px;padding:1px 5px;white-space:nowrap;overflow:hidden;position:relative;text-align:center}
 #bar span i{position:absolute;left:0;bottom:0;height:2.5px;background:var(--work);transition:width .6s}
 #bar span.hot{color:var(--ask)}#bar span.hot i{background:var(--ask)}
 #bar b{color:var(--ink);font-weight:650}
@@ -86,7 +87,7 @@ textarea{min-height:84px;resize:vertical}
 .dot.ask{background:var(--ask)}.dot.wait{background:var(--wait)}.dot.mail{background:#c79a2b}
 @media (min-width:820px){#t-office.on{display:grid;grid-template-columns:1fr 360px;gap:0 14px}#stage{margin:0;height:calc(100vh - 150px);border:1px solid var(--line);border-radius:12px}}
 #gear{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:9px;font-size:17px;line-height:1;padding:5px 8px}
-#chat{margin:10px 0 2px}
+#chat{margin:10px -4px 2px;padding:0 4px;max-height:calc(100vh - 42vh - 240px);max-height:calc(100dvh - 42vh - 240px);min-height:110px;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;scrollbar-width:thin}
 .msg{max-width:86%;margin:6px 0;padding:8px 11px;border-radius:14px;font-size:14px;line-height:1.4;white-space:pre-wrap;overflow-wrap:anywhere}
 .msg.vinh{margin-left:auto;background:var(--ready);color:#fff;border-bottom-right-radius:4px}
 .msg.boss{background:var(--card);border:1px solid var(--line);border-bottom-left-radius:4px}
@@ -97,6 +98,7 @@ textarea{min-height:84px;resize:vertical}
 #say textarea{flex:1;margin:0;min-height:40px;max-height:110px;height:40px;border-radius:20px;padding:9px 14px;resize:none}
 #say button{flex:none;margin:0;border:0;border-radius:20px;background:var(--ready);color:#fff;font:inherit;font-weight:650;padding:0 16px}
 body.chatting{padding-bottom:calc(140px + env(safe-area-inset-bottom))}
+@media (max-width:819px){body.chatting #stage{height:42vh}}
 #pair{position:fixed;inset:0;z-index:9;background:var(--bg);padding:calc(40px + env(safe-area-inset-top)) 18px;display:none}
 #pair.on{display:block}
 a{color:var(--ready)}
@@ -106,7 +108,7 @@ a{color:var(--ready)}
 <header><h1>Điều phối</h1><span id="live"><i></i><span id="when">Đang nối…</span></span><button id="gear" aria-label="Cài đặt">⚙</button><div id="bar" aria-label="Phần cứng PC"></div></header>
 <section id="t-office" class="on"><div id="stage"><canvas id="cv"></canvas><button class="act" id="back">‹ Toàn cảnh</button><span id="hint">Chạm một bàn để phóng vào</span><div id="stats"></div><div id="log"></div></div><div id="chat"></div><div id="col"></div></section>
 <section id="t-work"></section>
-<section id="t-hw"><div class="empty">Đang đọc phần cứng…</div></section>
+<section id="t-hw"><div id="board"></div><div id="hwfold"></div></section>
 <section id="t-msg">
   <h2>Nhắn một orchestra</h2>
   <div class="card" style="padding:4px 12px 12px">
@@ -118,9 +120,10 @@ a{color:var(--ready)}
   <p class="note"><a href="index.html?3d=1">Xem diorama 3D</a></p>
 </section>
 <form id="say"><textarea id="sayt" rows="1" placeholder="Nhắn tổng quản…" enterkeyhint="send"></textarea><button type="submit">Gửi</button></form>
-<nav><button data-t="office" class="on">Văn phòng</button><button data-t="work">Việc <b id="nq"></b></button><button data-t="hw">Máy</button><button data-t="msg">Nhắn</button></nav>
+<nav><button data-t="office" class="on">Văn phòng</button><button data-t="hw">Trình chiếu</button><button data-t="work">Việc <b id="nq"></b></button><button data-t="msg">Nhắn</button></nav>
 <div id="pair"><h1>Cài đặt kết nối</h1><p class="note" id="pairinfo"></p><p class="note">Nhập mật khẩu kết nối của anh, hoặc mở đường dẫn ghép có đoạn <code>#k=…</code> mà PC ghi ở <code>out/phone-link.txt</code>.</p>
   <input id="key" type="password" placeholder="Mật khẩu kết nối" autocomplete="current-password" autocapitalize="off"><button class="act go" id="savekey">Kết nối</button> <button class="act" id="forget">Quên máy này</button> <button class="act" id="closepair">Đóng</button><div class="res bad" id="pairerr"></div><p class="note" id="pairlinks"></p></div>
+<script src="board.js"></script>
 <script>
 const E = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
 const $ = id => document.getElementById(id);
@@ -188,20 +191,21 @@ function draw(s) {
   s.projects.forEach(p => { (p.questions || []).forEach(q => { n++; qc.append(question(p, q)); });
     (p.person || []).forEach(i => { n++; qc.append(personItem(p, i)); }); });
   if (!n) qc.append(E('div', 'empty', 'Không có việc nào chờ.')); m.append(qc);
-  m.append(E('h2', '', 'Nhân viên đang làm')); const wc = E('div', 'card');
+  const wc = E('div', 'card');
   working.forEach(({p, i}) => { const d = E('div', 'row line'); d.append(E('span', 'dot work')); const nm = E('span', 'nm'); nm.append(E('b', '', i.id + ' · @' + p.id), E('small', '', i.title)); d.append(nm); wc.append(d); });
-  if (!working.length) wc.append(E('div', 'empty', 'Chưa có việc nào đang chạy.')); m.append(wc);
+  if (!working.length) wc.append(E('div', 'empty', 'Chưa có việc nào đang chạy.')); m.append(sect('w-work', 'Nhân viên đang làm', wc, false, working.length + ' việc'));
   s.groups.forEach(g => { const ps = heads.filter(p => p.group === g.id).sort((a, b) => (a.parent || a.id).localeCompare(b.parent || b.id) || (a.parent ? 1 : 0) - (b.parent ? 1 : 0));
-    if (!ps.length) return; m.append(E('h2', '', 'Trưởng phòng · ' + g.name)); const c = E('div', 'card'); ps.forEach(p => c.append(head(p, byId))); m.append(c); });
-  if (kho.length) { m.append(E('h2', '', 'Kho')); const c = E('div', 'card'); kho.forEach(p => { const d = E('div', 'row line'); d.append(E('span', 'dot')); const nm = E('span', 'nm');
-    nm.append(E('b', '', p.name), E('small', '', {archive:'Bản lưu', tool:'Công cụ'}[p.kind] || 'Đã xong')); d.append(nm); c.append(d); }); m.append(c); }
+    if (!ps.length) return; const c = E('div', 'card'); ps.forEach(p => c.append(head(p, byId))); const hot = ps.filter(p => ['ask', 'work'].includes(stateOf(p))).length;
+    m.append(sect('w-g-' + g.id, 'Trưởng phòng · ' + g.name, c, false, ps.length + ' project' + (hot ? ' · ' + hot + ' đang bận' : ''))); });
+  if (kho.length) { const c = E('div', 'card'); kho.forEach(p => { const d = E('div', 'row line'); d.append(E('span', 'dot')); const nm = E('span', 'nm');
+    nm.append(E('b', '', p.name), E('small', '', {archive:'Bản lưu', tool:'Công cụ'}[p.kind] || 'Đã xong')); d.append(nm); c.append(d); }); m.append(sect('w-kho', 'Kho', c, false, kho.length + ' hộp')); }
   const to = $('to'), cur = to.value; to.textContent = ''; s.projects.filter(p => p.kind !== 'archive' && p.kind !== 'tool').forEach(p => { const o = E('option', '', '@' + p.id + ' · ' + p.name); o.value = p.id; to.append(o); }); if (cur) to.value = cur;
   scrollTo(0, y); }
 
-// hardware: asked only while the Máy tab is on screen
+// hardware: asked only while the Máy section of the board is open
 function gauge(c, name, pct, text) { const d = E('div', 'g'), l = E('div', 'line'); l.append(E('b', '', name), E('span', '', text)); const b = E('div', 'bar' + (pct > 85 ? ' hot' : '')), sp = E('span'); sp.style.width = Math.max(0, Math.min(100, pct || 0)) + '%'; b.append(sp); d.append(l, b); c.append(d); }
 function drawHw(h) {
-  const m = $('t-hw'); m.textContent = ''; m.append(E('h2', '', 'Máy lúc ' + h.time.slice(11)));
+  const m = $('hwin'); m.textContent = ''; m.append(E('h2', '', 'Máy lúc ' + h.time.slice(11)));
   const c = E('div', 'card');
   if (h.ram) { gauge(c, 'CPU', h.cpu, Math.round(h.cpu) + '%'); gauge(c, 'RAM', h.ram.percent, h.ram.used_gb + ' / ' + h.ram.total_gb + ' GB'); }
   if (!h.psutil) c.append(E('div', 'empty', 'PC chưa cài psutil nên chưa biết tiến trình nào thuộc project nào (pip install psutil).'));
@@ -241,15 +245,19 @@ function drawHw(h) {
 function drawBar(h) { const b = $('bar'); b.textContent = ''; const chip = (name, pct, text) => { const c = E('span', pct > 85 ? 'hot' : ''); c.append(name + ' ', E('b', '', text)); const i = E('i'); i.style.width = Math.max(0, Math.min(100, pct || 0)) + '%'; c.append(i); b.append(c); };
   if (h.cpu != null) chip('CPU', h.cpu, h.cpu + '%'); if (h.ram != null) chip('RAM', h.ram, h.ram + '%');
   (h.gpu || []).slice(0, 1).forEach(g => { if (g.util != null) chip('GPU', g.util, g.util + '%'); if (g.mem_total) chip('VRAM', 100 * g.mem_used / g.mem_total, (g.mem_used / 1024).toFixed(1) + 'G'); if (g.temp != null) chip('Nhiệt', g.temp, g.temp + '°'); });
-  if (h.net) { const sp = n => n >= 1048576 ? (n / 1048576).toFixed(1) + 'M' : Math.round(n / 1024) + 'k'; chip('Mạng', Math.min(100, (h.net.down + h.net.up) / 1048576 * 10), '↓' + sp(h.net.down) + ' ↑' + sp(h.net.up)); }
+  const sz = n => n >= 1073741824 ? (n / 1073741824).toFixed(1) + 'G' : n >= 1048576 ? (n / 1048576).toFixed(1) + 'M' : Math.round((n || 0) / 1024) + 'k', tk = n => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? Math.round(n / 1e3) + 'k' : String(n || 0);
+  if (h.net || h.tok) b.append(E('u'));
+  if (h.net) { chip('↓ Đến', Math.min(100, h.net.down / 1048576 * 10), sz(h.net.down) + '/s · ' + sz(h.net.day_down)); chip('↑ Đi', Math.min(100, h.net.up / 1048576 * 10), sz(h.net.up) + '/s · ' + sz(h.net.day_up)); }
+  if (h.tok) chip('Token', 0, tk(h.tok.out) + ' ra · ' + tk(h.tok.all));
   if (!b.children.length) b.append(E('span', '', 'Chưa đọc được phần cứng')); }
 function gameChip() { const gm = ACT.game; if (gm && gm.on) { const c = E('span', 'hot'); c.style.flex = '2'; c.append('🎮 Chơi game · agents nghỉ'); $('bar').prepend(c); } }
 async function pollBar() { if (document.hidden || !liveMode) return; try { drawBar(await api('api/hwlite')); gameChip(); } catch (e) { $('bar').textContent = ''; } }
 setInterval(pollBar, 6000);
 let hwTimer = null, cur = 'office';
-async function pollHw() { if (cur !== 'hw' || document.hidden) return; try { drawHw(await api('api/hw')); } catch (e) { $('t-hw').textContent = ''; $('t-hw').append(E('div', 'empty', liveMode ? e.message : 'Chỉ xem được khi nối trực tiếp với PC.')); } }
+function hwBox() { if ($('hwin')) return $('hwin').parentNode; const inn = E('div'); inn.id = 'hwin'; inn.append(E('div', 'empty', 'Đang đọc phần cứng…')); const d = sect('b-hw', 'Máy, mạng, token, chế độ game, nguồn', inn, false); d.onopen = pollHw; $('hwfold').append(d); return d; }
+async function pollHw() { if (cur !== 'hw' || document.hidden || !hwBox().open) return; try { drawHw(await api('api/hw')); } catch (e) { $('hwin').textContent = ''; $('hwin').append(E('div', 'empty', liveMode ? e.message : 'Chỉ xem được khi nối trực tiếp với PC.')); } }
 function tab(t) { cur = t; $('say').classList.toggle('on', t === 'office' && liveMode); document.body.classList.toggle('chatting', t === 'office' && liveMode); if (t === 'office') { pollAct(); pollChat(); } document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === 't-' + t)); document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
-  clearInterval(hwTimer); if (t === 'hw') { pollHw(); hwTimer = setInterval(pollHw, 10000); } if (t === 'office') office.wake(); scrollTo(0, 0); }
+  clearInterval(hwTimer); if (t === 'hw') { hwBox(); boardOpen(); pollAct(true); pollChat(); pollHw(); hwTimer = setInterval(pollHw, 10000); } if (t === 'office') office.wake(); scrollTo(0, 0); }
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => tab(b.dataset.t));
 setTimeout(() => { $('hint').style.display = 'none'; }, 7000);
 $('send').onclick = async () => { const r = $('sent'), t = $('text').value.trim(); if (!t) return; $('send').disabled = true; r.className = 'res';
@@ -272,15 +280,15 @@ function feedDiff(a, b) { if (!a || !b) return; const old = Object.fromEntries(a
     if ((p.mail || 0) > (o.mail || 0)) add(p, 'mail', 'nhận thư mới'); if ((p.mail || 0) < (o.mail || 0)) add(p, 'ready', 'đã đọc thư'); }); }
 let focusId = null, ACT = {claude:{}}, CHATS = {messages:[], busy:false, step:''};
 function rich(el, text) { String(text).split('**').forEach((part, i) => el.append(i % 2 ? E('b', '', part) : document.createTextNode(part))); }
-function drawChat() { const c = $('chat'), near = innerHeight + scrollY > document.body.scrollHeight - 160; c.textContent = ''; const ms = CHATS.messages.slice(-8);
+function drawChat() { const c = $('chat'), near = c.scrollHeight - c.scrollTop - c.clientHeight < 90; c.textContent = ''; const ms = CHATS.messages.slice(-40);
   if (!ms.length && liveMode) { const d = E('div', 'msg boss'); d.append('Em là tổng quản. Anh nhắn ở ô bên dưới: hỏi việc, giao việc, hoặc gọi @tên-project.'); c.append(d); }
   ms.forEach(m => { const d = E('div', 'msg ' + (m.who === 'vinh' ? 'vinh' : 'boss')); rich(d, m.text); const mt = m.meta && m.meta.model ? ' · ' + m.meta.model + ' · ' + m.meta.secs + ' giây · ' + Math.round((m.meta.in + m.meta.out + m.meta.cache_read + m.meta.cache_write) / 1000) + 'k token' : ''; d.append(E('small', '', m.t.slice(11) + mt)); c.append(d); });
   if (CHATS.busy) c.append(E('div', 'msg boss typing', 'Tổng quản ' + (CHATS.model ? '(' + CHATS.model + ') ' : '') + (CHATS.step || 'đang trả lời') + '…'));
-  if (near && ms.length && cur === 'office' && document.activeElement === $('sayt')) scrollTo(0, document.body.scrollHeight); }
+  if (near) c.scrollTop = c.scrollHeight; }                // only the history scrolls, the page stays where it is
 let chatSig = '';
 async function pollChat() { if (!liveMode || document.hidden) return; try { const c = await api('api/chat'), sig = JSON.stringify([c.busy, c.step, c.messages.length, (c.messages.slice(-1)[0] || {}).t]); CHATS = c; if (sig !== chatSig) { const grew = chatSig && !c.busy && /true/.test(chatSig.slice(0, 6)); chatSig = sig; drawChat(); office.boss(); if (grew) chime('mail'); } } catch (e) {} }
 setInterval(() => { if (cur === 'office' && (CHATS.busy || Date.now() % 12000 < 3000)) pollChat(); }, 3000);
-$('say').onsubmit = async e => { e.preventDefault(); const t = $('sayt').value.trim(); if (!t) return; $('sayt').value = ''; CHATS.messages.push({t:'          ' + new Date().toTimeString().slice(0, 5), who:'vinh', text:t}); CHATS.busy = true; CHATS.step = 'đang đọc tin nhắn'; drawChat(); office.boss(); scrollTo(0, document.body.scrollHeight);
+$('say').onsubmit = async e => { e.preventDefault(); const t = $('sayt').value.trim(); if (!t) return; $('sayt').value = ''; CHATS.messages.push({t:'          ' + new Date().toTimeString().slice(0, 5), who:'vinh', text:t}); CHATS.busy = true; CHATS.step = 'đang đọc tin nhắn'; drawChat(); office.boss(); $('chat').scrollTop = $('chat').scrollHeight;
   try { await api('api/chat', {text:t}); } catch (err) { CHATS.busy = false; CHATS.messages.push({t:'           ', who:'boss', text:'Không gửi được: ' + err.message}); drawChat(); } pollChat(); };
 $('sayt').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('say').requestSubmit(); } });
 async function pollAct(force) { if (!force && (cur !== 'office' || document.hidden || !liveMode)) return; try { const a = await api('api/activity'); const sig = x => JSON.stringify([Object.entries(x.claude || {}).map(([k, v]) => [k, v.map(i => [i.what, i.age < 300])]), x.game, Object.entries(x.programs || {}).map(([k, v]) => [k, v.n])]); const ch = sig(a) !== sig(ACT); ACT = a;
@@ -312,11 +320,11 @@ function drawCol() { drawOverlays(); const s = STATE, c = $('col'); if (!s || (b
     if (p.mail) now.push(['mail', p.id, 'có ' + p.mail + ' thư chưa phiên nào đọc']); });
   const ready = []; ps.forEach(p => { if (!(p.working || []).length && (p.ready || []).length) ready.push(['ready', p.id, 'sẵn sàng làm ' + p.ready[0].id + ': ' + p.ready[0].title]); else if (!(p.working || []).length && p.waiting) ready.push(['wait', p.id, p.waiting + ' mục bị chặn']); else if (!(p.working || []).length && !(p.questions || []).length) ready.push(['', p.id, 'đang nghỉ, không có việc mở']); });
   c.append(E('h2', '', focusId ? 'Trong phòng @' + focusId : 'Đang làm gì')); const k = E('div', 'card feed');
-  now.forEach(r => k.append(line(...r))); if (!now.length) k.append(E('div', 'empty', 'Chưa có việc nào đang chạy hay đang chờ anh.')); c.append(k);
+  (focusId ? now.map(r => line(...r)) : grouped(now, line, open, 'col:')).forEach(x => k.append(x)); if (!now.length) k.append(E('div', 'empty', 'Chưa có việc nào đang chạy hay đang chờ anh.')); c.append(k);
   if (focusId && byId[focusId]) { const k2 = E('div', 'card'); k2.style.marginTop = '10px'; open.add(focusId); k2.append(head(byId[focusId], byId)); c.append(k2); }
   const ev = events.filter(e => !focusId || e.id === focusId);
-  if (ev.length) { c.append(E('h2', '', 'Vừa xảy ra')); const k3 = E('div', 'card feed'); ev.slice(0, 12).forEach(e => k3.append(line(e.kind, e.id, e.t + ' · ' + e.text))); c.append(k3); }
-  if (ready.length) { c.append(E('h2', '', focusId ? 'Kế tiếp' : 'Sẵn sàng và đang nghỉ')); const k4 = E('div', 'card feed'); ready.forEach(r => k4.append(line(...r))); c.append(k4); } }
+  if (ev.length) { const k3 = E('div', 'card feed'); ev.slice(0, 12).forEach(e => k3.append(line(e.kind, e.id, e.t + ' · ' + e.text))); c.append(sect('c-ev', 'Vừa xảy ra', k3, false, Math.min(12, ev.length) + ' việc')); }
+  if (ready.length) { const k4 = E('div', 'card feed'); ready.forEach(r => k4.append(line(...r))); if (focusId) c.append(E('h2', '', 'Kế tiếp'), k4); else c.append(sect('c-ready', 'Sẵn sàng và đang nghỉ', k4, false, ready.length + ' project')); } }
 
 // ---- the office floor: a 2D map the reader can pan, pinch and tap; robots walk their errands
 const office = (() => {
@@ -359,7 +367,7 @@ const office = (() => {
     if (CHATS.busy) slides.push({boss:true, tag:'TỔNG QUẢN · đang làm việc anh giao', big:(CHATS.step || 'đang trả lời').replace(/^./, c => c.toUpperCase()), sub:lastU ? 'Anh nhắn: ' + lastU.text : '', color:COL.ready, f:0});
     else if (lastB && !focusId) slides.push({boss:true, tag:'TỔNG QUẢN · trả lời lúc ' + lastB.t.slice(11), big:'Báo cáo anh', sub:lastB.text.replace(/\*\*/g, ''), color:COL.ready, f:0});
     if (nt && nt.text && !focusId && !CHATS.busy) slides.push({boss:true, tag:'TỔNG QUẢN · ' + (nt.time || ''), big:nt.title || 'Vừa làm', sub:nt.text, color:COL.link, f:0});
-    if (gm.on) { slides.push({tag:'CHẾ ĐỘ CHƠI GAME', big:'Agents đang nghỉ', sub:'Tạm dừng từ ' + (gm.since || '') + '. Tắt ở tab Máy hoặc khi thoát game.', color:COL.wait, f:0}); return; }
+    if (gm.on) { slides.push({tag:'CHẾ ĐỘ CHƠI GAME', big:'Agents đang nghỉ', sub:'Tạm dừng từ ' + (gm.since || '') + '. Tắt ở tab Trình chiếu (mục Máy) hoặc khi thoát game.', color:COL.wait, f:0}); return; }
     tiles.forEach(t => { const p = t.p; if (focusId && p.id !== focusId) return; const c = p.counts || {}, f = p.total ? ((c.done || 0) + (c.dropped || 0)) / p.total : 0, w0 = (p.working || [])[0];
       (ACT.claude[p.id] || []).filter(a => a.age < 300).forEach(a => slides.push({id:p.id, tag:'@' + p.id + ' · ' + (a.sub ? 'nhân viên' : 'phiên chính'), big:a.what.charAt(0).toUpperCase() + a.what.slice(1), sub:w0 ? w0.id + ': ' + w0.title : p.name, color:COL.work, f}));
       if (!(ACT.claude[p.id] || []).some(a => a.age < 300)) (p.working || []).forEach(i => slides.push({id:p.id, tag:'@' + p.id, big:'Đang làm ' + i.id, sub:i.title, color:COL.work, f}));
