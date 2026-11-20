@@ -7,10 +7,14 @@ dp serve          serve the agents office page (office/) and /api/state
 dp build          write the office as a static site into out/site (page + state.json snapshot)
 dp who @name      resolve an @name to one project and print where its orchestra lives
 dp msg @name text leave a message in that project's mailbox (plan/INBOX.md)
+dp passwd         read a passphrase from standard input; phones may pair with it instead of the key
 dp hw             what the PC is doing and which project is using it (tools/hw.py)
+dp todo build     write the owner's to-do page (encrypted) into out/todo-site
+dp todo publish   build it and deploy it to Cloudflare Pages with wrangler
 dp init <id>      write a starter plan into a registered project that has none
 """
 import argparse
+import base64
 import collections
 import datetime
 import hashlib
@@ -22,6 +26,7 @@ import secrets
 import shutil
 import subprocess
 import sys
+import threading
 import time
 import unicodedata
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -312,13 +317,15 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):
         """Remote control. Always needs the key, also from this PC, so no web page can post here on its own."""
         path = self.path.split('?')[0]
-        if not hmac.compare_digest(self.headers.get('X-DP-Key') or '', Handler.key):
+        if not pass_ok(self.headers.get('X-DP-Key'), self.client_address[0]):
             return self.reply(401, {'error': 'key'})
         try:
             n = int(self.headers.get('Content-Length') or 0)
             if not 0 < n <= 16384:
                 raise ValueError('body size')
             data = json.loads(self.rfile.read(n).decode('utf-8'))
+            if path == '/api/power':
+                return self.reply(200, {'ok': True, 'result': power(str(data.get('action')))})
             reg = registry()
             p, cands = resolve(str(data.get('to') or ''), reg)
             if p is None:
@@ -334,6 +341,10 @@ class Handler(SimpleHTTPRequestHandler):
                 if not text or not re.fullmatch(r'Q-\d+', str(data.get('q'))):
                     raise ValueError('need q and text')
                 out = {'ok': True, 'result': answer(p, data['q'], text, sender)}
+            elif path == '/api/done':
+                if not re.fullmatch(r'[A-Z][0-9]-[0-9]{2,3}[a-z]?', str(data.get('item'))):
+                    raise ValueError('need item')
+                out = {'ok': True, 'result': mark_done(p, data['item'], sender)}
             elif path == '/api/open':
                 out = open_item(p, data.get('item') or None, reg)
             else:
@@ -384,7 +395,7 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         path = self.path.split('?')[0]
-        if path.startswith('/api/') and not self.local() and not hmac.compare_digest(self.given(), Handler.key):
+        if path.startswith('/api/') and not self.local() and not pass_ok(self.given(), self.client_address[0]):
             return self.reply(401, {'error': 'key'})
         if path == '/api/hw':
             try:
@@ -543,6 +554,158 @@ def open_item(p, item, reg):
     return {'ok': r.returncode == 0, 'output': one_line((r.stdout or '') + ' ' + (r.stderr or ''), 600)}
 
 
+def mark_done(p, item, sender):
+    """The owner reports one of his own items done. Only items owned by a person can be closed this way."""
+    if p['kind'] != 'plan':
+        n, where = send_msg(p, 'Anh Vinh báo đã xong %s' % item, sender)
+        return 'M-%03d -> %s' % (n, where)
+    f = real(p['path']) / 'plan' / 'STATUS.yaml'
+    text = f.read_text(encoding='utf-8-sig')
+    it = next((i for i in (yaml.safe_load(text).get('items') or []) if i.get('id') == item), None)
+    if it is None or it.get('owner', 'agent') == 'agent' or it.get('status') in CLOSED:
+        raise ValueError('%s is not an open item of a person in @%s' % (item, p['id']))
+    lines, start = text.split('\n'), None
+    for i, line in enumerate(lines):
+        m = re.match(r'^(\s*)- id:\s*%s\s*(#.*)?$' % re.escape(item), line)
+        if m:
+            start, pad = i, m.group(1) + '  '
+            break
+    if start is None:
+        raise ValueError('%s is written in a form this command cannot edit; change plan/STATUS.yaml by hand' % item)
+    for j in range(start + 1, len(lines)):
+        if lines[j].strip() and not lines[j].startswith(pad):
+            break
+        if re.match(r'^%sstatus:' % pad, lines[j]):
+            lines[j] = '%sstatus: done\n%sevidence: [anh Vinh báo xong, %s]\n%sdone_on: %s' % (
+                pad, pad, sender, pad, datetime.date.today().isoformat())
+            break
+    else:
+        raise ValueError('%s has no status line' % item)
+    new = '\n'.join(lines)
+    done = next(i for i in yaml.safe_load(new)['items'] if i.get('id') == item)
+    if done.get('status') != 'done':
+        raise ValueError('edit did not take; nothing written')
+    f.write_text(new, encoding='utf-8', newline='\n')
+    log = real(p['path']) / 'plan' / 'CHANGELOG.md'
+    if log.is_file():
+        head, _, rest = log.read_text(encoding='utf-8').partition('\n')
+        log.write_text('%s\n\n- %s: %s xong (%s).%s' % (head, datetime.date.today().isoformat(), item, sender,
+                       '\n' + rest.lstrip('\n') if rest.strip() else '\n'), encoding='utf-8', newline='\n')
+    return '%s of @%s done' % (item, p['id'])
+
+
+def seal(secret, data):
+    """Encrypt for the public to-do page: HMAC-SHA256 in counter mode, then a MAC over nonce and ciphertext.
+    Only the standard library is needed here, and the page undoes it with WebCrypto."""
+    key = secret.encode('utf-8')
+    k_enc, k_mac = (hmac.new(key, tag, 'sha256').digest() for tag in (b'enc', b'mac'))
+    nonce = secrets.token_bytes(16)
+    stream = b''.join(hmac.new(k_enc, nonce + i.to_bytes(4, 'big'), 'sha256').digest() for i in range((len(data) + 31) // 32))
+    ct = bytes(a ^ b for a, b in zip(data, stream))
+    return base64.b64encode(nonce + hmac.new(k_mac, nonce + ct, 'sha256').digest() + ct)
+
+
+def todo_payload():
+    tasks = []
+    for p in scan()['projects']:
+        for q in p.get('questions', []):
+            tasks.append({'project': p['id'], 'name': p['name'], 'kind': 'answer', 'id': q['id'], 'text': q['text'], 'since': q.get('asked')})
+        for i in p.get('person', []):
+            tasks.append({'project': p['id'], 'name': p['name'], 'kind': 'do', 'id': i['id'], 'text': i['title'], 'owner': i['owner']})
+    digest = hashlib.sha1(json.dumps(tasks, ensure_ascii=False, sort_keys=True).encode('utf-8')).hexdigest()
+    return {'generated': datetime.datetime.now().strftime('%Y-%m-%d %H:%M'), 'tasks': tasks}, digest
+
+
+def todo_build():
+    site = HUB / 'out' / 'todo-site'
+    shutil.copytree(HUB / 'todo', site, dirs_exist_ok=True)
+    for icon in ('icon-192.png', 'icon-512.png'):
+        if (HUB / 'office' / icon).is_file():
+            shutil.copy(HUB / 'office' / icon, site / icon)
+    payload, digest = todo_payload()
+    (site / 'data.enc').write_bytes(seal(token(), json.dumps(payload, ensure_ascii=False).encode('utf-8')))
+    return site, digest, len(payload['tasks'])
+
+
+def todo_publish():
+    """Deploy the to-do page with the wrangler login of this PC. Returns (ok, message)."""
+    name = (registry().get('publish') or {}).get('pages_project')
+    if not name:
+        return False, 'registry.yaml has no publish.pages_project'
+    site, digest, n = todo_build()
+    npx = ['cmd', '/c', 'npx'] if os.name == 'nt' else ['npx']
+    try:
+        r = subprocess.run(npx + ['--yes', 'wrangler', 'pages', 'deploy', str(site), '--project-name', name, '--branch', 'main',
+                                  '--commit-dirty=true'], capture_output=True, text=True, timeout=420,
+                           creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        ok, out = r.returncode == 0, (r.stdout or '') + (r.stderr or '')
+    except (OSError, subprocess.SubprocessError) as e:
+        ok, out = False, '%s: %s' % (type(e).__name__, e)
+    stamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+    with open(HUB / 'out' / 'publish.log', 'a', encoding='utf-8') as f:
+        f.write('%s %s %d tasks %s\n' % (stamp, 'OK' if ok else 'FAILED', n, '' if ok else one_line(out, 400)))
+    if ok:
+        (HUB / 'out' / 'todo.hash').write_text(digest, encoding='ascii')
+        (HUB / 'out' / 'todo-link.txt').write_text('https://%s.pages.dev/#k=%s\n' % (name, token()), encoding='ascii')
+    return ok, ('%d tasks published to https://%s.pages.dev' % (n, name)) if ok else one_line(out, 400)
+
+
+def reload_on_change():
+    """A hidden server cannot be restarted by hand: leave when its own code changes, the start script runs it again."""
+    files = [Path(__file__).resolve(), Path(__file__).resolve().parent / 'hw.py']
+    seen = [f.stat().st_mtime_ns if f.is_file() else 0 for f in files]
+    while True:
+        time.sleep(20)
+        if [f.stat().st_mtime_ns if f.is_file() else 0 for f in files] != seen:
+            os._exit(3)
+
+
+def auto_publish():
+    """Runs inside `dp serve` once a first publish has worked: redeploy when the owner's to-do list changes."""
+    wait = 300
+    while True:
+        time.sleep(wait)
+        try:
+            mark = HUB / 'out' / 'todo.hash'
+            if not (registry().get('publish') or {}).get('auto') or not mark.is_file():
+                continue
+            if todo_payload()[1] != mark.read_text(encoding='ascii').strip():
+                wait = 300 if todo_publish()[0] else 3600          # a failing deploy is retried hourly, not every 5 minutes
+        except Exception:
+            wait = 3600
+
+
+def cmd_todo(args):
+    if args.what == 'build':
+        site, _, n = todo_build()
+        print('%d tasks -> %s' % (n, site))
+        return 0
+    ok, msg = todo_publish()
+    print(msg)
+    return 0 if ok else 1
+
+
+POWER = {'shutdown': ['shutdown', '/s', '/t', '60', '/c', 'dieuphoi: tat may sau 60 giay'],
+         'restart': ['shutdown', '/r', '/t', '60', '/c', 'dieuphoi: khoi dong lai sau 60 giay'],
+         'cancel': ['shutdown', '/a'],
+         'sleep': ['rundll32.exe', 'powrprof.dll,SetSuspendState', '0,1,0']}
+
+
+def power(action):
+    """Shut down or restart after 60 seconds (cancel stops it), or sleep now. Windows only."""
+    if action not in POWER:
+        raise ValueError('unknown power action')
+    if os.name != 'nt':
+        raise ValueError('power control is only wired for Windows')
+    if action == 'sleep':                          # answer first: the PC is asleep before a reply could leave
+        threading.Timer(3, lambda: subprocess.run(POWER['sleep'], creationflags=subprocess.CREATE_NO_WINDOW)).start()
+        return 'sleep in 3 seconds'
+    r = subprocess.run(POWER[action], capture_output=True, text=True, timeout=20, creationflags=subprocess.CREATE_NO_WINDOW)
+    if r.returncode:
+        raise ValueError(one_line((r.stdout or '') + (r.stderr or ''), 200) or 'command failed')
+    return {'shutdown': 'shutdown in 60 seconds', 'restart': 'restart in 60 seconds', 'cancel': 'cancelled'}[action]
+
+
 def hw_state():
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import hw
@@ -553,6 +716,51 @@ def cmd_hw(args):
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     import hw
     return hw.main(args.rest)
+
+
+_GOOD, _FAILS = set(), {}
+
+
+def pass_ok(given, ip='local'):
+    """True for the random key, or for the owner's passphrase (kept only as a salted PBKDF2 hash in out/pass.hash).
+    Five wrong tries from one address lock that address out for a minute."""
+    raw = str(given or '').encode('utf-8')
+    if not raw:
+        return False
+    fails = _FAILS.get(ip, [0, 0.0])
+    if fails[0] >= 5 and time.time() < fails[1]:
+        return False
+    ok = hmac.compare_digest(raw, token().encode('ascii')) or hashlib.sha256(raw).digest() in _GOOD
+    f = HUB / 'out' / 'pass.hash'
+    if not ok and f.is_file():
+        try:
+            salt, rounds, digest = f.read_text(encoding='ascii').strip().split('$')
+            ok = hmac.compare_digest(hashlib.pbkdf2_hmac('sha256', raw, bytes.fromhex(salt), int(rounds)).hex(), digest)
+        except ValueError:
+            ok = False
+        if ok:
+            _GOOD.add(hashlib.sha256(raw).digest())
+    if ok:
+        _FAILS.pop(ip, None)
+    else:
+        _FAILS[ip] = [fails[0] + 1, time.time() + 60]
+    return ok
+
+
+def cmd_passwd(_):
+    """Read a passphrase from standard input and keep its salted hash; an empty line removes it."""
+    raw = sys.stdin.buffer.readline().rstrip(b'\r\n')
+    f = HUB / 'out' / 'pass.hash'
+    f.parent.mkdir(exist_ok=True)
+    if not raw:
+        if f.is_file():
+            f.write_text('', encoding='ascii')
+        print('passphrase removed; only the key in out/token.txt pairs a phone now')
+        return 0
+    salt, rounds = secrets.token_bytes(16), 300000
+    f.write_text('%s$%d$%s' % (salt.hex(), rounds, hashlib.pbkdf2_hmac('sha256', raw, salt, rounds).hex()), encoding='ascii')
+    print('passphrase set (%d characters); only its hash is stored' % len(raw.decode('utf-8', 'replace')))
+    return 0
 
 
 def token():
@@ -614,6 +822,9 @@ def cmd_serve(args):
     ThreadingHTTPServer.daemon_threads = True
     Handler.key = token()
     srv = ThreadingHTTPServer((host, args.port), Handler)
+    threading.Thread(target=auto_publish, daemon=True).start()
+    if args.reload:
+        threading.Thread(target=reload_on_change, daemon=True).start()
     print('agents office: http://%s:%d   (Ctrl+C to stop)' % (host, args.port))
     link = 'http://%s:%d/m.html#k=%s' % (host, args.port, Handler.key)
     (HUB / 'out' / 'phone-link.txt').write_text(link + '\n', encoding='ascii')     # a hidden server has no console to read it from
@@ -636,6 +847,7 @@ def main(argv=None):
     s = sub.add_parser('serve')
     s.add_argument('--host', default='127.0.0.1', help="an address, or 'zerotier' / 'tailscale' to use that adapter's address")
     s.add_argument('--port', type=int, default=8765)
+    s.add_argument('--reload', action='store_true', help='exit when tools/dp.py or tools/hw.py changes (the start script restarts it)')
     s.set_defaults(fn=cmd_serve)
     sub.add_parser('build').set_defaults(fn=cmd_build)
     w = sub.add_parser('who')
@@ -646,6 +858,10 @@ def main(argv=None):
     m.add_argument('text', nargs='+')
     m.add_argument('--from', dest='sender', default='Vinh qua dieuphoi')
     m.set_defaults(fn=cmd_msg)
+    sub.add_parser('passwd').set_defaults(fn=cmd_passwd)
+    t = sub.add_parser('todo')
+    t.add_argument('what', choices=['build', 'publish'])
+    t.set_defaults(fn=cmd_todo)
     h = sub.add_parser('hw')
     h.add_argument('rest', nargs=argparse.REMAINDER)
     h.set_defaults(fn=cmd_hw)

@@ -7,6 +7,8 @@
 # aliases: tên gọi tắt dùng sau dấu @ (không phân biệt hoa thường, dấu, khoảng trắng).
 schema: 1
 hub: {id: dieuphoi, name: Điều phối, path: 'D:/dieuphoi'}
+# publish: trang việc chờ anh Vinh trên Cloudflare Pages (nội dung được mã hoá bằng khoá trong out/token.txt).
+publish: {pages_project: projectorchestra, auto: true}
 groups:
   - {id: luan-van, name: Luận văn SEAL}
   - {id: benh-vien, name: Sản phẩm giải phẫu bệnh và bệnh viện}

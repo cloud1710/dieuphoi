@@ -42,11 +42,16 @@ Bản tĩnh (`dp build`) chứa tên project, đường dẫn và câu hỏi đa
 server Python nhỏ: không mở trình duyệt, không vẽ 3D, chỉ đọc kế hoạch khi có điện thoại đang nối và chỉ đẩy dữ liệu
 khi có thay đổi.
 
-Ba tab:
+Bốn tab:
 
+- **Văn phòng**: sơ đồ 2D, mỗi orchestra một bàn; robot đi lại theo trạng thái thật (báo cáo việc đang làm, mang câu hỏi
+  tới cửa "Anh Vinh", đưa thư, project con sang báo project cha). Kéo để di chuyển, chụm để phóng, chạm một bàn để
+  phóng vào project đó. Cột bên dưới ghi ai đang làm gì và những gì vừa thay đổi, bằng tiếng Việt.
 - **Việc**: việc chờ anh (trả lời câu hỏi ngay trên app), nhân viên đang làm, từng trưởng phòng; nút "Mở phiên" chạy
   `pp open <ID>` của projectplaner trên PC, mọi kiểm tra an toàn của projectplaner vẫn áp dụng.
-- **Máy**: CPU, RAM, GPU, ổ đĩa và project nào đang chạy (xem `tools/hw.py`). Chỉ đo khi tab này đang mở.
+- **Máy**: CPU, RAM, GPU, ổ đĩa và project nào đang chạy (xem `tools/hw.py`). Chỉ đo khi tab này đang mở. Có nút
+  ngủ, khởi động lại, tắt máy (trễ 60 giây, huỷ được). Bật máy từ xa cần Wake-on-LAN và một thiết bị luôn bật trong
+  mạng nhà; app này không làm được.
 - **Nhắn**: gửi thư vào hộp thư của một orchestra.
 
 Cài:
@@ -60,9 +65,26 @@ Chạy ngầm: bấm đúp `start-hidden.vbs` (không hiện cửa sổ; nhật 
 `out/phone-link.txt`). Muốn tự bật khi đăng nhập Windows: bấm đúp `autostart.cmd` một lần (nó đặt một tệp nhỏ vào thư mục Startup, bật server
 ngay và in đường dẫn ghép). Gỡ: xoá `dieuphoi-server.vbs` trong `shell:startup`.
 
+Mật khẩu kết nối: `python tools/dp.py passwd` đọc một dòng từ bàn phím và chỉ lưu bản băm (`out/pass.hash`); điện
+thoại ghép bằng mật khẩu đó hoặc bằng khoá ngẫu nhiên. Sai 5 lần thì địa chỉ đó bị khoá 1 phút.
+
 Khoá nằm ở `out/token.txt`; xoá tệp rồi chạy lại server để đổi khoá. Mọi lệnh ghi (trả lời, nhắn, mở phiên) đều cần
 khoá, kể cả gọi từ chính PC. Kết nối là HTTP trong mạng riêng: iPhone vẫn thêm được app toàn màn hình; Chrome trên
 Android chỉ tạo lối tắt, vì cài PWA đầy đủ và chạy ngoại tuyến cần HTTPS.
+
+## Trang việc chờ anh trên Cloudflare Pages
+
+`todo/` là một trang tĩnh liệt kê việc cần anh Vinh làm: câu hỏi đang mở và mục có `owner` là người trong mọi kế
+hoạch (ví dụ gắn nhãn). Việc biến mất khỏi trang khi đã xong trong kế hoạch.
+
+- Trang công khai, nên dữ liệu (`data.enc`) được mã hoá bằng khoá ngẫu nhiên trong `out/token.txt`; mở trang bằng đường
+  dẫn có `#k=…` ở `out/todo-link.txt`. Không dùng mật khẩu tự đặt cho trang này: tệp mã hoá ai cũng tải được nên mật
+  khẩu dễ đoán sẽ bị dò ngoại tuyến.
+- Lần đầu: bấm đúp `publish-todo.cmd` (cần `npx wrangler login`). Tên project lấy ở `publish.pages_project` trong
+  `registry.yaml`.
+- Sau lần đầu, server tự đăng lại trong vòng 5 phút mỗi khi danh sách việc đổi (`publish.auto`); nhật ký ở
+  `out/publish.log`.
+- Báo xong một việc của mình: nút "Báo đã xong" trong app điện thoại, hoặc nhắn tổng quản.
 
 ## Phần cứng
 

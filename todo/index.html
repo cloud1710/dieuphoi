@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Việc chờ anh">
+<meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme:light)">
+<meta name="theme-color" content="#17181b" media="(prefers-color-scheme:dark)">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Việc chờ anh</title>
+<style>
+:root{--bg:#f4f1ea;--ink:#23211d;--mute:#6f6a60;--card:#fffdf8;--line:#ddd6c7;--ask:#c2452f;--do:#356fa6;--ok:#2f8a63}
+@media (prefers-color-scheme:dark){:root{--bg:#17181b;--ink:#ecebe7;--mute:#9a9890;--card:#212329;--line:#353840;--ask:#ef7f6a;--do:#7fb2e5;--ok:#5fbf93}}
+*{box-sizing:border-box}
+body{margin:0 auto;max-width:640px;background:var(--bg);color:var(--ink);font:15.5px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;padding:calc(14px + env(safe-area-inset-top)) 14px 40px}
+h1{font-size:21px;margin:0}
+.meta{color:var(--mute);font-size:12.5px;margin:2px 0 14px}
+h2{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--mute);margin:18px 2px 6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.t{padding:11px 13px;border-top:1px solid var(--line)}.t:first-child{border-top:0}
+.t small{display:block;font-weight:650;font-size:12px;margin-bottom:2px;color:var(--do)}
+.t.answer small{color:var(--ask)}
+.empty{padding:26px 14px;text-align:center;color:var(--ok);font-weight:600}
+.gone{font-size:13px;color:var(--ok);margin:10px 2px}
+input,button{width:100%;font:inherit;color:var(--ink);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-top:10px}
+button{background:var(--do);border-color:var(--do);color:#fff}
+.err{color:var(--ask);font-size:13.5px;margin-top:10px}
+</style>
+</head>
+<body>
+<h1>Việc chờ anh</h1>
+<div class="meta" id="meta">Đang tải…</div>
+<div id="lock" hidden>
+  <p class="meta">Trang này công khai nhưng nội dung được mã hoá. Mở đường dẫn có <code>#k=…</code> mà PC in ra (tệp <code>out/todo-link.txt</code>), hoặc dán khoá vào đây.</p>
+  <input id="key" placeholder="Khoá" autocomplete="off" autocapitalize="off"><button id="save">Mở khoá</button><div class="err" id="err"></div>
+</div>
+<main id="main"></main>
+<script>
+const $ = id => document.getElementById(id), E = (t, c, x) => { const e = document.createElement(t); if (c) e.className = c; if (x != null) e.textContent = x; return e; };
+let KEY = ''; try { KEY = localStorage.getItem('todo-key') || ''; } catch (e) {}
+if (location.hash.startsWith('#k=')) { KEY = decodeURIComponent(location.hash.slice(3)); try { localStorage.setItem('todo-key', KEY); } catch (e) {} history.replaceState(null, '', location.pathname); }
+// undo dp.py seal(): HMAC-SHA256 in counter mode, MAC over nonce and ciphertext
+async function unseal(b64, secret) {
+  const raw = Uint8Array.from(atob(b64.trim()), c => c.charCodeAt(0)), nonce = raw.slice(0, 16), tag = raw.slice(16, 48), ct = raw.slice(48), te = new TextEncoder();
+  const hk = bytes => crypto.subtle.importKey('raw', bytes, {name:'HMAC', hash:'SHA-256'}, false, ['sign', 'verify']);
+  const base = await hk(te.encode(secret)), ke = await hk(await crypto.subtle.sign('HMAC', base, te.encode('enc'))), km = await hk(await crypto.subtle.sign('HMAC', base, te.encode('mac')));
+  const both = new Uint8Array(16 + ct.length); both.set(nonce); both.set(ct, 16);
+  if (!await crypto.subtle.verify('HMAC', km, tag, both)) throw new Error('Khoá không đúng');
+  const blocks = await Promise.all(Array.from({length:Math.ceil(ct.length / 32)}, (_, i) => { const m = new Uint8Array(20); m.set(nonce); new DataView(m.buffer).setUint32(16, i); return crypto.subtle.sign('HMAC', ke, m); }));
+  const out = new Uint8Array(ct.length); blocks.forEach((b, i) => { const k = new Uint8Array(b); for (let j = 0; j < 32 && i * 32 + j < ct.length; j++) out[i * 32 + j] = ct[i * 32 + j] ^ k[j]; });
+  return JSON.parse(new TextDecoder().decode(out)); }
+let before = null;
+function draw(d) {
+  const m = $('main'); m.textContent = ''; $('meta').textContent = 'PC cập nhật lúc ' + d.generated + ' · ' + d.tasks.length + ' việc';
+  const ids = new Set(d.tasks.map(t => t.project + '/' + t.id));
+  if (before) { const gone = [...before].filter(x => !ids.has(x)); if (gone.length) m.append(E('div', 'gone', 'Vừa xong và đã xoá: ' + gone.map(x => '@' + x.replace('/', ' ')).join(', '))); }
+  before = ids;
+  if (!d.tasks.length) { const c = E('div', 'card'); c.append(E('div', 'empty', 'Không còn việc nào chờ anh.')); m.append(c); return; }
+  const by = {}; d.tasks.forEach(t => (by[t.project] = by[t.project] || []).push(t));
+  Object.entries(by).forEach(([pid, ts]) => { m.append(E('h2', '', '@' + pid + ' · ' + ts[0].name)); const c = E('div', 'card');
+    ts.forEach(t => { const r = E('div', 't ' + t.kind); r.append(E('small', '', (t.kind === 'answer' ? 'Cần anh trả lời · ' : 'Cần anh làm · ') + t.id + (t.since ? ' · từ ' + t.since : '')), document.createTextNode(t.text)); c.append(r); }); m.append(c); });
+  m.append(E('p', 'meta', 'Việc tự biến mất khỏi trang khi đã xong trong kế hoạch của project. Trả lời hoặc báo xong bằng app Điều phối (qua ZeroTier) hoặc nhắn tổng quản @project.')); }
+async function load() {
+  if (!KEY) { $('lock').hidden = false; $('meta').textContent = 'Cần khoá để đọc'; return; }
+  try { const r = await fetch('data.enc', {cache:'no-store'}); if (!r.ok) throw new Error('Chưa có dữ liệu trên trang'); draw(await unseal(await r.text(), KEY)); $('lock').hidden = true; }
+  catch (e) { $('meta').textContent = e.message; if (e.message === 'Khoá không đúng') { $('lock').hidden = false; $('err').textContent = 'Khoá không mở được dữ liệu.'; } } }
+$('save').onclick = () => { KEY = $('key').value.trim(); try { localStorage.setItem('todo-key', KEY); } catch (e) {} $('err').textContent = ''; load(); };
+load(); setInterval(() => { if (!document.hidden) load(); }, 120000); document.addEventListener('visibilitychange', () => { if (!document.hidden) load(); });
+</script>
+</body>
+</html>
