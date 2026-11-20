@@ -77,7 +77,9 @@ textarea{min-height:84px;resize:vertical}
 #stage{position:relative;margin:0 -12px;height:52vh;min-height:300px;background:linear-gradient(#e9f0f4,#f4f1ea);border-bottom:1px solid var(--line);overflow:hidden;touch-action:none}
 @media (prefers-color-scheme:dark){#stage{background:linear-gradient(#1c2230,#17181b)}}
 #stage canvas{width:100%;height:100%;display:block}
-#back{position:absolute;left:10px;top:10px;display:none}
+#back{position:absolute;left:8px;top:50px;display:none}
+#wx{position:absolute;left:8px;top:8px;margin:0;padding:4px 10px 4px 9px;border:0;border-radius:11px;background:rgba(14,16,22,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);color:#f2f3f6;font:500 11px/1.3 system-ui,sans-serif;text-align:left;max-width:calc(100% - 120px);cursor:pointer}
+#wx b{font-size:15px;font-weight:700;margin-right:5px;font-variant-numeric:tabular-nums}#wx small{display:block;font-size:10px;opacity:.78;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#wx .more{display:none;white-space:normal}#wx.open .more{display:block}#wx.open~#hint{display:none}
 #back.on{display:block}
 #stats{position:absolute;left:8px;right:8px;bottom:8px;display:flex;gap:4px;justify-content:space-between;background:rgba(14,16,22,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:10px;padding:4px 8px;font-size:9.5px;color:#c8ccd6;pointer-events:none;white-space:nowrap}
 #stats div{display:flex;align-items:baseline;gap:3px}#stats b{font-size:12px;color:#fff}
@@ -121,7 +123,7 @@ a{color:var(--ready)}
 </head>
 <body>
 <header><h1>Điều phối</h1><span id="live"><i></i><span id="when">Đang nối…</span></span><button id="gear" aria-label="Cài đặt">⚙</button><div id="bar" aria-label="Phần cứng PC"></div></header>
-<section id="t-office" class="on"><div id="stage"><canvas id="cv"></canvas><button class="act" id="back">‹ Toàn cảnh</button><button class="act" id="camb" aria-label="Camera"></button><span id="hint">Chạm một bàn để phóng vào</span><div id="stats"></div><div id="log"></div></div><div id="chat"></div><div id="col"></div></section>
+<section id="t-office" class="on"><div id="stage"><canvas id="cv"></canvas><button id="wx" aria-label="Giờ và thời tiết"></button><button class="act" id="back">‹ Toàn cảnh</button><button class="act" id="camb" aria-label="Camera"></button><span id="hint">Chạm một bàn để phóng vào</span><div id="stats"></div><div id="log"></div></div><div id="chat"></div><div id="col"></div></section>
 <section id="t-work"></section>
 <section id="t-hw"><div id="board"></div><div id="hwfold"></div></section>
 <form id="say"><div id="atts"></div><button type="button" id="att" aria-label="Gửi tệp hoặc ảnh">📎</button><button type="button" id="mic" aria-label="Nói">🎤</button><button type="button" id="tts" aria-label="Đọc câu trả lời">🔈</button><input type="file" id="attf" multiple hidden><textarea id="sayt" rows="1" placeholder="Nhắn…" enterkeyhint="send"></textarea><button type="submit">Gửi</button></form>
@@ -408,12 +410,47 @@ function drawCol() { drawOverlays(); const s = STATE, c = $('col'); if (!s || (b
   if (ev.length) { const k3 = E('div', 'card feed'); ev.slice(0, 12).forEach(e => k3.append(line(e.kind, e.id, e.t + ' · ' + e.text))); c.append(sect('c-ev', 'Vừa xảy ra', k3, false, Math.min(12, ev.length) + ' việc')); }
   if (ready.length) { const k4 = E('div', 'card feed'); ready.forEach(r => k4.append(line(...r))); if (focusId) c.append(E('h2', '', 'Kế tiếp'), k4); else c.append(sect('c-ready', 'Sẵn sàng và đang nghỉ', k4, false, ready.length + ' project')); } }
 
+// ---- time and weather where the phone is: the iPhone's clock, its location (asked once), Open-Meteo for the sky
+const WX = (() => {
+  const HCM = {lat:10.78, lon:106.70, place:'TP.HCM', guess:true}; let d = null, busy = false, open = false, perm = 'prompt', fail = false;
+  try { d = JSON.parse(localStorage.getItem('dp-wx') || 'null'); } catch (e) {}
+  const save = () => { try { localStorage.setItem('dp-wx', JSON.stringify(d)); } catch (e) {} };
+  const KIND = c => c >= 95 ? 'storm' : c >= 85 ? 'snow' : c >= 80 ? 'rain' : c >= 71 ? 'snow' : c >= 61 ? 'rain' : c >= 51 ? 'drizzle' : c >= 45 ? 'fog' : c >= 3 ? 'cloud' : c >= 1 ? 'part' : 'clear';
+  const NAME = {clear:'Trời quang', part:'Ít mây', cloud:'Nhiều mây', fog:'Sương mù', drizzle:'Mưa phùn', rain:'Mưa', snow:'Tuyết', storm:'Dông'};
+  const ICON = (k, day) => ({clear:day ? '☀️' : '🌙', part:day ? '⛅' : '☁️', cloud:'☁️', fog:'🌫️', drizzle:'🌦️', rain:'🌧️', snow:'❄️', storm:'⛈️'})[k] || '';
+  const hm = iso => { const m = /T(\d\d):(\d\d)/.exec(iso || ''); return m ? +m[1] + m[2] / 60 : null; };
+  function locate() { return new Promise(res => { if (!navigator.geolocation || !window.isSecureContext) return res(null);
+    navigator.geolocation.getCurrentPosition(p => { perm = 'granted'; res({lat:p.coords.latitude, lon:p.coords.longitude}); }, e => { if (e.code === 1) perm = 'denied'; res(null); }, {maximumAge:15 * 60e3, timeout:20000, enableHighAccuracy:false}); }); }
+  async function place(l) { try { const j = await (await fetch('https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=' + l.lat + '&longitude=' + l.lon + '&localityLanguage=vi')).json();
+    const a = j.locality || j.city || '', b = (j.principalSubdivision || '').replace(/^(Thành phố|Tỉnh) /, ''); return a && b && !a.includes(b) ? a + ', ' + b : a || b || ''; } catch (e) { return ''; } }
+  async function refresh(force) { if (busy || (!force && d && Date.now() - d.at < 15 * 60e3)) return; busy = true;
+    try { let l = perm === 'granted' || force ? await locate() : null; const keep = d && d.loc;
+      if (l) { l = {lat:+l.lat.toFixed(2), lon:+l.lon.toFixed(2)}; l.place = keep && keep.lat === l.lat && keep.lon === l.lon && keep.place ? keep.place : await place(l); }   // ~1 km: enough for the sky
+      else l = keep && !keep.guess ? keep : HCM;
+      const u = 'https://api.open-meteo.com/v1/forecast?latitude=' + l.lat + '&longitude=' + l.lon + '&current=temperature_2m,apparent_temperature,relative_humidity_2m,weather_code,cloud_cover,precipitation,wind_speed_10m,is_day&daily=sunrise,sunset&timezone=auto&forecast_days=1';
+      const j = await (await fetch(u)).json(), c = j.current || {};
+      d = {at:Date.now(), loc:l, temp:c.temperature_2m, feels:c.apparent_temperature, hum:c.relative_humidity_2m, code:c.weather_code, cloud:c.cloud_cover, rain:c.precipitation, wind:c.wind_speed_10m, day:c.is_day,
+           rise:hm((j.daily || {}).sunrise && j.daily.sunrise[0]), set:hm((j.daily || {}).sunset && j.daily.sunset[0])}; fail = false; save(); office.sky(); }
+    catch (e) { fail = true; } finally { busy = false; hud(); } }
+  function now() { const k = d && d.code != null ? KIND(d.code) : 'clear', o = Object.assign({rise:6, set:17.75, cloud:k === 'clear' ? 5 : 40, wind:6}, d || {}); o.kind = k; o.wet = /rain|drizzle|storm/.test(k); return o; }
+  const pad = n => String(n).padStart(2, '0'), clock = h => pad(Math.floor(h)) + ':' + pad(Math.round(h % 1 * 60) % 60);
+  function hud() { const b = $('wx'); if (!b) return; const t = new Date(), w = now(), day = d ? d.day : (t.getHours() >= 6 && t.getHours() < 18);
+    const DOW = ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'][t.getDay()], l = d && d.loc;
+    b.textContent = ''; const top = E('div'); top.append(E('b', '', pad(t.getHours()) + ':' + pad(t.getMinutes())), DOW + ' ' + t.getDate() + '/' + (t.getMonth() + 1) + (d ? '  ' + ICON(w.kind, day) + ' ' + Math.round(d.temp) + '°' : '')); b.append(top);
+    b.append(E('small', '', l ? (l.guess ? '📍 Chạm để lấy thời tiết nơi anh' : '📍 ' + (l.place || l.lat + ', ' + l.lon)) : fail ? 'Chưa lấy được thời tiết · chạm để thử lại' : 'Đang lấy thời tiết…'));
+    if (d) b.append(E('small', 'more', NAME[w.kind] + ' · cảm giác ' + Math.round(d.feels) + '° · ẩm ' + d.hum + '% · gió ' + Math.round(d.wind) + ' km/h · mọc ' + clock(w.rise) + ', lặn ' + clock(w.set) + ' · cập nhật ' + new Date(d.at).toTimeString().slice(0, 5) + (perm === 'denied' ? ' · iPhone chưa cho định vị (Cài đặt › Quyền riêng tư › Định vị)' : ''))); b.classList.toggle('open', open); }
+  $('wx').onclick = e => { e.stopPropagation(); open = !open; hud(); refresh(true); };
+  try { navigator.permissions.query({name:'geolocation'}).then(p => { perm = p.state; refresh(perm === 'granted'); }, () => refresh()); } catch (e) { refresh(); }
+  setInterval(() => { hud(); if (!document.hidden) refresh(); }, 20000); document.addEventListener('visibilitychange', () => { if (!document.hidden) { hud(); refresh(); } });
+  hud(); return {now, hud, refresh};
+})();
+
 // ---- the office floor: a 2D map the reader can pan, pinch and tap; robots walk their errands
 const office = (() => {
   const cv = $('cv'), G0 = cv.getContext('2d'), off = document.createElement('canvas'), GO = off.getContext('2d'); let g = G0, offKey = '', stamp = 0, held = 0; const cvx = cv, dark = matchMedia('(prefers-color-scheme:dark)').matches;
   const COL = {work:'#3f9d74', ready:'#3f73a8', ask:'#d2553d', wait:'#d39a2f', sleep:'#98a0ae', mail:'#c79a2b', link:'#8a6fc2'};
   const GC = ['#d9b98a', '#a9c7a4', '#a7bfd8', '#e0b3a8', '#c5b7dc', '#d8d3a0'];
-  const TW = 160, TH = 118, G = 12, PLAZA = 150;
+  const TW = 160, TH = 118, G = 12, PLAZA = 150, M = 40, SKY = 196, BOT = 54, WB = () => W + 2 * M;
   let W = 0, H = 0, cw = 0, ch = 0, tiles = [], byTile = {}, walkers = [], boxes = [], cam = {x:0, y:0, s:1}, to = null, boss = {x:0, y:0}, door = {x:0, y:0}, running = false, last = 0;
   const rnd = (a, b) => a + Math.random() * (b - a);
   function layout(s) {
@@ -424,7 +461,7 @@ const office = (() => {
       return {p, x, y, mx:x + TW / 2, my:y + 44, tint:GC[gi[p.group] % GC.length], first:i === 0 || heads[i - 1].group !== p.group, gname:s.groups[gi[p.group]].name}; });
     byTile = Object.fromEntries(tiles.map(t => [t.p.id, t]));
     const rows = Math.ceil(tiles.length / cols), ky = PLAZA + rows * (TH + G) + 8; boxes = s.projects.filter(stored).map((p, i) => ({p, x:G + 20 + (i % cols) * (TW + G), y:ky + 34 + Math.floor(i / cols) * 46}));
-    H = ky + 50 + Math.ceil(Math.max(1, boxes.length) / cols) * 46 + 20;
+    H = ky + 50 + Math.ceil(Math.max(1, boxes.length) / cols) * 46 + 20; plantScene();
     // walkers: staff at their desks, plus couriers for questions, mail and parent links
     const old = Object.fromEntries(walkers.map(w => [w.key, w])); walkers = [];
     const mk = (key, t, role, kind, home, say) => { const o = old[key]; const w = o || {x:home.x, y:home.y, idle:role === 'link' ? rnd(4, 110) : rnd(1, 14), leg:null}; Object.assign(w, {key, t, role, kind, home, say}); walkers.push(w); };
@@ -530,8 +567,10 @@ const office = (() => {
   function world(ctx, dpr) { const k = dpr * cam.s; ctx.setTransform(k, 0, 0, k, Math.round(-cam.x * k), Math.round(-cam.y * k)); }
   // ---- the look of the place
   const hsh = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return h >>> 0; };
-  function daylight() { const d = new Date(), h = d.getHours() + d.getMinutes() / 60;
-    return h >= 6.5 && h < 16.5 ? {k:'day', a:'#7fbfe9', b:'#dff1fa', n:0} : h >= 16.5 && h < 18.5 ? {k:'dusk', a:'#e98a52', b:'#f9d9a6', n:.4} : h >= 5 && h < 6.5 ? {k:'dawn', a:'#e8a3a0', b:'#fbe6c6', n:.45} : {k:'night', a:'#10152c', b:'#2a3157', n:1}; }
+  function daylight() { const d = new Date(), h = d.getHours() + d.getMinutes() / 60, w = WX.now(), r = w.rise, st = w.set, grey = w.wet || w.kind === 'fog' || w.cloud > 80;
+    const o = h >= r + .6 && h < st - .6 ? (grey ? {k:'day', a:'#8fa3b4', b:'#d3dce3', n:.08} : {k:'day', a:'#6fb4e6', b:'#dbeffa', n:0}) : h >= st - .6 && h < st + .5 ? {k:'dusk', a:grey ? '#8b7f94' : '#e0804e', b:grey ? '#d9c3b2' : '#f9d9a6', n:.4}
+      : h >= r - .5 && h < r + .6 ? {k:'dawn', a:'#d999a4', b:'#fbe6c6', n:.45} : {k:'night', a:'#0c1128', b:grey ? '#262b3d' : '#27305a', n:1};
+    o.w = w; o.h = h; o.u = (h - r) / (st - r); o.v = ((h - st + 24) % 24) / (24 - st + r); o.key = o.k + w.kind + Math.floor(h * 12); return o; }
   function plant(x, y, s, v) { g.fillStyle = 'rgba(0,0,0,.13)'; g.beginPath(); g.ellipse(x, y + s * .17, s * .34, s * .09, 0, 0, 7); g.fill();
     for (let k = -2; k <= 2; k++) { g.fillStyle = k % 2 ? '#3f8f63' : (v % 2 ? '#4fa46c' : '#57a15a'); g.beginPath(); g.ellipse(x + k * s * .2, y - s * (.78 - Math.abs(k) * .13), s * .17, s * .46, k * .38, 0, 7); g.fill(); }
     g.fillStyle = '#b96f45'; g.beginPath(); g.moveTo(x - s * .3, y - s * .3); g.lineTo(x + s * .3, y - s * .3); g.lineTo(x + s * .21, y + s * .16); g.lineTo(x - s * .21, y + s * .16); g.closePath(); g.fill();
@@ -544,13 +583,61 @@ const office = (() => {
     for (let r = 0; r < 3; r++) { g.fillStyle = '#4f3a28'; g.fillRect(x + 2, y + 2 + r * 9.6, 20, 8); for (let c = 0; c < 4; c++) { g.fillStyle = BOOKS[(seed >> (r * 3 + c)) % BOOKS.length]; g.fillRect(x + 3 + c * 4.8, y + 3.4 + r * 9.6 + ((seed >> (c + r)) & 1), 3.9, 6.6 - ((seed >> (c + r)) & 1)); } } }
   function pane(x, y, w, h, dl) { g.fillStyle = dark ? '#161920' : '#fffdf6'; rr(x - 3.5, y - 3.5, w + 7, h + 7, 5); g.fill();
     const gr = g.createLinearGradient(0, y, 0, y + h); gr.addColorStop(0, dl.a); gr.addColorStop(1, dl.b); g.fillStyle = gr; rr(x, y, w, h, 3); g.fill();
-    if (dl.k === 'night') { g.fillStyle = '#fff'; [[.16, .3], [.4, .62], [.6, .22], [.86, .5], [.3, .16]].forEach(([u, v]) => { g.beginPath(); g.arc(x + w * u, y + h * v, 1, 0, 7); g.fill(); }); g.fillStyle = '#f6efc9'; g.beginPath(); g.arc(x + w * .76, y + h * .3, 4.5, 0, 7); g.fill(); }
+    if (dl.k === 'night' && !dl.w.wet && dl.w.cloud < 85) { g.fillStyle = '#fff'; [[.16, .3], [.4, .62], [.6, .22], [.86, .5], [.3, .16]].forEach(([u, v]) => { g.beginPath(); g.arc(x + w * u, y + h * v, 1, 0, 7); g.fill(); }); g.fillStyle = '#f6efc9'; g.beginPath(); g.arc(x + w * .76, y + h * .3, 4.5, 0, 7); g.fill(); }
     else if (dl.k === 'day') { g.fillStyle = 'rgba(255,255,255,.92)'; g.beginPath(); g.ellipse(x + w * .3, y + h * .42, 9, 4.5, 0, 0, 7); g.ellipse(x + w * .42, y + h * .33, 7, 5, 0, 0, 7); g.ellipse(x + w * .74, y + h * .64, 8, 3.6, 0, 0, 7); g.fill(); }
     else { g.fillStyle = '#ffe9a8'; g.beginPath(); g.arc(x + w * .5, y + h * .82, 7, 0, 7); g.fill(); }
+    if (dl.w.wet) { g.strokeStyle = 'rgba(255,255,255,.55)'; g.lineWidth = .8; g.beginPath(); for (let i = 0; i < 9; i++) { const u = (i * .37 + .05) % 1, v = (i * .53) % .7; g.moveTo(x + w * u, y + h * v); g.lineTo(x + w * u - 2, y + h * v + 8); } g.stroke(); }
     g.fillStyle = dark ? '#161920' : '#fffdf6'; g.fillRect(x + w / 2 - 1.5, y, 3, h); }
+  // ---- the land around the office: sky, sun or moon, two ranges of hills that slide slower than the camera (depth),
+  // a lawn with pixel trees, palms, bushes and flowers; the building stands on it with walls you see from above
+  const SPR = {};
+  function sprite(kind, v, tone) { const key = kind + v + tone; if (SPR[key]) return SPR[key];
+    const c = document.createElement('canvas'), x = c.getContext('2d'), P = (a, b, w, h, col) => { x.fillStyle = col; x.fillRect(a, b, w, h); };
+    const T = {night:.38, dusk:.74, dawn:.82, wet:.86}[tone] || 1, S = col => shade(col, T);
+    const LF = [['#4f9a45', '#74c25b', '#356f33'], ['#3f8a52', '#62b26c', '#2b6140'], ['#6a9d3a', '#93c653', '#4b7429'], ['#2f7a5c', '#52a27f', '#215745']][v % 4];
+    if (kind === 'round') { c.width = 18; c.height = 24; P(8, 14, 2, 10, S('#6b4a2e')); P(9, 15, 1, 9, S('#4e3420'));
+      for (let j = 0; j < 17; j++) for (let i = 0; i < 18; i++) { const dx = i - 8.5, dy = j - 8, dd = Math.hypot(dx, dy); if (dd > 8.4 - (((i * 7 + j * 3 + v) % 6) === 0 ? 1.2 : 0)) continue; const l = (-dx - dy) / 9; P(i, j, 1, 1, S(l > .5 ? LF[1] : l < -.4 ? LF[2] : LF[0])); } }
+    else if (kind === 'pine') { c.width = 14; c.height = 26; P(6, 21, 2, 5, S('#5b3d26'));
+      for (let k = 0; k < 3; k++) for (let j = 0; j < 9; j++) { const half = 1 + j * (.55 + k * .1), y = k * 6 + j; if (y > 22) break; for (let i = Math.round(7 - half); i < Math.round(7 + half); i++) P(i, y, 1, 1, S(i < 6 ? LF[1] : i > 8 ? LF[2] : LF[0])); } }
+    else if (kind === 'palm') { c.width = 24; c.height = 30; for (let j = 9; j < 30; j++) { const xx = 11 + Math.round(Math.sin((30 - j) / 21 * 1.3) * 3 * (v % 2 ? 1 : -1)); P(xx, j, 2, 1, S(j % 3 ? '#8a6a45' : '#6e5235')); }
+      const cx = 12 + (v % 2 ? 2 : -2), cy = 9; [[-2.9, LF[1]], [-2.3, LF[0]], [-1.6, LF[1]], [-.9, LF[0]], [-.3, LF[2]], [.4, LF[0]], [-3.6, LF[2]]].forEach(([a, col]) => { for (let k = 0; k < 11; k++) { const px = cx + Math.cos(a) * k, py = cy + Math.sin(a) * k * .55 + k * k * .07; P(Math.round(px), Math.round(py), 2, 1, S(col)); } });
+      P(cx - 1, cy + 1, 2, 2, S('#5a4220')); P(cx + 1, cy + 2, 2, 2, S('#6b4f27')); }
+    else if (kind === 'bush') { c.width = 14; c.height = 8; for (let j = 0; j < 8; j++) for (let i = 0; i < 14; i++) { const dx = (i - 6.5) / 7, dy = (j - 4) / 4; if (dx * dx + dy * dy > 1) continue; P(i, j, 1, 1, S(dy < -.3 ? LF[1] : dy > .4 ? LF[2] : LF[0])); }
+      if (v % 2) [[3, 2], [8, 1], [10, 4], [5, 5]].forEach(([i, j]) => P(i, j, 1, 1, S(['#f4d35e', '#ef8fa8', '#ffffff', '#e85d5d'][(v >> 1) % 4]))); }
+    return SPR[key] = c; }
+  let scen = [];
+  function plantScene() { scen = []; let r = 7; const R = () => (r = (r * 16807) % 2147483647) / 2147483647, kinds = ['round', 'round', 'pine', 'palm'];
+    for (let x = -M + 6; x < W + M; x += 26 + R() * 22) scen.push({k:kinds[Math.floor(R() * 4)], v:Math.floor(R() * 8), x, y:-14 - R() * 22, s:1.6 + R() * .5});            // back row, behind the building
+    for (let y = 40; y < H; y += 54 + R() * 40) { scen.push({k:R() < .4 ? 'palm' : 'round', v:Math.floor(R() * 8), x:-M / 2 - 2, y, s:1.15}); scen.push({k:R() < .4 ? 'palm' : 'round', v:Math.floor(R() * 8), x:W + M / 2 + 2, y:y + 20, s:1.15}); }
+    for (let x = -M + 10; x < W + M; x += 34 + R() * 40) { const fr = Math.abs(x - W / 2) < 26; if (!fr) scen.push({k:R() < .25 ? 'round' : 'bush', v:Math.floor(R() * 8), x, y:H + 26 + R() * 20, s:R() < .25 ? 1.3 : 1.6}); }
+    scen.sort((a, b) => a.y - b.y); }
+  function paintScene(dl) { const w = dl.w, tone = dl.k === 'day' ? (w.wet ? 'wet' : 'day') : dl.k, px = (cam.x + M), py = (cam.y + SKY), L = -M - 400, R = W + M + 400, top = -SKY - 500, ground = -40;
+    const sk = g.createLinearGradient(0, -SKY - 40 + py * .25, 0, ground + 10); sk.addColorStop(0, dl.a); sk.addColorStop(1, dl.b); g.fillStyle = sk; g.fillRect(L, top, R - L, ground - top + 20);
+    if (dl.k === 'night') { g.fillStyle = 'rgba(255,255,255,.85)'; for (let i = 0; i < 46; i++) { const q = hsh('s' + i), sx = -M + (q % 1000) / 1000 * (W + 2 * M) + px * .85, sy = -SKY + 4 + ((q >>> 10) % 1000) / 1000 * 110 + py * .85; if (!w.wet && w.cloud < 85 || i % 4 === 0) g.fillRect(sx, sy, i % 5 ? 1 : 1.6, i % 5 ? 1 : 1.6); }
+      const u = Math.max(0, Math.min(1, dl.v)), mx = -M + 30 + (W + 2 * M - 60) * u + px * .8, my = -SKY + 40 + (1 - Math.sin(Math.PI * u)) * 70 + py * .8; g.fillStyle = 'rgba(246,239,201,.15)'; g.beginPath(); g.arc(mx, my, 16, 0, 7); g.fill(); g.fillStyle = '#f6efc9'; g.beginPath(); g.arc(mx, my, 8, 0, 7); g.fill(); g.fillStyle = dl.a; g.beginPath(); g.arc(mx + 4, my - 2, 7, 0, 7); g.fill(); }
+    else { const u = Math.max(0, Math.min(1, dl.u)), sx = -M + 30 + (W + 2 * M - 60) * u + px * .8, sy = -SKY + 40 + (1 - Math.sin(Math.PI * u)) * 80 + py * .8, sun = dl.k === 'day' ? '#fff3c4' : '#ffc27a';
+      if (!(w.wet || w.cloud > 85)) { const gl = g.createRadialGradient(sx, sy, 4, sx, sy, 46); gl.addColorStop(0, 'rgba(255,240,190,.75)'); gl.addColorStop(1, 'rgba(255,240,190,0)'); g.fillStyle = gl; g.fillRect(sx - 46, sy - 46, 92, 92); g.fillStyle = sun; for (let j = -5; j <= 5; j++) { const hw = Math.round(Math.sqrt(30 - j * j)); g.fillRect(sx - hw, sy + j * 1.6, hw * 2, 1.7); } } }
+    const ridge = (base, amp, k, c1, seed) => { g.fillStyle = c1; g.beginPath(); g.moveTo(L, ground + 40); for (let x = L; x <= R; x += 6) { const xx = x - px * k; g.lineTo(x, base + py * k - amp * (.55 * Math.sin(xx / 61 + seed) + .3 * Math.sin(xx / 23 + seed * 2) + .15 * Math.sin(xx / 9 + seed))); } g.lineTo(R, ground + 40); g.closePath(); g.fill(); };
+    const night = dl.k === 'night', far = night ? '#1c2540' : dl.k === 'day' ? (w.wet ? '#9db0b8' : '#a9c8c6') : '#c49a8f', mid = night ? '#1b2b2c' : dl.k === 'day' ? (w.wet ? '#6f9178' : '#7fb07a') : '#8b8a5c';
+    g.save(); g.beginPath(); g.rect(L, top, R - L, ground + 2 - top); g.clip(); ridge(-84, 34, .55, far, 1.7); ridge(-56, 20, .32, mid, 4.2); g.restore();
+    const gr = {day:'#8cc266', wet:'#79ab5c', dusk:'#88a45a', dawn:'#8fb36a', night:'#26402f'}[tone], gk = shade(gr, .9);
+    g.fillStyle = gr; g.fillRect(L, ground, R - L, H + BOT + 600); g.fillStyle = 'rgba(0,0,0,.08)'; g.fillRect(L, ground, R - L, 3);
+    g.fillStyle = gk; for (let i = 0; i < 300; i++) { const q = hsh('g' + i), x = -M + (q % 1000) / 1000 * (W + 2 * M), y = ground + 6 + ((q >>> 10) % 1000) / 1000 * (H + BOT + 40); if (x > -6 && x < W + 6 && y > -6 && y < H + 14) continue; g.fillRect(x, y, 2, 2); g.fillRect(x + 2, y - 1, 1, 2); }
+    if (w.wet) { g.fillStyle = 'rgba(190,215,235,.35)'; for (let i = 0; i < 9; i++) { const x = -M + ((i * 131.7) % (W + 2 * M)), y = H + 14 + ((i * 29) % 30); g.beginPath(); g.ellipse(x, y, 9, 2.5, 0, 0, 7); g.fill(); } }
+    g.fillStyle = shade('#d9c7a3', tone === 'night' ? .45 : 1); for (let y = H + 14; y < H + BOT + 40; y += 9) { g.beginPath(); g.ellipse(W / 2 + Math.sin(y / 17) * 3, y, 9, 3.2, 0, 0, 7); g.fill(); }
+    for (const o of scen) if (o.y < 0) drawTree(o, tone); }
+  function drawTree(o, tone) { const sp = sprite(o.k, o.v, tone), w = sp.width * o.s, h = sp.height * o.s;
+    g.fillStyle = 'rgba(0,0,0,.16)'; g.beginPath(); g.ellipse(o.x + 3, o.y, w * .32, w * .1, 0, 0, 7); g.fill(); g.imageSmoothingEnabled = false; g.drawImage(sp, Math.round(o.x - w / 2), Math.round(o.y - h), Math.round(w), Math.round(h)); }
+  function paintBuilding(dl) { const night = dl.k === 'night', top = dark ? '#3a3e48' : '#e6dcc8', face = dark ? '#262931' : '#b9a98a';
+    g.fillStyle = 'rgba(0,0,0,.22)'; rr(4, 10, W + 4, H + 10, 10); g.fill();
+    g.fillStyle = face; rr(-5, -5, W + 10, H + 20, 10); g.fill();
+    for (let x = 40; x < W - 30; x += 54) { if (Math.abs(x - W / 2) < 30) continue; g.fillStyle = night || dl.k === 'dusk' ? 'rgba(255,214,130,.95)' : (dark ? '#4b5568' : '#9cc1da'); g.fillRect(x, H + 7, 16, 5); }
+    g.fillStyle = shade('#6d4c35', night ? .6 : 1); g.fillRect(W / 2 - 9, H + 4, 18, 11);
+    g.fillStyle = top; rr(-5, -5, W + 10, H + 9, 10); g.fill(); }
   function paintStatic(zoomed) { const ink = dark ? '#ecebe7' : '#23211d', mute = dark ? '#9a9890' : '#6f6a60', line = dark ? '#3a3d45' : '#d9cfbb', dl = daylight();
-    const fl = g.createLinearGradient(0, 0, 0, H); fl.addColorStop(0, dark ? '#3a332b' : '#efdcb9'); fl.addColorStop(1, dark ? '#2c2722' : '#e3cba2'); g.fillStyle = fl; g.fillRect(-60, -60, W + 120, H + 120);
-    g.fillStyle = dark ? 'rgba(0,0,0,.10)' : 'rgba(150,110,60,.07)'; for (let y = -44; y < H + 60; y += 88) g.fillRect(-60, y, W + 120, 44);          // wide planks: no thin lines to shimmer
+    paintScene(dl); paintBuilding(dl);
+    const fl = g.createLinearGradient(0, 0, 0, H); fl.addColorStop(0, dark ? '#3a332b' : '#efdcb9'); fl.addColorStop(1, dark ? '#2c2722' : '#e3cba2'); g.fillStyle = fl; rr(0, 0, W, H, 7); g.fill();
+    g.save(); rr(0, 0, W, H, 7); g.clip(); g.fillStyle = dark ? 'rgba(0,0,0,.10)' : 'rgba(150,110,60,.07)'; for (let y = -44; y < H + 60; y += 88) g.fillRect(0, y, W, 44); g.restore();          // wide planks: no thin lines to shimmer
     // the hall: a wall with windows, the manager's rug, the owner's door
     g.fillStyle = 'rgba(0,0,0,.08)'; rr(G + 1, 17, W - 2 * G, PLAZA - 26, 14); g.fill();
     g.fillStyle = dark ? '#262a33' : '#f3ebdb'; rr(G, 14, W - 2 * G, PLAZA - 26, 14); g.fill();
@@ -594,7 +681,8 @@ const office = (() => {
         plaque(tl.x + 8, tl.y + TH - 26, TW - 16, q0 ? 'Chờ anh trả lời ' + q0.id : r0 ? 'Sẵn sàng ' + r0.id + ' · ' + r0.title : st === 'sleep' ? 'Đang nghỉ' : p.waiting ? p.waiting + ' mục bị chặn' : 'Không có việc mở', COL[st]); } }
     if (boxes.length) { const y0 = boxes[0].y - 34; g.fillStyle = dark ? '#2a2c31' : '#e7e1d2'; rr(G, y0, W - 2 * G, H - y0 - 10, 12); g.fill(); g.fillStyle = mute; g.font = '700 8px system-ui,sans-serif'; g.textAlign = 'left'; g.textBaseline = 'alphabetic'; g.fillText('KHO · ĐÃ XONG HOẶC BẢN LƯU', G + 10, y0 + 13);
       for (const b of boxes) { g.fillStyle = 'rgba(0,0,0,.12)'; g.beginPath(); g.ellipse(b.x + 11, b.y + 18, 13, 2.6, 0, 0, 7); g.fill(); g.fillStyle = '#c9a36b'; rr(b.x, b.y, 22, 17, 2); g.fill(); g.fillStyle = '#b48d57'; g.fillRect(b.x, b.y + 11, 22, 6); g.fillStyle = '#e9dcc0'; g.fillRect(b.x + 8, b.y, 6, 17); g.fillStyle = ink; g.font = '600 8.5px system-ui,sans-serif'; g.fillText(clip(b.p.name, TW - 40), b.x + 28, b.y + 12); } }
-    if (dl.n > .3) { g.fillStyle = 'rgba(16,20,46,' + (dark ? .16 : .13) * dl.n + ')'; g.fillRect(-60, -60, W + 120, H + 120); } }
+    { const tone = dl.k === 'day' ? (dl.w.wet ? 'wet' : 'day') : dl.k; for (const o of scen) if (o.y >= 0) drawTree(o, tone); }
+    if (dl.n > .3) { g.fillStyle = 'rgba(16,20,46,' + (dark ? .16 : .13) * dl.n + ')'; g.fillRect(-M - 400, -SKY - 500, W + 2 * M + 800, H + SKY + BOT + 1100); } }
   function paintDynamic(t, zoomed) {
     screen(t); const busy = CHATS.busy; g.strokeStyle = '#f4f0e6'; g.lineWidth = 2; g.beginPath(); g.moveTo(boss.x - 12, boss.y - 2); g.lineTo(scr.x + scr.w + 6, scr.y + scr.h * .45 + Math.sin(t * (busy ? 5 : 2)) * 6); g.stroke();
     bot(boss.x, boss.y - 4, 32, '#3f73a8', busy ? t : 0, false, 77); desk(boss.x, boss.y + 2, busy ? 'work' : 'ready', busy ? t : 0);
@@ -608,17 +696,34 @@ const office = (() => {
     for (const w of ws) { const sign = SIGN[w.role] || (w.walk ? (w.kind === 'work' ? '…' : '!') : null); if (!sign) continue;
       const bx = w.x, by = w.y - 13; if (used.some(u => Math.abs(u[0] - bx) < 14 && Math.abs(u[1] - by) < 13)) continue; used.push([bx, by]); iconBub(bx, by, sign, COL[w.kind] || COL.ready); }
     drawFlights(performance.now()); }
+  function weather(t) { const dl = daylight(), w = dl.w, k = cam.s, vx = cam.x, vy = cam.y, vw = cw / k, vh = ch / k, px = cam.x + M, py = cam.y + SKY;
+    const nc = Math.round((w.cloud || 0) / 18) + (w.wet ? 2 : 0); if (nc && vy < -42) { g.save(); g.beginPath(); g.rect(vx, vy, vw, -40 - vy); g.clip();
+      const cc = dl.k === 'night' ? 'rgba(70,78,104,.75)' : w.wet || w.cloud > 80 ? 'rgba(206,212,220,.92)' : 'rgba(255,255,255,.92)', span = W + 2 * M + 240;
+      for (let i = 0; i < nc; i++) { const cx = -M - 120 + ((i * 173.3 + t * (2 + (w.wind || 6) * .35) * (1 + i % 3 * .3)) % span) + px * .7, cy = -SKY + 46 + (i * 23.7) % 70 + py * .7, s = 1 + (i % 3) * .35;
+        g.fillStyle = cc; g.fillRect(cx - 14 * s, cy, 30 * s, 6 * s); g.fillRect(cx - 8 * s, cy - 4 * s, 18 * s, 5 * s); g.fillRect(cx - 2 * s, cy - 7 * s, 9 * s, 4 * s); g.fillStyle = 'rgba(0,0,0,.06)'; g.fillRect(cx - 14 * s, cy + 5 * s, 30 * s, 1.2 * s); }
+      g.restore(); }
+    if (w.kind === 'fog') { g.fillStyle = 'rgba(235,238,240,.18)'; for (let i = 0; i < 5; i++) g.fillRect(vx, vy + ((i * .21 + t * .006) % 1) * vh, vw, vh * .14); }
+    if (!w.wet && w.kind !== 'snow') return;
+    g.save(); g.beginPath(); g.rect(vx, vy, vw, vh); g.roundRect(-5, -5, W + 10, H + 20, 10); g.clip('evenodd');
+    const snow = w.kind === 'snow', n = snow ? 70 : w.kind === 'drizzle' ? 55 : Math.min(170, 70 + (w.rain || 1) * 25), len = (w.kind === 'drizzle' ? 6 : 12) / k, sl = .25 + Math.min(.5, (w.wind || 6) / 50);
+    g.strokeStyle = dl.k === 'night' ? 'rgba(185,205,235,.72)' : 'rgba(230,238,250,.8)'; g.fillStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 1.3 / k; g.beginPath();
+    for (let i = 0; i < n; i++) { const sp = snow ? .12 : .9 + (i % 5) * .08, x = vx + ((i * 97.31 + t * vw * sp * sl * .6) % vw), y = vy + ((i * 61.7 + t * vh * sp) % vh);
+      if (snow) g.fillRect(x + Math.sin(t + i) * 2 / k, y, 2 / k, 2 / k); else { g.moveTo(x, y); g.lineTo(x - len * sl, y + len); } }
+    g.stroke();
+    if (!snow) { g.strokeStyle = 'rgba(225,235,248,.5)'; g.beginPath(); for (let i = 0; i < 14; i++) { const ph = (t * 1.7 + i * .37) % 1, x = -M + ((i * 113.9 + Math.floor(t * 1.7 + i * .37) * 41) % (W + 2 * M)), y = (i % 2 ? H + 20 + (i * 7) % 30 : -30 + (i * 13) % 20); g.moveTo(x + 4 * ph + .5, y); g.ellipse(x, y, 4 * ph + .5, 1.4 * ph + .3, 0, 0, 7); } g.stroke(); }
+    g.restore();
+    if (w.kind === 'storm') { const ph = t % 9; if (ph < .18 || (ph > .3 && ph < .38)) { g.fillStyle = 'rgba(235,240,255,.35)'; g.fillRect(vx, vy, vw, vh); g.strokeStyle = '#fffbe0'; g.lineWidth = 2 / k; g.beginPath(); let bx = -M + ((Math.floor(t / 9) * 211) % (W + 2 * M)), by = -SKY + 10; g.moveTo(bx, by); for (let j = 0; j < 5; j++) { bx += (j % 2 ? 7 : -9); by += 13; g.lineTo(bx, by); } g.stroke(); } } }
   function paint(t) { const dpr = Math.min(devicePixelRatio || 1, 3), zoomed = cam.s * TW > cw * .55;
-    const key = [cam.x.toFixed(2), cam.y.toFixed(2), cam.s.toFixed(4), stamp, focusId, zoomed, cw, ch, daylight().k].join('|');
+    const key = [cam.x.toFixed(2), cam.y.toFixed(2), cam.s.toFixed(4), stamp, focusId, zoomed, cw, ch, daylight().key].join('|');
     if (key !== offKey) { offKey = key; g = GO; g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, off.width, off.height); world(g, dpr); paintStatic(zoomed); g = G0; }
-    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cvx.width, cvx.height); g.drawImage(off, 0, 0); world(g, dpr); paintDynamic(t, zoomed); }
-  function clamp(c) { const minS = cw / W; c.s = Math.max(minS, Math.min(minS * 5, c.s)); const vw = cw / c.s, vh = ch / c.s; c.x = W <= vw ? (W - vw) / 2 : Math.max(0, Math.min(W - vw, c.x)); c.y = H <= vh ? Math.min(0, (H - vh) / 2) : Math.max(0, Math.min(H - vh, c.y)); return c; }
+    g.setTransform(1, 0, 0, 1, 0, 0); g.clearRect(0, 0, cvx.width, cvx.height); g.drawImage(off, 0, 0); world(g, dpr); paintDynamic(t, zoomed); weather(t); }
+  function clamp(c) { const minS = cw / WB(), HB = H + SKY + BOT; c.s = Math.max(minS, Math.min(minS * 5, c.s)); const vw = cw / c.s, vh = ch / c.s; c.x = WB() <= vw ? -M + (WB() - vw) / 2 : Math.max(-M, Math.min(W + M - vw, c.x)); c.y = HB <= vh ? -SKY + (HB - vh) / 2 : Math.max(-SKY, Math.min(H + BOT - vh, c.y)); return c; }
   function size() { const r = cv.getBoundingClientRect(), dpr = Math.min(devicePixelRatio || 1, 3); if (!r.width) return false; cw = r.width; ch = r.height; cv.width = off.width = Math.round(cw * dpr); cv.height = off.height = Math.round(ch * dpr); offKey = ''; return true; }
   // the director: when nobody touches the map, the camera goes where the work is (a busy manager, a letter in
   // flight, a robot on an errand, a room at work) and comes back to the whole office when all is quiet
   let auto = true, touched = -1e9, dsub = null, dkeep = 0, moving = false, zoomIn = false; try { auto = localStorage.getItem('dp-cam') !== '0'; } catch (e) {}
   const camb = $('camb'), camLabel = () => { camb.textContent = auto ? '🎥 Tự động' : '🎥 Tay'; }; camLabel();
-  camb.onclick = () => { auto = !auto; try { localStorage.setItem('dp-cam', auto ? '1' : '0'); } catch (e) {} camLabel(); touched = -1e9; if (!auto && !focusId) to = clamp({x:0, y:0, s:cw / W}); };
+  camb.onclick = () => { auto = !auto; try { localStorage.setItem('dp-cam', auto ? '1' : '0'); } catch (e) {} camLabel(); touched = -1e9; if (!auto && !focusId) to = clamp({x:-M, y:-SKY, s:cw / WB()}); };
   function subject(ms) {
     if (CHATS.busy) return {x:(scr.x + scr.w / 2 + boss.x) / 2, y:scr.y + scr.h / 2 + 10, z:1.7};
     const f = flights[flights.length - 1]; if (f) return {x:f.b.x, y:f.b.y, z:2.3};
@@ -627,15 +732,15 @@ const office = (() => {
     const act = tiles.filter(t => stateOf(t.p) === 'work'); if (act.length) { const tl = act[Math.floor(ms / 9000) % act.length]; return {x:tl.mx, y:tl.my + 14, z:2.7}; }
     return null; }
   function director(ms, dt) { moving = false; if (!auto || held || focusId || ms - touched < 9000 || (ACT.game || {}).on) return;
-    dsub = subject(ms); const minS = cw / W, s = dsub ? minS * dsub.z : minS, tg = clamp({s, x:dsub ? dsub.x - cw / s / 2 : 0, y:dsub ? dsub.y - ch / s / 2 : 0});
+    dsub = subject(ms); const minS = cw / WB(), s = dsub ? minS * dsub.z : minS, tg = clamp({s, x:dsub ? dsub.x - cw / s / 2 : -M, y:dsub ? dsub.y - ch / s / 2 : -SKY});
     if (Math.abs(tg.s - cam.s) < .003 && Math.hypot(tg.x - cam.x, tg.y - cam.y) < .7) return;
-    moving = true; const a = 1 - Math.exp(-dt * 2.2), zin = cam.s > cw / W * 1.3; if (zin !== zoomIn) { zoomIn = zin; $('stage').classList.toggle('zoomin', zin); } cam.x += (tg.x - cam.x) * a; cam.y += (tg.y - cam.y) * a; cam.s += (tg.s - cam.s) * a; }
-  function frame(ms) { if (!running) return; requestAnimationFrame(frame); const lively = to || held || moving || flights.length || CHATS.busy || walkers.some(w => w.walk); if (ms - last < (lively ? 30 : 125)) return; const dt = Math.min(.2, (ms - last) / 1000); last = ms;
+    moving = true; const a = 1 - Math.exp(-dt * 2.2), zin = cam.s > cw / WB() * 1.3; if (zin !== zoomIn) { zoomIn = zin; $('stage').classList.toggle('zoomin', zin); } cam.x += (tg.x - cam.x) * a; cam.y += (tg.y - cam.y) * a; cam.s += (tg.s - cam.s) * a; }
+  function frame(ms) { if (!running) return; requestAnimationFrame(frame); const lively = to || held || moving || flights.length || CHATS.busy || walkers.some(w => w.walk), wet = WX.now().wet || WX.now().kind === 'snow'; if (ms - last < (lively ? 30 : wet ? 50 : 125)) return; const dt = Math.min(.2, (ms - last) / 1000); last = ms;
     if (to) { cam.x += (to.x - cam.x) * .18; cam.y += (to.y - cam.y) * .18; cam.s += (to.s - cam.s) * .18; if (Math.abs(to.s - cam.s) < .002 && Math.hypot(to.x - cam.x, to.y - cam.y) < .5) { cam = to; to = null; } } else director(ms, dt);
     step(dt); paint(ms / 1000); }
-  function wake() { const on = cur === 'office' && !document.hidden && STATE; if (on && !running) { if (!size()) return; if (!tiles.length) { layout(STATE); cam = clamp({x:0, y:0, s:cw / W}); } running = true; last = performance.now(); requestAnimationFrame(frame); } else if (!on) running = false; }
+  function wake() { const on = cur === 'office' && !document.hidden && STATE; if (on && !running) { if (!size()) return; if (!tiles.length) { layout(STATE); cam = clamp({x:-M, y:-SKY, s:cw / WB()}); } running = true; last = performance.now(); requestAnimationFrame(frame); } else if (!on) running = false; }
   function focus(id) { const tl = byTile[id]; focusId = tl ? id : null; $('back').classList.toggle('on', !!focusId); $('hint').style.display = focusId ? 'none' : '';
-    if (tl) { const s = Math.min(cw / (TW + 50), ch / (TH + 70)); to = clamp({s, x:tl.x + TW / 2 - cw / s / 2, y:tl.y + TH / 2 - ch / s / 2}); } else to = clamp({x:0, y:Math.max(0, cam.y - 40), s:cw / W});
+    if (tl) { const s = Math.min(cw / (TW + 50), ch / (TH + 70)); to = clamp({s, x:tl.x + TW / 2 - cw / s / 2, y:tl.y + TH / 2 - ch / s / 2}); } else to = clamp({x:-M, y:Math.max(-SKY, cam.y - 40), s:cw / WB()});
     busy = false; mkSlides(); drawCol(); }
   $('back').onclick = () => { touched = -1e9; focus(null); };
   // pan with one finger, pinch with two, tap to enter a room
@@ -654,7 +759,7 @@ const office = (() => {
   cv.addEventListener('wheel', e => { e.preventDefault(); touched = performance.now(); const wx = cam.x + e.offsetX / cam.s, wy = cam.y + e.offsetY / cam.s; cam.s *= e.deltaY < 0 ? 1.15 : .87; clamp(cam); cam.x = wx - e.offsetX / cam.s; cam.y = wy - e.offsetY / cam.s; clamp(cam); }, {passive:false});
   addEventListener('resize', () => { if (size() && STATE) { layout(STATE); clamp(cam); } });
   document.addEventListener('visibilitychange', wake);
-  return {note, boss() { mkSlides(); stamp++; }, set(s) { if (cw || size()) { const first = !tiles.length; layout(s); if (first) cam = clamp({x:0, y:0, s:cw / W}); if (focusId && !byTile[focusId]) focus(null); } wake(); }, wake, focus};
+  return {note, sky() { offKey = ''; }, boss() { mkSlides(); stamp++; }, set(s) { if (cw || size()) { const first = !tiles.length; layout(s); if (first) cam = clamp({x:-M, y:-SKY, s:cw / WB()}); if (focusId && !byTile[focusId]) focus(null); } wake(); }, wake, focus};
 })();
 
 const live = $('live'), when = $('when');
