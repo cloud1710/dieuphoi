@@ -18,7 +18,12 @@
 @media (prefers-color-scheme:dark){:root{--bg:#17181b;--ink:#ecebe7;--mute:#9a9890;--card:#212329;--line:#353840;--work:#5fbf93;--ready:#7fb2e5;--ask:#ef7f6a;--wait:#e0a94a;--sleep:#6f7888}}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.42 system-ui,-apple-system,"Segoe UI",sans-serif;padding:0 12px calc(78px + env(safe-area-inset-bottom))}
-header{position:sticky;top:0;z-index:2;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 0 8px;display:flex;align-items:center;gap:10px}
+header{position:sticky;top:0;z-index:2;background:var(--bg);padding:calc(10px + env(safe-area-inset-top)) 0 6px;display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px}
+#bar{flex-basis:100%;display:flex;gap:6px;font-size:11.5px;color:var(--mute);min-height:22px}
+#bar span{flex:1;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:2px 6px;white-space:nowrap;overflow:hidden;position:relative;text-align:center}
+#bar span i{position:absolute;left:0;bottom:0;height:2.5px;background:var(--work);transition:width .6s}
+#bar span.hot{color:var(--ask)}#bar span.hot i{background:var(--ask)}
+#bar b{color:var(--ink);font-weight:650}
 h1{font-size:19px;margin:0;flex:1}
 #live{font-size:12px;color:var(--mute);display:flex;align-items:center;gap:6px}
 #live i{width:9px;height:9px;border-radius:50%;background:var(--sleep)}
@@ -80,7 +85,7 @@ a{color:var(--ready)}
 </style>
 </head>
 <body>
-<header><h1>Điều phối</h1><span id="live"><i></i><span id="when">Đang nối…</span></span><button id="gear" aria-label="Cài đặt">⚙</button></header>
+<header><h1>Điều phối</h1><span id="live"><i></i><span id="when">Đang nối…</span></span><button id="gear" aria-label="Cài đặt">⚙</button><div id="bar" aria-label="Phần cứng PC"></div></header>
 <section id="t-office" class="on"><div id="stage"><canvas id="cv"></canvas><button class="act" id="back">‹ Toàn cảnh</button><span id="hint">Chạm một bàn để phóng vào</span></div><div id="col"></div></section>
 <section id="t-work"></section>
 <section id="t-hw"><div class="empty">Đang đọc phần cứng…</div></section>
@@ -179,8 +184,8 @@ function gauge(c, name, pct, text) { const d = E('div', 'g'), l = E('div', 'line
 function drawHw(h) {
   const m = $('t-hw'); m.textContent = ''; m.append(E('h2', '', 'Máy lúc ' + h.time.slice(11)));
   const c = E('div', 'card');
-  if (!h.psutil) c.append(E('div', 'empty', 'PC chưa cài psutil nên không đọc được CPU, RAM và tiến trình (pip install psutil).'));
-  else { gauge(c, 'CPU', h.cpu, Math.round(h.cpu) + '%'); gauge(c, 'RAM', h.ram.percent, h.ram.used_gb + ' / ' + h.ram.total_gb + ' GB'); }
+  if (h.ram) { gauge(c, 'CPU', h.cpu, Math.round(h.cpu) + '%'); gauge(c, 'RAM', h.ram.percent, h.ram.used_gb + ' / ' + h.ram.total_gb + ' GB'); }
+  if (!h.psutil) c.append(E('div', 'empty', 'PC chưa cài psutil nên chưa biết tiến trình nào thuộc project nào (pip install psutil).'));
   (h.gpu || []).forEach(g => { gauge(c, 'GPU · ' + g.name, g.util, (g.util ?? '?') + '% · ' + (g.temp ?? '?') + ' °C'); gauge(c, 'VRAM', 100 * g.mem_used / g.mem_total, Math.round(g.mem_used) + ' / ' + Math.round(g.mem_total) + ' MB'); });
   if (h.gpu === null) c.append(E('div', 'empty', 'Không thấy nvidia-smi nên không có số GPU.'));
   (h.disks || []).forEach(d => gauge(c, 'Ổ ' + d.mount, 100 * (1 - d.free_gb / d.total_gb), 'còn ' + d.free_gb + ' GB'));
@@ -199,6 +204,13 @@ function drawHw(h) {
     const run = h.projects.filter(p => p.state === 'running'); k.append(E('p', 'note', run.length ? 'Đang có project chạy: ' + run.map(p => '@' + p.id).join(', ') + '. Tắt máy sẽ dừng chúng.' : 'Không có project nào đang chạy. Bật máy từ xa không làm được từ app này.')); m.append(k); }
   if ((h.other || []).length) { m.append(E('h2', '', 'Chương trình nặng ngoài các project')); const k = E('div', 'card');
     h.other.forEach(o => { const d = E('div', 'row line'); d.append(E('span', 'dot')); const nm = E('span', 'nm'); nm.append(E('b', '', o.name), E('small', '', 'CPU ' + o.cpu + '% · RAM ' + o.ram_mb + ' MB' + (o.gpu_mb ? ' · GPU ' + Math.round(o.gpu_mb) + ' MB' : ''))); d.append(nm); k.append(d); }); m.append(k); } }
+// status bar: a few numbers from the PC, refreshed while the app is on screen
+function drawBar(h) { const b = $('bar'); b.textContent = ''; const chip = (name, pct, text) => { const c = E('span', pct > 85 ? 'hot' : ''); c.append(name + ' ', E('b', '', text)); const i = E('i'); i.style.width = Math.max(0, Math.min(100, pct || 0)) + '%'; c.append(i); b.append(c); };
+  if (h.cpu != null) chip('CPU', h.cpu, h.cpu + '%'); if (h.ram != null) chip('RAM', h.ram, h.ram + '%');
+  (h.gpu || []).slice(0, 1).forEach(g => { if (g.util != null) chip('GPU', g.util, g.util + '%'); if (g.mem_total) chip('VRAM', 100 * g.mem_used / g.mem_total, (g.mem_used / 1024).toFixed(1) + 'G'); if (g.temp != null) chip('Nhiệt', g.temp, g.temp + '°'); });
+  if (!b.children.length) b.append(E('span', '', 'Chưa đọc được phần cứng')); }
+async function pollBar() { if (document.hidden || !liveMode) return; try { drawBar(await api('api/hwlite')); } catch (e) { $('bar').textContent = ''; } }
+setInterval(pollBar, 6000);
 let hwTimer = null, cur = 'office';
 async function pollHw() { if (cur !== 'hw' || document.hidden) return; try { drawHw(await api('api/hw')); } catch (e) { $('t-hw').textContent = ''; $('t-hw').append(E('div', 'empty', liveMode ? e.message : 'Chỉ xem được khi nối trực tiếp với PC.')); } }
 function tab(t) { cur = t; if (t === 'office') pollAct(); document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === 't-' + t)); document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
@@ -355,7 +367,7 @@ const office = (() => {
 
 const live = $('live'), when = $('when');
 function show(s, mode) { if (s.error) { live.className = 'off'; when.textContent = s.error; return; }
-  const was = liveMode; liveMode = mode === 'live'; draw(s); if (liveMode && !was) pollAct(); live.className = liveMode ? 'on' : ''; when.textContent = (liveMode ? 'Trực tiếp · ' : 'Bản chụp · ') + s.generated.slice(5, 16); }
+  const was = liveMode; liveMode = mode === 'live'; draw(s); if (liveMode && !was) { pollAct(); pollBar(); } if (!liveMode) $('bar').textContent = ''; live.className = liveMode ? 'on' : ''; when.textContent = (liveMode ? 'Trực tiếp · ' : 'Bản chụp · ') + s.generated.slice(5, 16); }
 let got = false, es = null;
 function snapshot() { fetch('state.json', {cache:'no-cache'}).then(r => r.json()).then(s => show(s, 'snap')).catch(() => { live.className = 'off'; when.textContent = 'Không nối được với PC'; }); }
 async function connect() {

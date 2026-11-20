@@ -63,6 +63,57 @@ def gpus():
     return cards, per_pid
 
 
+_cpu_prev, _gpu_cache = [None], [0.0, None]
+
+
+def cpu_ram():
+    """(cpu %, ram %, ram used GB, ram total GB) without psutil when it is missing: Windows API or /proc."""
+    if psutil:
+        vm = psutil.virtual_memory()
+        return psutil.cpu_percent(None), vm.percent, vm.used / 2 ** 30, vm.total / 2 ** 30
+    try:
+        if os.name == 'nt':
+            import ctypes
+
+            class FT(ctypes.Structure):
+                _fields_ = [('lo', ctypes.c_uint32), ('hi', ctypes.c_uint32)]
+
+            class MS(ctypes.Structure):
+                _fields_ = [('length', ctypes.c_uint32), ('load', ctypes.c_uint32)] + [
+                    (n, ctypes.c_uint64) for n in ('total', 'avail', 'tpage', 'apage', 'tvirt', 'avirt', 'aext')]
+            idle, kern, user = FT(), FT(), FT()
+            ctypes.windll.kernel32.GetSystemTimes(ctypes.byref(idle), ctypes.byref(kern), ctypes.byref(user))
+            val = lambda f: (f.hi << 32) | f.lo
+            cur = (val(idle), val(kern) + val(user))          # kernel time already contains idle time
+            ms = MS()
+            ms.length = ctypes.sizeof(MS)
+            ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(ms))
+            ram = (float(ms.load), (ms.total - ms.avail) / 2 ** 30, ms.total / 2 ** 30)
+        else:
+            with open('/proc/stat') as f:
+                n = [int(x) for x in f.readline().split()[1:]]
+            cur = (n[3] + n[4], sum(n))
+            with open('/proc/meminfo') as f:
+                mem = {ln.split(':')[0]: int(ln.split()[1]) for ln in f if ':' in ln}
+            total, avail = mem['MemTotal'] * 1024, mem.get('MemAvailable', mem['MemFree']) * 1024
+            ram = (100 * (1 - avail / total), (total - avail) / 2 ** 30, total / 2 ** 30)
+        prev, _cpu_prev[0] = _cpu_prev[0], cur
+        cpu = None if not prev or cur[1] == prev[1] else max(0.0, 100 * (1 - (cur[0] - prev[0]) / (cur[1] - prev[1])))
+        return (cpu,) + ram
+    except Exception:
+        return None, None, None, None
+
+
+def lite():
+    """The few numbers for the app's status bar: cheap enough to ask every few seconds."""
+    cpu, ram, used, total = cpu_ram()
+    if time.time() - _gpu_cache[0] > 8:                 # one nvidia-smi run at most every 8 seconds
+        _gpu_cache[:] = [time.time(), gpus()[0]]
+    return {'time': time.strftime('%H:%M:%S'), 'cpu': None if cpu is None else round(cpu), 'ram': None if ram is None else round(ram),
+            'ram_used_gb': None if used is None else round(used, 1), 'ram_total_gb': None if total is None else round(total, 1),
+            'gpu': _gpu_cache[1]}
+
+
 def _norm(path):
     return str(path).replace('\\', '/').lower().rstrip('/') + '/'
 
@@ -196,6 +247,11 @@ def snapshot(projects):
                 row['names'].append(short)
         for key in set(_seen) - alive:
             del _seen[key]
+    if not psutil:
+        cpu, ram, used, total = cpu_ram()
+        if ram is not None:
+            out['cpu'] = cpu or 0.0
+            out['ram'] = {'used_gb': round(used, 1), 'total_gb': round(total, 1), 'percent': ram}
     acts = claude_activity(projects)
     out['claude'] = acts
     now = time.time()

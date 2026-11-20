@@ -405,6 +405,10 @@ class Handler(SimpleHTTPRequestHandler):
                 return self.reply(200, activity())
             except Exception as e:
                 return self.reply(500, {'error': '%s: %s' % (type(e).__name__, e)})
+        if path == '/api/hwlite':
+            sys.path.insert(0, str(Path(__file__).resolve().parent))
+            import hw
+            return self.reply(200, hw.lite())
         if path == '/api/net':
             return self.reply(200, net_diag())
         if path == '/api/hw':
