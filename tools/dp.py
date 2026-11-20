@@ -1953,7 +1953,7 @@ def vpn_addresses():
 def cmd_serve(args):
     hosts = [args.host]
     if args.host in ('zerotier', 'tailscale', 'vpn'):
-        for attempt in range(18):                # at logon the VPN adapter can come up after this script
+        for attempt in range(6 if (registry().get('tunnel') or {}).get('enabled') else 18):     # at logon the VPN adapter can come up after this script
             hosts = vpn_addresses() if args.host == 'vpn' else []
             if args.host != 'vpn':
                 try:
@@ -1964,7 +1964,9 @@ def cmd_serve(args):
                 break
             time.sleep(10)
         else:
-            raise SystemExit('dp serve: no %s adapter with an IPv4 address; is it installed and joined?' % args.host)
+            if not (registry().get('tunnel') or {}).get('enabled'):
+                raise SystemExit('dp serve: no %s adapter with an IPv4 address; is it installed and joined?' % args.host)
+            hosts = ['127.0.0.1']                    # no VPN on this PC: the Cloudflare tunnel alone carries the phone
     ThreadingHTTPServer.daemon_threads = True
     Handler.key = token()
     tun = registry().get('tunnel') or {}
