@@ -1494,11 +1494,77 @@ def claude_cmd():
     return ['cmd', '/c', exe] if exe.lower().endswith(('.cmd', '.bat')) else [exe]
 
 
+# How hard a message is, by rule and without spending a token. Built from Anthropic's own guidance on picking a model
+# (claude.com "Claude models explained", "Working with Claude Fable 5"): Fable is for the most complex or ambiguous
+# work, where the outcome is not yet clear, with many steps that build on each other, many tools or projects, a series
+# of judgment calls, or a high cost of getting it wrong; Opus for deep work with a clear shape; Sonnet for everyday
+# work; Haiku for quick questions. Keywords are matched on fold() text (no accents, no spaces).
+ROUTE_LIGHT = ('tinhhinh', 'aidang', 'danglamgi', 'phancung', 'gpu', 'ram', 'cpu', 'baonhieu', 'trangthai', 'viecnaocho', 'choanh',
+               'chao', 'hello', 'token', 'luuluong', 'conchay', 'xongchua', 'camon', 'okela', 'oke', 'mayconbat')
+ROUTE_DEEP = ('thietke', 'kehoach', 'phantich', 'chienluoc', 'nguyennhan', 'taisao', 'visao', 'sosanh', 'dexuat', 'nghiky', 'nghisau',
+              'kientruc', 'rasoat', 'ralai', 'toiuu', 'danhgia', 'quyetdinh', 'hoidong', 'uutien', 'lotrinh', 'tracuu', 'nghiencuu',
+              'tonghop', 'phanloai', 'xaydung', 'lamlai')
+ROUTE_FABLE = (   # (points, why, keywords)
+    (2, 'chưa rõ kết quả', ('taisao', 'visao', 'nguyennhan', 'chuabiet', 'khongbiet', 'khampha', 'ytuong', 'brainstorm', 'huongdi',
+                           'lamsaode', 'cachnao', 'cothekhong', 'duockhong', 'giaiphap', 'dieutra', 'timhieu')),
+    (2, 'nhiều bước nối tiếp', ('tudaudencuoi', 'toanbo', 'trongoi', 'endtoend', 'hoanchinh', 'tulamhet', 'nhieubuoc', 'nhieungay',
+                               'toanhethong', 'cahethong', 'kientruc', 'refactor', 'vietlai', 'lamlai', 'dunglai', 'xaydunglai',
+                               'tudonghoa', 'quytrinh', 'pipeline', 'migrat', 'chuyendoi')),
+    (2, 'sai thì tốn kém', ('quantrong', 'hetrong', 'khongduocsai', 'chinhxac', 'luanvan', 'baibao', 'manuscript', 'hopdong',
+                           'ngansach', 'taichinh', 'nopdon', 'nophoso', 'deadline', 'chienluoc', 'quyetdinh', 'baomat', 'duongdai')),
+    (1, 'cần nhiều phán đoán', ('tonghop', 'sosanh', 'danhgia', 'rasoat', 'phanbien', 'toiuu', 'lotrinh', 'kehoach', 'dexuat',
+                               'phantich', 'thietke', 'nghiencuu', 'tracuu', 'uutien', 'cannhac', 'danhdoi')),
+    (1, 'nhiều project', ('nhieuproject', 'cacproject', 'moiproject', 'tatcaproject', 'caccorchestra', 'cacorchestra', 'moiorchestra')),
+)
+ROUTE_CLEAR = ('sualoi', 'doiten', 'doimau', 'themnut', 'xoanut', 'chinhsua', 'dichsang', 'tomtat', 'xemgiup', 'kiemtra', 'gui',
+               'mophien', 'tatmay', 'khoidong', 'giaofile', 'nhacnho', 'ngangon')
+
+
+def classify(text, cfg=None):
+    """Sorts one message, by rule, into light / normal / deep / fable. Returns (tier, score, reasons)."""
+    cfg = cfg if cfg is not None else (registry().get('chat') or {})
+    f = fold(text)
+    score, why = 0, []
+    for pts, label, keys in ROUTE_FABLE:
+        if any(k in f for k in keys):
+            score += pts
+            why.append(label)
+    tags = set(m.lower() for m in re.findall(r'@([\w.-]+)', text))
+    if len(tags) >= 2:
+        score += min(3, len(tags) - 1)
+        why.append('%d project' % len(tags))
+    lines = [l for l in str(text).splitlines() if re.match(r'\s*(?:[-*•]|\d+[.)])\s+', l)]
+    if len(lines) >= 4:
+        score += 1
+        why.append('%d yêu cầu con' % len(lines))
+    n = len(text)
+    if n > 1500:
+        score += 2
+        why.append('rất dài')
+    elif n > 600:
+        score += 1
+        why.append('dài')
+    if 'inbox-files' in text:
+        score += 1
+        why.append('có tệp kèm')
+    if any(k in f for k in ROUTE_CLEAR):
+        score -= 2
+        why.append('việc rõ hình')
+    if n < 120:
+        score -= 1
+    if score >= int(cfg.get('fable_score') or 6):
+        return 'fable', score, why
+    if n > 400 or score >= int(cfg.get('deep_score') or 3) or any(k in f for k in ROUTE_DEEP):
+        return 'deep', score, why
+    if n < 90 and '@' not in text and any(k in f for k in ROUTE_LIGHT):
+        return 'light', score, why
+    return 'normal', score, why
+
+
 def pick_model(text):
-    """Which model answers this message. `chat.model` in registry.yaml: a fixed name, or `auto` = a quick look at
-    the message: status questions go to the light model, design and analysis to the deep one, the rest to the
-    normal one. The owner can force it by starting the message with /haiku, /sonnet, /opus or /fable.
-    A deep message then goes before the shareholders' council (see `council`), which decides Opus or Fable."""
+    """Which model answers this message. `chat.model` in registry.yaml: a fixed name, or `auto` = `classify`, a rule
+    with no token spent. The owner can force a model by starting the message with /haiku, /sonnet, /opus or /fable.
+    With `chat.fable_by: council` a deep message also goes to the shareholders' council (see `council`)."""
     cfg = registry().get('chat') or {}
     m = re.match(r'\s*/(haiku|sonnet|opus|fable)\b\s*', text, re.I)
     if m:
@@ -1507,21 +1573,22 @@ def pick_model(text):
     fixed = str(cfg.get('model') or 'auto')
     if fixed != 'auto':
         return fixed, text, 'cố định'
-    f = fold(text)
-    deep = ('thietke', 'kehoach', 'phantich', 'chienluoc', 'nguyennhan', 'taisao', 'visao', 'sosanh', 'dexuat', 'nghiky', 'nghisau',
-            'kientruc', 'rasoat', 'ralai', 'toiuu', 'danhgia', 'quyetdinh', 'hoidong', 'uutien', 'lotrinh')
-    light = ('tinhhinh', 'aidang', 'danglamgi', 'phancung', 'gpu', 'ram', 'cpu', 'baonhieu', 'trangthai', 'viecnaocho', 'choanh',
-             'chao', 'hello', 'token', 'luuluong', 'conchay', 'xongchua', 'camon')
-    if len(text) > 400 or any(k in f for k in deep):
-        return str(cfg.get('deep') or 'opus'), text, 'việc cần nghĩ sâu'
-    if len(text) < 90 and '@' not in text and any(k in f for k in light):
+    tier, score, why = classify(text, cfg)
+    tail = (' (%s)' % ', '.join(why)) if why else ''
+    if tier == 'fable':
+        if cfg.get('fable', True) is False:
+            return str(cfg.get('deep') or 'opus'), text, 'việc rất khó, Fable đang tắt' + tail
+        return fable_name(cfg), text, 'việc rất khó, điểm %d%s' % (score, tail)
+    if tier == 'deep':
+        return str(cfg.get('deep') or 'opus'), text, 'việc cần nghĩ sâu, điểm %d%s' % (score, tail)
+    if tier == 'light':
         return str(cfg.get('light') or 'haiku'), text, 'câu hỏi nhanh'
     return str(cfg.get('normal') or 'sonnet'), text, 'việc thường'
 
 
 def fable_name(cfg=None):
     cfg = cfg if cfg is not None else (registry().get('chat') or {})
-    return str(cfg.get('fable') or 'claude-fable-5-2')
+    return str(cfg.get('fable_model') or 'claude-fable-5-2')
 
 
 COUNCIL_SYS = ('You are one member of a shareholders council that picks the model for an AI agent (the CEO). '
@@ -1635,6 +1702,9 @@ def chat_recent(n=6):
         '- %s: %s' % ('anh Vinh' if r.get('who') == 'vinh' else 'CEO', short(r.get('text', ''), 400)) for r in rows) + '\n\nTin mới của anh Vinh:\n'
 
 
+NO_BYPASS = []
+
+
 def chat_turn(text, model, session=None):
     """Runs `claude -p` once. Returns (reply, result event)."""
     cmd = claude_cmd()
@@ -1645,13 +1715,18 @@ def chat_turn(text, model, session=None):
         full = json.loads((HUB / 'quyen-tong-quan.json').read_text(encoding='utf-8')).get('toan_quyen') is True
     except (OSError, ValueError, AttributeError):
         full = False
+    bypass = full and not NO_BYPASS
     py = sys.executable.replace('\\', '/')
     if py.lower().endswith('pythonw.exe') and Path(py[:-5] + '.exe').is_file():
         py = py[:-5] + '.exe'
     hook = {'hooks': {'PreToolUse': [{'matcher': '', 'hooks': [{'type': 'command', 'command': '"%s" "%s"' % (py, str(HUB / 'tools' / 'guard.py').replace('\\', '/'))}]}]}}
+    if bypass:   # full rights: nothing waits for a permission prompt that nobody can answer in -p; guard.py still blocks every delete
+        hook['permissions'] = {'defaultMode': 'bypassPermissions', 'allow': [
+            'Read', 'Edit', 'Write', 'MultiEdit', 'NotebookEdit', 'Bash', 'WebSearch', 'WebFetch', 'Task', 'Agent', 'TodoWrite',
+            'Edit(**/.claude/**)', 'Write(**/.claude/**)', 'Edit(//**)', 'Write(//**)']}
     sfile = HUB / 'out' / 'chat-settings.json'
     sfile.write_text(json.dumps(hook), encoding='utf-8')
-    cmd += ['-p', '--output-format', 'stream-json', '--verbose', '--max-turns', '40' if full else '25', '--model', model, '--permission-mode', 'acceptEdits',
+    cmd += ['-p', '--output-format', 'stream-json', '--verbose', '--max-turns', '40' if full else '25', '--model', model, '--permission-mode', 'bypassPermissions' if bypass else 'acceptEdits',
             '--settings', str(sfile)]
     if full:
         cmd += ['--allowedTools', 'Read,Grep,Glob,Edit,Write,MultiEdit,NotebookEdit,TodoWrite,Bash,WebSearch,WebFetch,Task,Agent',
@@ -1693,6 +1768,10 @@ def chat_turn(text, model, session=None):
         killer.cancel()
     if not reply or result.get('is_error'):
         err = pr.stderr.read().decode('utf-8', 'replace')
+        if bypass and 'bypass' in (err + str(reply or '')).lower():   # this PC's policy refuses the mode: back to acceptEdits
+            NO_BYPASS.append(1)
+            heal_log('CEO: chế độ bypassPermissions bị từ chối, quay về acceptEdits')
+            return chat_turn(text, model, session)
         raise RuntimeError(one_line(err or reply or '', 300) or 'không có câu trả lời (mã %s)' % pr.returncode)
     return reply, result
 
@@ -1705,7 +1784,7 @@ def chat_run(text):
     try:
         model, text, why = pick_model(text)
         cfg = registry().get('chat') or {}
-        if why == 'việc cần nghĩ sâu' and cfg.get('council', True) is not False:
+        if why.startswith(('việc cần nghĩ sâu', 'việc rất khó')) and str(cfg.get('fable_by') or 'rules') == 'council':
             CHAT['step'] = 'hội đồng cổ đông đang họp'
             model, why, votes = council(text, cfg)
         CHAT['model'] = model
