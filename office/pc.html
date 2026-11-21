@@ -287,7 +287,7 @@ function drawChat(st) {
     d.append(E('small', '', String(m.t || '').slice(11, 16) + (meta.model ? ' · ' + String(meta.model).replace(/^claude-fable.*/, 'fable') : '') + (meta.why ? ' · ' + meta.why : ''))); log.append(d); });
   $('logbox').scrollTop = 1e9;
   const boss = ms.filter(m => m.who !== 'vinh'), last = boss[boss.length - 1], id = last ? last.t + '|' + last.text.length : '';
-  if (SEEN !== null && id && id !== SEEN) { if (TTS) speak(last.text); if (!document.body.classList.contains('chat')) { $('openchat').classList.add('new'); toast('CEO: ' + last.text.split('\n')[0].slice(0, 140)); } }
+  if (SEEN !== null && id && id !== SEEN) { if (TTS) speakQ(last.text); if (!document.body.classList.contains('chat')) { $('openchat').classList.add('new'); toast('CEO: ' + last.text.split('\n')[0].slice(0, 140)); } }
   SEEN = id; }
 async function pollChat() { let wait = 6000; try { const st = await api('api/chat'); drawChat(st); if (st.busy) wait = 2500; } catch (e) { $('ceo').className = 'off'; $('ceot').textContent = e.message; } setTimeout(pollChat, document.hidden ? 15000 : wait); }
 async function upload(f) { const r = await fetch('api/upload?name=' + encodeURIComponent(f.name), {method: 'POST', headers: {'X-DP-Key': KEY, 'Content-Type': 'application/octet-stream'}, body: f}); const j = await r.json(); if (!r.ok || !j.ok) throw new Error(j.error || 'tải lên lỗi'); return j.id; }
@@ -307,12 +307,47 @@ document.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.fi
 /* ---------- voice ---------- */
 let TTS = LS.get('dp-tts', '0') === '1', HANDS = false, SPEAKING = false;
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-function speak(text) { if (!('speechSynthesis' in window)) return;
-  const u = new SpeechSynthesisUtterance(String(text).replace(/```[\s\S]*?```/g, ' ').replace(/[*_`#>|]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').slice(0, 1200));
+function browserSpeak(text) {
+  if (!('speechSynthesis' in window)) return;
+  const u = new SpeechSynthesisUtterance(String(text).replace(/```[\s\S]*?```/g, ' ').replace(/[*_`#>|]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').slice(0, 900));
   u.lang = 'vi-VN'; const v = speechSynthesis.getVoices().find(x => /^vi/i.test(x.lang)); if (v) u.voice = v; u.rate = 1.05;
-  u.onstart = () => { SPEAKING = true; duck(true); }; u.onend = u.onerror = () => { SPEAKING = false; duck(false); }; speechSynthesis.cancel(); speechSynthesis.speak(u); }
+  u.onstart = () => { SPEAKING = true; duck(true); }; u.onend = u.onerror = () => { SPEAKING = false; duck(false); };
+  speechSynthesis.cancel(); speechSynthesis.speak(u);
+}
+/* the PC reads the answer (VieNeu-TTS, southern voice) sentence by sentence; the browser voice is the fallback */
+const SAYER = new Audio(); let SAY_ID = 0;
+function sayStop() { SAYE++; SAY_ID++; SAYER.pause(); if ('speechSynthesis' in window) speechSynthesis.cancel(); SPEAKING = false; duck(false); }
+function sayChunks(text) {
+  const t = String(text).replace(/```[\s\S]*?```/g, ' ').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/[*_`#>|]/g, '').replace(/\s+/g, ' ').trim().slice(0, 3000), out = [];
+  for (const s of t.match(/[^.!?\n]+[.!?]*/g) || []) { if (out.length && out[out.length - 1].length + s.length < 160) out[out.length - 1] += s; else out.push(s); }
+  return out.map(x => x.trim()).filter(Boolean);
+}
+async function fetchWav(t) {
+  const r = await fetch('api/tts', {method:'POST', headers:{'Content-Type':'application/json', 'X-DP-Key':KEY}, body:JSON.stringify({text:t})});
+  if (!r.ok) throw new Error('tts ' + r.status);
+  return URL.createObjectURL(await r.blob());
+}
+let SAYQ = Promise.resolve(), SAYE = 0;   // a new message waits for the one being read instead of cutting it off
+function speakQ(t) { const e = SAYE; SAYQ = SAYQ.then(() => e === SAYE ? speak(t) : null).catch(() => {}); }
+async function speak(text) {
+  const id = ++SAY_ID; SAYER.pause(); if ('speechSynthesis' in window) speechSynthesis.cancel();
+  const parts = sayChunks(text); if (!parts.length) return;
+  const get = t => fetchWav(t).catch(() => new Promise(r => setTimeout(r, 1500)).then(() => fetchWav(t)));   // one retry: the hub may be restarting
+  let i = 0;
+  try {
+    let next = get(parts[0]);
+    for (; i < parts.length; i++) {
+      const url = await next; if (id !== SAY_ID) return;
+      if (i + 1 < parts.length) { next = get(parts[i + 1]); next.catch(() => {}); }
+      SAYER.src = url; await SAYER.play(); SPEAKING = true; duck(true);
+      await new Promise(res => { SAYER.onended = SAYER.onerror = res; SAYER.onpause = () => { if (id !== SAY_ID) res(); }; });
+      URL.revokeObjectURL(url); if (id !== SAY_ID) return;
+    }
+    SPEAKING = false; duck(false);
+  } catch (e) { if (id === SAY_ID) browserSpeak(parts.slice(i).join(' ')); }
+}
 function drawTts() { $('tts').classList.toggle('on', TTS); }
-$('tts').onclick = () => { TTS = !TTS; LS.set('dp-tts', TTS ? '1' : '0'); drawTts(); if (!TTS) speechSynthesis.cancel(); }; drawTts();
+$('tts').onclick = () => { TTS = !TTS; LS.set('dp-tts', TTS ? '1' : '0'); drawTts(); if (!TTS) sayStop(); }; drawTts();
 function readTab(tab) { const ts = topics().filter(t => tabOf(t.name) === tab); if (!ts.length) return speak('Chưa có mục nào.'); speak(ts.map(t => t.name + '. ' + t.items.slice(0, 5).map(x => x.title).join('. ')).join('. ')); }
 function command(said) { const f = fold(said);
   if (/(phat|mo|bat) nhac/.test(f)) { P.play(); return true; }
@@ -323,7 +358,7 @@ function command(said) { const f = fold(said);
   if (/doc cap nhat|doc chuyen mon/.test(f)) { readTab('pro'); return true; }
   if (/doc (tin )?cong nghe/.test(f)) { readTab('tech'); return true; }
   if (/doc tin/.test(f)) { readTab(TAB === 'today' ? 'pro' : TAB); return true; }
-  if (/(dung|thoi|ngung) doc|im lang/.test(f)) { speechSynthesis.cancel(); return true; }
+  if (/(dung|thoi|ngung) doc|im lang/.test(f)) { sayStop(); return true; }
   if (/thu gian|be ca|ho ca/.test(f)) { Relax.open(); return true; }
   if (/(quay lai|ve) (dashboard|bang tin)|thoat thu gian/.test(f)) { Relax.close(); return true; }
   return false; }
