@@ -1,0 +1,109 @@
+{
+  "group_id": "16728ca8-86e9-490d-9270-b304829b6612",
+  "states": [
+    {
+      "character": {
+        "id": "674002ad-cf7c-4193-b384-916ff1de9738",
+        "name": "Idle",
+        "prompt": "Tall slender glamorous Vietnamese woman CEO in her early 30s, supermodel figure and long legs, long straight glossy black hair flowing past her shoulders, elegant fitted navy blue business suit: tailored navy blazer with a small red pocket square and a navy knee-length pencil skirt, white silk blouse, black high heels, red lipstick, confident charming look. Chic modern office executive, cozy RPG game sprite.",
+        "size": {
+          "width": 80,
+          "height": 80
+        },
+        "template_id": "mannequin",
+        "directions": 8,
+        "view": "high top-down",
+        "created_at": "2026-11-21T06:06:45.782715+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {
+          "sit2": {
+            "south": [
+              "Idle/animations/sit2/south/frame_000.png",
+              "Idle/animations/sit2/south/frame_001.png",
+              "Idle/animations/sit2/south/frame_002.png",
+              "Idle/animations/sit2/south/frame_003.png",
+              "Idle/animations/sit2/south/frame_004.png"
+            ]
+          },
+          "walk3": {
+            "south": [
+              "Idle/animations/walk3/south/frame_000.png",
+              "Idle/animations/walk3/south/frame_001.png",
+              "Idle/animations/walk3/south/frame_002.png",
+              "Idle/animations/walk3/south/frame_003.png",
+              "Idle/animations/walk3/south/frame_004.png",
+              "Idle/animations/walk3/south/frame_005.png"
+            ]
+          },
+          "walk2": {
+            "south": [
+              "Idle/animations/walk2/south/frame_000.png",
+              "Idle/animations/walk2/south/frame_001.png",
+              "Idle/animations/walk2/south/frame_002.png",
+              "Idle/animations/walk2/south/frame_003.png",
+              "Idle/animations/walk2/south/frame_004.png",
+              "Idle/animations/walk2/south/frame_005.png"
+            ]
+          },
+          "sit3": {
+            "south": [
+              "Idle/animations/sit3/south/frame_000.png",
+              "Idle/animations/sit3/south/frame_001.png",
+              "Idle/animations/sit3/south/frame_002.png",
+              "Idle/animations/sit3/south/frame_003.png",
+              "Idle/animations/sit3/south/frame_004.png"
+            ]
+          },
+          "walk": {
+            "south": [
+              "Idle/animations/walk/south/frame_000.png",
+              "Idle/animations/walk/south/frame_001.png",
+              "Idle/animations/walk/south/frame_002.png",
+              "Idle/animations/walk/south/frame_003.png",
+              "Idle/animations/walk/south/frame_004.png",
+              "Idle/animations/walk/south/frame_005.png"
+            ],
+            "east": [
+              "Idle/animations/walk/east/frame_000.png",
+              "Idle/animations/walk/east/frame_001.png",
+              "Idle/animations/walk/east/frame_002.png",
+              "Idle/animations/walk/east/frame_003.png",
+              "Idle/animations/walk/east/frame_004.png",
+              "Idle/animations/walk/east/frame_005.png"
+            ],
+            "west": [
+              "Idle/animations/walk/west/frame_000.png",
+              "Idle/animations/walk/west/frame_001.png",
+              "Idle/animations/walk/west/frame_002.png",
+              "Idle/animations/walk/west/frame_003.png",
+              "Idle/animations/walk/west/frame_004.png",
+              "Idle/animations/walk/west/frame_005.png"
+            ],
+            "north": [
+              "Idle/animations/walk/north/frame_000.png",
+              "Idle/animations/walk/north/frame_001.png",
+              "Idle/animations/walk/north/frame_002.png",
+              "Idle/animations/walk/north/frame_003.png",
+              "Idle/animations/walk/north/frame_004.png",
+              "Idle/animations/walk/north/frame_005.png"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-11-21T06:13:59.872661"
+}
