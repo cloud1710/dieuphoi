@@ -2651,7 +2651,7 @@ def viec_view():
     except Exception:
         return []
     since = (datetime.datetime.now() - datetime.timedelta(hours=18)).strftime('%Y-%m-%d %H:%M')
-    return [{k: j.get(k) for k in ('id', 'name', 'parent', 'state', 'start', 'end', 'result', 'kind')} | {'step': (j['steps'][-1]['text'] if j['steps'] else '')}
+    return [dict({k: j.get(k) for k in ('id', 'name', 'parent', 'state', 'start', 'end', 'result', 'kind')}, step=(j['steps'][-1]['text'] if j['steps'] else ''))
             for j in book['jobs'] if j['state'] in ('chay', 'cho') or str(j.get('end') or '') >= since][-40:]
 
 
