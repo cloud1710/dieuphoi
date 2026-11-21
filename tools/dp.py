@@ -1103,6 +1103,26 @@ def reload_on_change():
             os._exit(3)
 
 
+def self_watch(port):
+    """The hidden server asks itself for a page every minute; three misses in a row (the listener died while the
+    process lives on) and it leaves, so the start script runs it again. Seen on 2026-11-21: port closed, process alive."""
+    import urllib.request
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))     # never through a system proxy
+    miss = 0
+    time.sleep(90)
+    while True:
+        try:
+            with opener.open('http://127.0.0.1:%d/manifest.webmanifest' % port, timeout=15) as r:
+                r.read(64)
+            miss = 0
+        except Exception as e:
+            miss += 1
+            if miss >= 3:
+                heal_log('server không còn nhận kết nối (%s): tự khởi động lại' % one_line(e, 120))
+                os._exit(4)
+        time.sleep(60)
+
+
 def auto_publish():
     """Runs inside `dp serve` once a first publish has worked: redeploy when the owner's to-do list changes."""
     wait = 300
@@ -2446,6 +2466,7 @@ def cmd_serve(args):
     threading.Thread(target=auto_publish, daemon=True).start()
     if args.reload:
         threading.Thread(target=reload_on_change, daemon=True).start()
+        threading.Thread(target=self_watch, args=(args.port,), daemon=True).start()
     threading.Thread(target=game_watch, daemon=True).start()
     threading.Timer(8, chat_resume).start()
     threading.Thread(target=token_loop, daemon=True).start()
