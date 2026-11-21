@@ -317,9 +317,11 @@ function browserSpeak(text) {
 /* the PC reads the answer (VieNeu-TTS, southern voice) sentence by sentence; the browser voice is the fallback */
 const SAYER = new Audio(); let SAY_ID = 0;
 function sayStop() { SAYE++; SAY_ID++; SAYER.pause(); if ('speechSynthesis' in window) speechSynthesis.cancel(); SPEAKING = false; duck(false); }
+/* long sentences are cut at commas / spaces (~110 chars): the voice model clips text that is too long, which ended answers mid-sentence */
+function sayPieces(t) { const r = []; for (const s of t.match(/[^.!?\n]+[.!?]*/g) || []) { if (s.length <= 120) { r.push(s); continue; } let c = ''; for (const w of s.match(/[^,;:]+[,;:]*/g) || [s]) { for (const x of (w.length > 120 ? w.match(/.{1,100}(\s|$)/g) : [w])) { if (c && c.length + x.length > 110) { r.push(c); c = ''; } c += x; } } if (c) r.push(c); } return r; }
 function sayChunks(text) {
-  const t = String(text).replace(/```[\s\S]*?```/g, ' ').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/[*_`#>|]/g, '').replace(/\s+/g, ' ').trim().slice(0, 3000), out = [];
-  for (const s of t.match(/[^.!?\n]+[.!?]*/g) || []) { if (out.length && out[out.length - 1].length + s.length < 160) out[out.length - 1] += s; else out.push(s); }
+  const t = String(text).replace(/```[\s\S]*?```/g, ' ').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').replace(/[*_`#>|]/g, '').replace(/(\.{2,}|…)/g, ', ').replace(/(\d{1,3})\.000\.000(?!\d)/g, '$1 triệu').replace(/(\d{1,3})\.(\d{3})(?!\d)/g, (m, a, b) => b === '000' ? a + ' ng\u00e0n' : a + ' ng\u00e0n ' + b).replace(/(^|\D)(\d{1,3})000(?!\d)/g, '$1$2 ng\u00e0n').replace(/%/g, ' ph\u1ea7n tr\u0103m').replace(/\u00d7/g, ' nh\u00e2n ').replace(/\u2265/g, ' l\u1edbn h\u01a1n ho\u1eb7c b\u1eb1ng ').replace(/\u2264/g, ' nh\u1ecf h\u01a1n ho\u1eb7c b\u1eb1ng ').replace(/\u00b1/g, ' c\u1ed9ng tr\u1eeb ').replace(/["\u201c\u201d]/g, '').replace(/(\d),(\d)/g, '$1 phẩy $2').replace(/(\d)\.(\d)/g, '$1 chấm $2').replace(/\s+/g, ' ').trim().slice(0, 3000), out = [];
+  for (const s of sayPieces(t)) { if (out.length && out[out.length - 1].length + s.length < 110) out[out.length - 1] += s; else out.push(s); }
   return out.map(x => x.trim()).filter(Boolean);
 }
 async function fetchWav(t) {
