@@ -92,7 +92,7 @@ textarea{min-height:84px;resize:vertical}
 .ar{display:flex;align-items:center;gap:6px;background:rgba(14,16,22,.58);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:17px;padding:2px 10px 2px 2px;color:#f2f3f6;font:600 11.5px/1.2 system-ui,sans-serif;width:max-content;max-width:100%;pointer-events:auto;cursor:pointer;flex:none}
 .ar img{width:28px;height:28px;border-radius:50%;flex:none;box-shadow:0 0 0 2px #3f9d74}.ar span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ar.meet{background:rgba(47,79,122,.85)}.ar.meet img{box-shadow:0 0 0 2px #5fd39a,0 0 8px #5fd39a}.ar.sel{outline:2px solid #fff}.ar small{opacity:.7;font-weight:500;margin-left:2px}.ar.none{padding:5px 10px;font-weight:500;opacity:.85}#stats,#log{transition:opacity .4s}#stage.zoomin #stats,#stage.zoomin #log{opacity:0;pointer-events:none}
 #camb{position:absolute;right:8px;top:8px;margin:0;padding:4px 9px;font-size:11.5px;opacity:.92}
-#viewb{position:absolute;right:8px;top:42px;margin:0;padding:4px 9px;font-size:11.5px;opacity:.92}
+#themes{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 4px}.th{border:1px solid var(--line);border-radius:12px;padding:9px 12px;background:var(--card);font:600 13px system-ui,sans-serif;color:inherit;text-align:left;min-width:46%;flex:1}.th small{display:block;font-weight:400;opacity:.7;margin-top:2px}.th.on{border-color:#3f9d74;box-shadow:0 0 0 2px #3f9d74 inset}.th:disabled{opacity:.5}#pair h2.sh{font-size:15px;margin:18px 0 4px}
 #cv3,#lb3{position:absolute;inset:0;width:100%;height:100%;display:none}#cv3{touch-action:none}#lb3{pointer-events:none;overflow:hidden}#stage.v3 #cv3,#stage.v3 #lb3{display:block}#stage:not(.v3) #cv3,#stage:not(.v3) #lb3{display:none!important}#stage.v3 #cv{display:none}
 .l3{position:absolute;left:0;top:0;white-space:nowrap;font:700 10.5px/1.35 system-ui,sans-serif;color:#2a251d;background:rgba(255,252,244,.93);border-radius:6px;padding:1px 6px;box-shadow:0 1px 4px rgba(0,0,0,.2);will-change:transform}
 .l3 em{font-style:normal;color:#fff;background:#d2553d;border-radius:6px;padding:0 4px;margin-left:4px;font-size:9px}.l3 em.m{background:#c79a2b}.l3.tag{background:rgba(43,47,56,.88);color:#fff}
@@ -133,12 +133,12 @@ a{color:var(--ready)}
 </head>
 <body>
 <header><h1>Điều phối</h1><span id="live"><i></i><span id="when">Đang nối…</span></span><button id="gear" aria-label="Cài đặt">⚙</button><div id="bar" aria-label="Phần cứng PC"></div></header>
-<section id="t-office" class="on"><div id="stage"><canvas id="cv"></canvas><button id="wx" aria-label="Giờ và thời tiết"></button><button class="act" id="back">‹ Toàn cảnh</button><button class="act" id="camb" aria-label="Camera"></button><button class="act" id="viewb" aria-label="Kiểu văn phòng"></button><span id="hint">Chạm một bàn để phóng vào</span><div id="stats"></div><div id="log"></div></div><div id="chat"></div><div id="col"></div></section>
+<section id="t-office" class="on"><div id="stage"><canvas id="cv"></canvas><button id="wx" aria-label="Giờ và thời tiết"></button><button class="act" id="back">‹ Toàn cảnh</button><button class="act" id="camb" aria-label="Camera"></button><span id="hint">Chạm một bàn để phóng vào</span><div id="stats"></div><div id="log"></div></div><div id="chat"></div><div id="col"></div></section>
 <section id="t-work"></section>
 <section id="t-hw"><div id="board"></div><div id="hwfold"></div></section>
 <form id="say"><div id="atts"></div><button type="button" id="att" aria-label="Gửi tệp hoặc ảnh">📎</button><button type="button" id="mic" aria-label="Nói">🎤</button><button type="button" id="tts" aria-label="Đọc câu trả lời">🔈</button><input type="file" id="attf" multiple hidden><textarea id="sayt" rows="1" placeholder="Nhắn…" enterkeyhint="send"></textarea><button type="submit">Gửi</button></form>
 <nav><button data-t="office" class="on">Văn phòng</button><button data-t="hw">Trình chiếu</button><button data-t="work">Việc <b id="nq"></b></button></nav>
-<div id="pair"><h1>Cài đặt kết nối</h1><p class="note" id="pairinfo"></p><p class="note">Nhập mật khẩu kết nối của anh, hoặc mở đường dẫn ghép có đoạn <code>#k=…</code> mà PC ghi ở <code>out/phone-link.txt</code>.</p>
+<div id="pair"><h1>Cài đặt</h1><h2 class="sh">Giao diện văn phòng</h2><div id="themes"></div><p class="note" id="themenote"></p><h2 class="sh">Kết nối</h2><p class="note" id="pairinfo"></p><p class="note">Nhập mật khẩu kết nối của anh, hoặc mở đường dẫn ghép có đoạn <code>#k=…</code> mà PC ghi ở <code>out/phone-link.txt</code>.</p>
   <input id="key" type="password" placeholder="Mật khẩu kết nối hoặc mã 6 số" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false"><button class="act go" id="savekey">Kết nối</button> <button class="act" id="forget">Quên máy này</button> <button class="act" id="closepair">Đóng</button><p class="note" style="margin-top:12px">Ghép máy khác cho nhanh: trên máy đã nối, bấm nút dưới để lấy mã 6 số, rồi nhập mã đó vào ô mật khẩu của máy mới.</p><button class="act" id="mkcode">Tạo mã ghép 6 số</button><div class="res" id="code" style="font-size:22px;letter-spacing:.12em;font-weight:700"></div><label class="note" style="display:block;margin-top:8px"><input type="checkbox" id="showkey" style="width:auto;margin:0 6px 0 0">Hiện mật khẩu khi gõ</label><div class="res bad" id="pairerr"></div><p class="note" id="pairlinks"></p></div>
 <script src="board.js"></script>
 <script>
@@ -780,11 +780,15 @@ const office2d = (() => {
 const O = () => VIEW === '3d' && window.O3D;
 const office = {set(s) { office2d.set(s); if (O()) O3D.set(s); }, note(k, id, t) { office2d.note(k, id, t); if (O()) O3D.note(k, id, t); }, boss() { office2d.boss(); if (O()) O3D.boss(); },
   focus(id) { O() ? O3D.focus(id) : office2d.focus(id); }, wake() { office2d.wake(); if (O()) O3D.wake(); }, sky() { office2d.sky(); if (window.O3D) O3D.sky(); }};
-function setView(v) { VIEW = v; try { localStorage.setItem('dp-view', v); } catch (e) {} $('viewb').textContent = v === '3d' ? '◆ 3D' : '▦ Pixel';
+function setView(v) { if (v !== '3d' && v !== 'pixel') v = '3d'; VIEW = v; try { localStorage.setItem('dp-view', v); } catch (e) {} drawThemes();
   if (v === '3d') { let ok = false; try { ok = !!document.createElement('canvas').getContext('webgl2'); } catch (e) {} if (!ok) return setView('pixel');
     (window.O3D ? Promise.resolve() : import('./o3d.js')).then(() => { if (VIEW !== '3d') return; O3D.show(true); if (STATE) O3D.set(STATE); }).catch(() => setView('pixel')); }
   else { if (window.O3D) O3D.show(false); if (STATE) office2d.set(STATE); office2d.wake(); } }
-$('viewb').onclick = () => setView(VIEW === '3d' ? 'pixel' : '3d'); setView(VIEW);
+function drawThemes() { const t = $('themes'); if (!t) return; t.textContent = '';
+  [['3d', 'Tòa tháp 3D', 'Penthouse CEO, phòng Chủ tịch, thời tiết, trang trí theo mùa'], ['pixel', 'Pixel', 'Bản đồ phẳng đủ các phòng orchestra'],
+   ['ai', 'Pixel AI', 'Nhân vật và cảnh vẽ bằng Gemini và PixelLab: đang dựng, cần khoá API']].forEach(([k, n, d]) => {
+    const b = E('button', 'th' + (VIEW === k ? ' on' : ''), n); b.append(E('small', '', d)); if (k === 'ai') b.disabled = true; b.onclick = () => { setView(k); $('pair').classList.remove('on'); tab('office'); }; t.append(b); }); }
+setView(VIEW);
 
 const live = $('live'), when = $('when');
 function show(s, mode) { if (s.error) { live.className = 'off'; when.textContent = s.error; return; }
