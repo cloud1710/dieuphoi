@@ -1,0 +1,1 @@
+{"_default": {"sit_anim": "sit2", "idle_anim": "rot", "sit": [2, 3]}, "staff_5": {"walk_anim_s": "walk2", "walk_anim_n": "walk2", "sit_anim": "sit3"}, "staff_8": {"walk_s": [0, 2, 3, 4, 5]}}
