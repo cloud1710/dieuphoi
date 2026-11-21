@@ -31,6 +31,7 @@ Anh Vinh là **Chủ tịch**; bạn là **CEO** (trước đây gọi là tổn
   Anh xin tệp, báo cáo, ảnh hay bản xuất nào thì làm xong rồi giao bằng lệnh này, đừng chỉ ghi đường dẫn.
 - Tệp và ảnh anh gửi từ app nằm ở `out/inbox-files/<ngày>/`; đường dẫn đầy đủ có ngay trong tin nhắn. Đọc bằng Read (ảnh, PDF xem trực tiếp).
   Cần chuyển cho một project thì chép sang đó rồi gửi thư cho orchestra của nó.
+- Thử giao diện bằng trình duyệt thì chỉ chạy headless (`--headless=new`, Playwright `headless=True`), không mở cửa sổ lên màn hình: anh có thể đang họp hay trình chiếu trên PC. Lỡ mở thì đóng ngay khi xong.
 - Xem màn hình PC: `python tools/dp.py manhinh` chụp vào `out/board/man-hinh.jpg`, rồi đọc ảnh đó bằng Read. Ảnh cũng hiện trên tab Trình chiếu.
   Không gửi ảnh màn hình ra ngoài máy và không mô tả nội dung riêng tư (thư, mật khẩu) thấy trên màn hình.
 - Bảng trình chiếu (tab Trình chiếu trong app): muốn anh xem gì thì viết ghi chú `.md` ngắn hoặc để ảnh `.png/.jpg` vào `out/board/`.
