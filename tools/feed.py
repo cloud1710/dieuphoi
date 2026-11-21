@@ -20,7 +20,7 @@ UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) dieuphoi-dashboard'
 DEFAULT_TOPICS = [
     {'name': 'Giải phẫu bệnh số và AI', 'q': '"digital pathology" OR "computational pathology" OR "pathology AI"', 'lang': 'en'},
     {'name': 'AI và Claude', 'q': 'Anthropic Claude OR "AI agents" OR "large language model"', 'lang': 'en'},
-    {'name': 'Chứng khoán Việt Nam', 'q': 'VN-Index chứng khoán', 'lang': 'vi'},
+    {'name': 'Chứng khoán Việt Nam', 'q': 'chứng khoán VNIndex OR "thị trường chứng khoán"', 'lang': 'vi'},
     {'name': 'Y khoa Việt Nam', 'q': 'bệnh viện ung thư chẩn đoán Bộ Y tế', 'lang': 'vi'},
     {'name': 'Bóng đá', 'q': 'bóng đá Ngoại hạng Anh OR "đội tuyển Việt Nam"', 'lang': 'vi'},
 ]
