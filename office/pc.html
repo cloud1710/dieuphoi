@@ -427,9 +427,10 @@ function duck(on) { P.duck(on); }
 
 /* ---------- relax mode: scenes and ambient sound ---------- */
 const Relax = (() => {
-  const SCENES = [['aq3d', 'Bể cá 3D'], ['aqua', 'Bể cá thật'], ['rain', 'Mưa bên cửa sổ'], ['fire', 'Lửa trại'], ['forest', 'Suối rừng'], ['stars', 'Trời sao'], ['office', 'Văn phòng 3D']];
+  const SCENES = [['aq3d', 'Bể cá 3D'], ['aqua', 'Bể cá thật'], ['rain', 'Mưa bên cửa sổ'], ['fire', 'Lửa trại'], ['forest', 'Suối rừng'], ['stars', 'Trời sao'], ['deep', 'Fish Tank Screen (orchidstreet)'], ['office', 'Văn phòng 3D']];
+  const FRAMES = {office: 'm.html', deep: 'https://orchidstreet.github.io/fish-tank-screen/'};
   const SOUNDS = [['canh', 'Theo cảnh'], ['nuoc', 'Nước chảy'], ['mua', 'Mưa'], ['song', 'Sóng biển'], ['lua', 'Lửa tí tách'], ['nau', 'Tiếng ồn nâu'], ['tat', 'Tắt']];
-  const NATURAL = {aq3d: 'nuoc', aqua: 'nuoc', rain: 'mua', fire: 'lua', forest: 'nuoc', stars: 'nau', office: 'tat'};
+  const NATURAL = {aq3d: 'nuoc', aqua: 'nuoc', rain: 'mua', fire: 'lua', forest: 'nuoc', stars: 'nau', office: 'tat', deep: 'nuoc'};
   let mod = null, live = null, vp = null, scene = LS.get('dp-scene', 'aq3d'), sound = LS.get('dp-sound', 'canh'), isOpen = false, idleT = 0, hideT = 0, frame = null;
   const load = async () => mod || (mod = await import('./relax.js'));
   const isVideo = k => ['aqua', 'rain', 'fire', 'forest'].includes(k);
@@ -438,7 +439,7 @@ const Relax = (() => {
     list.forEach(([k, name]) => { if (!has(k)) return; const b = E('button', k === cur() ? 'on' : '', name); b.onclick = () => pick(k); box.append(b); }); }); }
   function stopScene() { if (live) { live.stop(); live = null; } if (frame) { frame.remove(); frame = null; } $('rv').style.display = 'none'; if (vp && vp.pauseVideo) vp.pauseVideo(); $('rc').style.display = 'none'; }
   async function setScene(k) { if (!has(k)) k = 'aq3d'; scene = k; LS.set('dp-scene', k); stopScene(); buttons(); if (!isOpen) return;
-    if (k === 'office') { frame = E('iframe', 'office'); frame.src = 'm.html'; frame.title = 'Văn phòng 3D'; $('relax').insertBefore(frame, $('rclock')); }
+    if (FRAMES[k]) { frame = E('iframe', 'office'); frame.src = FRAMES[k]; frame.title = k; frame.allow = 'fullscreen'; frame.referrerPolicy = 'no-referrer'; $('relax').insertBefore(frame, $('rclock')); }
     else if (isVideo(k)) { $('rv').style.display = 'block'; const id = DASH.news.scenes[k];
       whenYT(() => { if (vp && vp.loadVideoById) vp.loadVideoById(id); else vp = new YT.Player('rvp', {videoId: id, playerVars: {autoplay: 1, controls: 0, loop: 1, playlist: id, rel: 0, playsinline: 1, mute: 1}, events: {onReady: () => { vp.playVideo(); mix(); }, onStateChange: e => { if (e.data === 0) vp.playVideo(); }}}); mix(); }); }
     else { const m = await load(); if (scene !== k || !isOpen) return; const c = $('rc'), fresh = c.cloneNode(false); c.replaceWith(fresh); fresh.style.display = 'block';   /* a canvas keeps its first context type */
