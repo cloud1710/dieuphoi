@@ -140,6 +140,7 @@ section.drop{outline:2px dashed var(--blue)}
   <label>Playlist thịnh hành để xen bài mới (bỏ trống thì dùng danh sách nhạc hot của CEO)</label><input id="s-tr">
   <label>Cứ mấy bài của anh thì xen một bài mới (0 = không xen)</label><input id="s-mix" type="number" min="0" max="10">
   <label>Chủ đề tin tức, mỗi dòng: Tên | từ khoá tìm | vi hoặc en</label><textarea id="s-top" rows="6"></textarea>
+  <label>Nguồn mạng xã hội công khai (mỗi dòng một đường dẫn nhóm hoặc trang Facebook; đọc mỗi sáng, không đăng nhập)</label><textarea id="s-soc" rows="5"></textarea>
   <div class="row"><button type="button" id="s-x">Đóng</button><button class="on">Lưu</button></div>
 </form></div>
 <div id="toast"></div>
@@ -348,11 +349,11 @@ function duck(on) { P.duck(on); }
 
 $('full').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
 /* ---------- settings ---------- */
-$('gear').onclick = () => { const c = DASH.cfg || {}; $('s-pl').value = c.playlist || ''; $('s-tr').value = c.trending || ''; $('s-mix').value = c.mix ?? 3; $('s-top').value = (c.topics || []).map(t => [t.name, t.q, t.lang || 'vi'].join(' | ')).join('\n'); $('set').classList.add('show'); };
+$('gear').onclick = () => { const c = DASH.cfg || {}; $('s-pl').value = c.playlist || ''; $('s-tr').value = c.trending || ''; $('s-mix').value = c.mix ?? 3; $('s-soc').value = (c.social || []).join('\n'); $('s-top').value = (c.topics || []).map(t => [t.name, t.q, t.lang || 'vi'].join(' | ')).join('\n'); $('set').classList.add('show'); };
 $('s-x').onclick = () => $('set').classList.remove('show');
 $('setf').onsubmit = async e => { e.preventDefault();
   const topics = $('s-top').value.split('\n').map(l => l.split('|').map(x => x.trim())).filter(p => p.length >= 2 && p[1]).map(p => ({name: p[0], q: p[1], lang: p[2] === 'en' ? 'en' : 'vi'}));
-  try { const r = await api('api/dash', {playlist: $('s-pl').value, trending: $('s-tr').value, mix: +$('s-mix').value, topics});
+  try { const r = await api('api/dash', {playlist: $('s-pl').value, trending: $('s-tr').value, mix: +$('s-mix').value, topics, social: $('s-soc').value.split('\n').map(x => x.trim()).filter(Boolean)});
     if ($('s-pl').value.trim() && !r.cfg.playlist) toast('Không đọc được mã playlist: dán đường dẫn có "list=…"'); else toast('Đã lưu; tin và nhạc cập nhật sau khoảng một phút');
     $('set').classList.remove('show'); setTimeout(pollDashOnce, 1500); setTimeout(pollDashOnce, 40000); } catch (x) { toast('Chưa lưu được: ' + x.message); } };
 async function pollDashOnce() { try { DASH = await api('api/dash'); drawNews(); drawHot(); drawProjects(); P.feed(); } catch (e) {} }

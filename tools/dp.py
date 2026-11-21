@@ -1100,7 +1100,7 @@ def token_loop():
 
 def reload_on_change():
     """A hidden server cannot be restarted by hand: leave when its own code changes, the start script runs it again."""
-    files = [Path(__file__).resolve(), Path(__file__).resolve().parent / 'hw.py', Path(__file__).resolve().parent / 'board.py', Path(__file__).resolve().parent / 'xoa.py', Path(__file__).resolve().parent / 'voice.py', Path(__file__).resolve().parent / 'feed.py']      # guard.py is run fresh each time
+    files = [Path(__file__).resolve(), Path(__file__).resolve().parent / 'hw.py', Path(__file__).resolve().parent / 'board.py', Path(__file__).resolve().parent / 'xoa.py', Path(__file__).resolve().parent / 'voice.py', Path(__file__).resolve().parent / 'feed.py', Path(__file__).resolve().parent / 'social.py']      # guard.py is run fresh each time
     seen = [f.stat().st_mtime_ns if f.is_file() else 0 for f in files]
     while True:
         time.sleep(20)
@@ -1145,9 +1145,20 @@ def feed_loop():
         try:
             if not GAME['on']:
                 _feed().refresh(HUB)
+                import social
+                urls = social.clean_list(_feed().cfg_load(HUB).get('social'))
+                if social.due(HUB, urls):         # once a day, and again when the owner changes the list
+                    social.refresh(HUB, urls)
         except Exception as e:
             heal_log('dashboard feed: %s: %s' % (type(e).__name__, one_line(e, 120)))
-        time.sleep(1800)
+        for _ in range(60):                       # news every 30 minutes; a changed list of social sources within a minute
+            time.sleep(30)
+            try:
+                import social
+                if social.due(HUB, social.clean_list(_feed().cfg_load(HUB).get('social')), hour=25):
+                    break
+            except Exception:
+                pass
 
 
 def cmd_pc(args):

@@ -52,6 +52,9 @@ def cfg_save(hub, data):
             cfg[k] = playlist_id(data[k])
     if 'mix' in data:
         cfg['mix'] = max(0, min(10, int(data['mix'] or 0)))
+    if isinstance(data.get('social'), list):
+        import social
+        cfg['social'] = social.clean_list(data['social'])
     if isinstance(data.get('topics'), list):
         topics = []
         for t in data['topics'][:10]:
@@ -239,5 +242,5 @@ def view(hub):
             return default
     cfg = cfg_load(hub)
     return {'social': read('dash-social.json', {}), 'news': read('dash-news.json', {}), 'hot': read('dash-hot.json', {}), 'projects': read('dash-projects.json', {}),
-            'cfg': {'playlist': cfg.get('playlist') or '', 'trending': cfg.get('trending') or '', 'mix': cfg.get('mix', 3),
+            'cfg': {'playlist': cfg.get('playlist') or '', 'trending': cfg.get('trending') or '', 'mix': cfg.get('mix', 3), 'social': cfg.get('social') or [],
                     'topics': cfg.get('topics') or DEFAULT_TOPICS}}
