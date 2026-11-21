@@ -322,9 +322,10 @@ const P = (() => {
     $('qinfo').textContent = (mine.length ? mine.length + ' bài của anh' : '') + (trend.length ? (mine.length ? ' + ' : '') + trend.length + ' bài mới' : ''); }
   function start(item) { cur = item; if (!cur) return show(); yt.loadVideoById(cur.id); yt.setVolume(ducked ? Math.min(volume, 12) : volume); $('play').textContent = '⏸ Dừng'; setTimeout(show, 1500); show(); }
   function next() { if (!ready) return; wantPlay = true; start(pickNext()); }
-  function loadMine() { const list = DASH.cfg.playlist || ''; if (!ready || list === loadedList) return; loadedList = list; mine = []; bagMine = []; if (list) yt.cuePlaylist({list, listType: 'playlist'}); }
+  function loadMine() { const ids = DASH.cfg.mine || [], list = DASH.cfg.playlist || ('ids:' + ids.join(',')); if (!ready || list === loadedList) return; loadedList = list; bagMine = [];
+    if (list.startsWith('ids:')) { mine = ids.slice(); if (wantPlay && !cur) next(); } else { mine = []; yt.cuePlaylist({list, listType: 'playlist'}); } }
   function onState(e) {
-    if (e.data === 5 && !mine.length && loadedList) { mine = (yt.getPlaylist() || []).slice(); show(); if (wantPlay) next(); }     /* cued: the playlist's video ids are known */
+    if (e.data === 5 && !mine.length && loadedList && !loadedList.startsWith('ids:')) { mine = (yt.getPlaylist() || []).slice(); show(); if (wantPlay) next(); }     /* cued: the playlist's video ids are known */
     if (e.data === 0) next();                                                                                                   /* ended */
     if (e.data === 1) show();
   }

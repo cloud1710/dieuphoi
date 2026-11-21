@@ -52,6 +52,8 @@ def cfg_save(hub, data):
             cfg[k] = playlist_id(data[k])
     if 'mix' in data:
         cfg['mix'] = max(0, min(10, int(data['mix'] or 0)))
+    if isinstance(data.get('mine'), list):       # the owner's own songs as YouTube video ids (used when no playlist is set)
+        cfg['mine'] = [v for v in data['mine'] if re.fullmatch(r'[\w-]{11}', str(v))][:300]
     if isinstance(data.get('social'), list):
         import social
         cfg['social'] = social.clean_list(data['social'])
@@ -244,5 +246,5 @@ def view(hub):
     social, digest = read('dash-social.json', {}), read('dash-digest.json', {})       # digest: the morning read of the owner's groups
     social['topics'] = (digest.get('topics') or []) + (social.get('topics') or [])
     return {'social': social, 'news': read('dash-news.json', {}), 'hot': read('dash-hot.json', {}), 'projects': read('dash-projects.json', {}),
-            'cfg': {'playlist': cfg.get('playlist') or '', 'trending': cfg.get('trending') or '', 'mix': cfg.get('mix', 3), 'social': cfg.get('social') or [],
+            'cfg': {'playlist': cfg.get('playlist') or '', 'trending': cfg.get('trending') or '', 'mix': cfg.get('mix', 3), 'social': cfg.get('social') or [], 'mine': [v for v in cfg.get('mine') or [] if re.fullmatch(r'[\w-]{11}', str(v))],
                     'topics': cfg.get('topics') or DEFAULT_TOPICS}}
