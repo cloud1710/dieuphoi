@@ -109,6 +109,7 @@ textarea{min-height:84px;resize:vertical}
 .msg.vinh{margin-left:auto;background:var(--ready);color:#fff;border-bottom-right-radius:4px}
 .msg.boss{background:var(--card);border:1px solid var(--line);border-bottom-left-radius:4px}
 .msg small{display:block;font-size:10.5px;opacity:.65;margin-top:2px}
+.vic{width:20px;flex:none;text-align:center}
 .msg .council{margin-top:6px;padding:5px 7px;border-left:2px solid #c9a227;background:rgba(201,162,39,.08);border-radius:4px}
 .msg .council b{font-size:11px;color:#c9a227}
 .msg.typing{color:var(--mute);font-style:italic}
@@ -239,6 +240,12 @@ function draw(s) {
   s.projects.forEach(p => { (p.questions || []).forEach(q => { n++; qc.append(question(p, q)); });
     (p.person || []).forEach(i => { n++; qc.append(personItem(p, i)); }); });
   if (!n) qc.append(E('div', 'empty', 'Không có việc nào chờ.')); m.append(qc);
+  const vs = ACT.viec || []; if (vs.length) { const vc = E('div', 'card'), ids = new Set(vs.map(v => v.id)), IC = {chay:'⏳', xong:'✅', loi:'❌', cho:'⏸'};
+    const walk = (v, dep) => { const r = E('div', 'row line'); r.style.paddingLeft = (8 + dep * 18) + 'px'; r.append(E('span', 'vic', IC[v.state] || '•')); const nm = E('span', 'nm');
+      nm.append(E('b', '', v.id + ' · ' + v.name), E('small', '', v.state === 'chay' || v.state === 'cho' ? 'từ ' + v.start.slice(11, 16) + (v.step ? ' · ' + v.step : '') : (v.end || '').slice(11, 16) + (v.result ? ' · ' + v.result : ''))); r.append(nm); vc.append(r);
+      vs.filter(k => k.parent === v.id).forEach(k => walk(k, dep + 1)); };
+    vs.filter(v => !v.parent || !ids.has(v.parent)).forEach(v => walk(v, 0)); const run = vs.filter(v => v.state === 'chay' || v.state === 'cho').length;
+    m.append(sect('w-viec', 'Cây tiến độ của CEO', vc, true, run ? run + ' đang chạy' : 'xong hết')); }
   const tr = (s.deletes || []).filter(r => r.status === 'trashed'); if (tr.length) { const tc = E('div', 'card'); tr.forEach(r => { const q = E('div', 'q'); q.append(delBody(r)); tc.append(q); });
     m.append(sect('w-trash', 'Thùng rác (khôi phục được)', tc, false, tr.length + ' đợt · ' + fbytes(tr.reduce((a, r) => a + r.items.reduce((b, i) => b + (i.bytes || 0), 0), 0)))); }
   const wc = E('div', 'card');
@@ -306,7 +313,7 @@ let hwTimer = null, cur = 'office';
 function hwBox() { if ($('hwin')) return $('hwin').parentNode; const inn = E('div'); inn.id = 'hwin'; inn.append(E('div', 'empty', 'Đang đọc phần cứng…')); const d = sect('b-hw', 'Máy, mạng, token, chế độ game, nguồn', inn, false); d.onopen = pollHw; $('hwfold').append(d); return d; }
 async function pollHw() { if (cur !== 'hw' || document.hidden || !hwBox().open) return; try { drawHw(await api('api/hw')); } catch (e) { $('hwin').textContent = ''; $('hwin').append(E('div', 'empty', liveMode ? e.message : 'Chỉ xem được khi nối trực tiếp với PC.')); } }
 function tab(t) { cur = t; $('say').classList.toggle('on', t === 'office' && liveMode); document.body.classList.toggle('chatting', t === 'office' && liveMode); if (t === 'office') { pollAct(); pollChat(); } document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === 't-' + t)); document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
-  clearInterval(hwTimer); if (t === 'hw') { hwBox(); boardOpen(); pollAct(true); pollChat(); pollHw(); hwTimer = setInterval(pollHw, 10000); } if (t === 'office') office.wake(); scrollTo(0, 0); }
+  clearInterval(hwTimer); if (t === 'work') { if (STATE) draw(STATE); pollAct(true); } if (t === 'hw') { hwBox(); boardOpen(); pollAct(true); pollChat(); pollHw(); hwTimer = setInterval(pollHw, 10000); } if (t === 'office') office.wake(); scrollTo(0, 0); }
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => tab(b.dataset.t));
 setTimeout(() => { $('hint').style.display = 'none'; }, 7000);
 // ---- what changed between two states, in plain Vietnamese
@@ -386,7 +393,7 @@ $('say').onsubmit = async e => { e.preventDefault(); const t = $('sayt').value.t
   CHATS.messages.push({t:'          ' + new Date().toTimeString().slice(0, 5), who:'vinh', text:t || '(anh gửi ' + sending.length + ' tệp)', meta:sending.length ? {files:sending.map(a => ({name:a.file.name, size:a.file.size, image:!!a.url, local:a.url}))} : undefined}); CHATS.busy = true; CHATS.step = 'đang đọc tin nhắn'; drawChat(); office.boss(); $('chat').scrollTop = $('chat').scrollHeight;
   try { const ids = []; for (const a of sending) ids.push(await upload(a.file)); await api('api/chat', ids.length ? {text:t, files:ids} : {text:t}); } catch (err) { CHATS.busy = false; CHATS.messages.push({t:'           ', who:'boss', text:'Không gửi được: ' + err.message}); drawChat(); } pollChat(); };
 $('sayt').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('say').requestSubmit(); } });
-async function pollAct(force) { if (!force && (cur !== 'office' || document.hidden || !liveMode)) return; try { const a = await api('api/activity'); const sig = x => JSON.stringify([Object.entries(x.claude || {}).map(([k, v]) => [k, v.map(i => [i.what, i.age < 300])]), x.game, x.stuck, Object.entries(x.programs || {}).map(([k, v]) => [k, v.n])]); const ch = sig(a) !== sig(ACT); ACT = a;
+let VSIG = ''; async function pollAct(force) { if (!force && ((cur !== 'office' && cur !== 'work') || document.hidden || !liveMode)) return; try { const a = await api('api/activity'); const sig = x => JSON.stringify([Object.entries(x.claude || {}).map(([k, v]) => [k, v.map(i => [i.what, i.age < 300])]), x.game, x.stuck, Object.entries(x.programs || {}).map(([k, v]) => [k, v.n])]); const ch = sig(a) !== sig(ACT); ACT = a; const vsig = JSON.stringify(a.viec || []); if (vsig !== VSIG) { VSIG = vsig; if (cur === 'work' && STATE) draw(STATE); }
     $('pairlinks').textContent = ''; if (a.todo_url) { const l = E('a', '', 'Trang việc chờ anh trên Cloudflare'); l.href = a.todo_url; l.target = '_blank'; $('pairlinks').append(l); }
     if (ch && STATE) { office.set(STATE); drawCol(); } else office.boss(); } catch (e) {} }
 setInterval(pollAct, 15000);

@@ -38,6 +38,16 @@ Anh Vinh là **Chủ tịch**; bạn là **CEO** (trước đây gọi là tổn
   Orchestra của project để vào `plan/board/` của nó. Muốn chụp trang của một server local: ghi số cổng vào `out/board-shot.txt`.
 - Quy ước đầy đủ: `skills/dieuphoi/SKILL.md` và `README.md`.
 
+## Cây tiến độ (mọi việc không xong ngay trong lượt này)
+- Việc nhiều phần: `python tools/dp.py viec mo "tên" --cay` (in ra mã V-xxx), mỗi phần là một việc con `--cha V-xxx`. Mọi con xong thì việc cha tự đóng và hub báo anh.
+- Chạy nền (script, render, agent vẽ…): `python tools/dp.py viec chay "tên" [--cha V-xxx] -- <lệnh>`. Hub giữ nhật ký `out/viec/V-xxx.log`; lệnh xong thì hub tự gọi em một lượt để kiểm thành phẩm rồi báo anh.
+  Agent Claude chạy nền: `... -- claude -p --settings out/chat-settings.json --permission-mode bypassPermissions "<việc; dùng agent pixel-artist ...>"`.
+  Không chạy nền cách khác (Task chạy ngầm, start, &): lượt chat kết thúc là mất dấu, anh không được báo.
+- Việc em tự làm qua nhiều lượt: `viec buoc V-xxx "đã làm gì"` khi qua bước; `viec xong V-xxx "kết quả một câu" --tep <thành phẩm>` khi đã kiểm (hub tự báo anh, gửi kèm tệp); `viec loi V-xxx "lý do"`; `viec cho V-xxx "chờ gì"`.
+- Chưa có mã việc thì không nói "em làm nền". Câu trả lời ghi mã việc để anh theo dõi ở tab Việc (Cây tiến độ) hoặc hỏi `python tools/dp.py viec`.
+- Lượt "[Việc nền V-xxx xong]" do hub gửi: mở thành phẩm ra kiểm thật, báo anh ngắn, rồi làm tiếp phần kế trong cây.
+- Kiểm xong thấy còn hở thì sửa luôn, không hỏi lại anh (trừ việc nặng máy hay khó lấy lại, xem dưới).
+
 ## Quyền và giới hạn
 - Quyền của bạn nằm trong `quyen-tong-quan.json` (chỉ anh Vinh sửa). Khi `toan_quyen: true`: bạn được chạy mọi lệnh, sửa tệp ở
   mọi project, tra web, giao việc cho nhân viên phụ. Việc thuộc chuyên môn của một project thì vẫn ưu tiên gửi thư cho orchestra của nó.

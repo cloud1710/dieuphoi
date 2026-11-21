@@ -1368,7 +1368,7 @@ def activity():
     claude = hw.claude_activity(pairs)
     return {'claude': claude, 'stuck': stuck_sessions(claude, pairs), 'programs': hw.project_programs(pairs), 'game': game_state(), 'tokens': hw._TOK['out'],
             'boss': {k: v for k, v in chat_state().items() if k != 'messages'}, 'boss_usage': boss_usage(), 'net': hw.net_today(),
-            'todo_url': 'https://%s.pages.dev/' % name if name else None, 'tunnel': _tunnel_status(), 'decor': decor_today(),
+            'todo_url': 'https://%s.pages.dev/' % name if name else None, 'tunnel': _tunnel_status(), 'decor': decor_today(), 'viec': viec_view(),
             'passphrase': (HUB / 'out' / 'pass.hash').is_file() and (HUB / 'out' / 'pass.hash').stat().st_size > 0}
 
 
@@ -1933,8 +1933,8 @@ def answer_ask(hid, choice):
     return chat_send('%s (anh chọn ở câu hỏi %s: %s)' % (choice, hid, a['q']))
 
 
-def chat_send(text, who='vinh', again=False, files=None):
-    text = str(text or '').strip()[:4000]
+def chat_send(text, who='vinh', again=False, files=None, show=None):
+    text = str(text or '').strip()[:6000]
     files = [f for f in (upload_path(x) for x in (files or [])[:10]) if f]
     meta = {'files': [{'id': f.relative_to(UPLOADS).as_posix(), 'name': f.name.split('-', 1)[-1], 'size': f.stat().st_size,
                        'image': f.suffix.lower() in IMAGE_EXT} for f in files]} if files else None
@@ -1946,13 +1946,13 @@ def chat_send(text, who='vinh', again=False, files=None):
     if CHAT['busy']:
         if again:
             raise ValueError('CEO đang trả lời tin trước, chờ một chút')
-        chat_log(who, shown if files else text, meta)
+        chat_log(who, show or (shown if files else text), meta)
         q = _queue()
         q.append(text)
         QUEUE.write_text(json.dumps(q, ensure_ascii=False), encoding='utf-8')
         return chat_state()
     if not again:
-        chat_log(who, shown if files else text, meta)
+        chat_log(who, show or (shown if files else text), meta)
     CHAT['busy'] = True
     PENDING.write_text(json.dumps({'text': text, 'at': time.time()}, ensure_ascii=False), encoding='utf-8')
     threading.Thread(target=chat_run, args=(text,), daemon=True).start()
@@ -2452,6 +2452,7 @@ def cmd_serve(args):
     if args.reload:                                  # only the hidden, self-updating server settles things on its own
         threading.Thread(target=bootstrap, daemon=True).start()
         threading.Thread(target=sched_loop, daemon=True).start()
+        threading.Thread(target=viec_loop, daemon=True).start()
     def _dump_hw():
         try:
             hw_state()
@@ -2502,6 +2503,321 @@ def cmd_serve(args):
         servers[0].serve_forever()
     except KeyboardInterrupt:
         pass
+    return 0
+
+
+# ---- Cây tiến độ: every piece of work that outlives one chat turn is a node here, so its end is never silent ----
+VIEC = HUB / 'out' / 'viec.json'
+VIEC_LOGS = HUB / 'out' / 'viec'
+VIEC_ICON = {'chay': '⏳', 'xong': '✅', 'loi': '❌', 'cho': '⏸'}
+
+
+def _now():
+    return datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+
+def viec_load():
+    for _ in range(5):
+        try:
+            got = json.loads(VIEC.read_text(encoding='utf-8'))
+            return got if isinstance(got, dict) and isinstance(got.get('jobs'), list) else {'n': 0, 'jobs': []}
+        except FileNotFoundError:
+            return {'n': 0, 'jobs': []}
+        except (OSError, ValueError):
+            time.sleep(0.2)                       # another process is writing it
+    return {'n': 0, 'jobs': []}
+
+
+def viec_save(book):
+    keep = datetime.datetime.now() - datetime.timedelta(days=7)
+    jobs = book['jobs']
+    old = {j['id'] for j in jobs if j['state'] != 'chay' and str(j.get('end') or '') < keep.strftime('%Y-%m-%d')}
+    book['jobs'] = [j for j in jobs if j['id'] not in old or any(c['parent'] == j['id'] and c['id'] not in old for c in jobs)]
+    tmp = VIEC.with_suffix('.tmp')
+    tmp.write_text(json.dumps(book, ensure_ascii=False, indent=1), encoding='utf-8')
+    os.replace(tmp, VIEC)
+
+
+def viec_edit(fn):
+    """Read, change, write: the hub and every `dp viec` call share the file."""
+    lock = VIEC.with_suffix('.lock')
+    for _ in range(50):
+        try:
+            fd = os.open(str(lock), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            os.close(fd)
+            break
+        except FileExistsError:
+            try:
+                if time.time() - lock.stat().st_mtime > 10:    # a writer died holding it
+                    os.replace(lock, VIEC.with_suffix('.stale'))
+            except OSError:
+                pass
+            time.sleep(0.1)
+    try:
+        book = viec_load()
+        out = fn(book)
+        viec_save(book)
+        return out
+    finally:
+        try:
+            os.replace(lock, VIEC.with_suffix('.free'))
+        except OSError:
+            pass
+
+
+def viec_find(book, jid):
+    jid = str(jid).upper()
+    j = next((j for j in book['jobs'] if j['id'] == jid), None)
+    if not j:
+        raise ValueError('không có việc %s' % jid)
+    return j
+
+
+def viec_new(name, parent=None, kind='tay', by='CEO', cmd=None, cwd=None):
+    def go(book):
+        if parent:
+            viec_find(book, parent)
+        book['n'] = int(book.get('n') or 0) + 1
+        j = {'id': 'V-%03d' % book['n'], 'name': short(name, 160), 'parent': str(parent).upper() if parent else None, 'kind': kind,
+             'by': by, 'state': 'chay', 'start': _now(), 'end': None, 'steps': [], 'result': '', 'files': [], 'reported': False}
+        if cmd:
+            j.update(cmd=cmd, cwd=cwd, log=str(VIEC_LOGS / (j['id'] + '.log')))
+        book['jobs'].append(j)
+        return j
+    return viec_edit(go)
+
+
+def viec_step(jid, text):
+    def go(book):
+        j = viec_find(book, jid)
+        j['steps'] = (j['steps'] + [{'t': _now()[11:16], 'text': short(text, 200)}])[-30:]
+        if j['state'] == 'cho':
+            j['state'] = 'chay'
+        return j
+    return viec_edit(go)
+
+
+def viec_close(jid, state, result='', files=None, code=None):
+    """Closes a node; when every child of its parent is closed, the parent closes too (failed if any child failed)."""
+    def go(book):
+        j = viec_find(book, jid)
+        j.update(state=state, end=_now(), result=short(result, 600) or j.get('result') or '')
+        if files:
+            j['files'] = list(files)
+        if code is not None:
+            j['code'] = code
+        closed = [j]
+        p = j
+        while p.get('parent'):
+            p = viec_find(book, p['parent'])
+            kids = [k for k in book['jobs'] if k['parent'] == p['id']]
+            if p['state'] != 'chay' or any(k['state'] in ('chay', 'cho') for k in kids) or p.get('kind') != 'cay':
+                break
+            p.update(state='loi' if any(k['state'] == 'loi' for k in kids) else 'xong', end=_now(),
+                     result='%d/%d phần xong' % (sum(k['state'] == 'xong' for k in kids), len(kids)))
+            closed.append(p)
+        return closed
+    return viec_edit(go)
+
+
+def viec_tree(book=None, days=1):
+    """The tree as text: running work, and what closed in the last day."""
+    book = book or viec_load()
+    since = (datetime.datetime.now() - datetime.timedelta(days=days)).strftime('%Y-%m-%d %H:%M')
+    jobs = [j for j in book['jobs'] if j['state'] in ('chay', 'cho') or str(j.get('end') or '') >= since]
+    ids = {j['id'] for j in jobs}
+    lines = []
+
+    def walk(j, depth):
+        took = ''
+        if j['state'] == 'chay':
+            took = ' · %d phút' % ((datetime.datetime.now() - datetime.datetime.strptime(j['start'], '%Y-%m-%d %H:%M:%S')).seconds // 60)
+        last = (' · ' + j['steps'][-1]['text']) if j['state'] == 'chay' and j['steps'] else ''
+        res = (' · ' + j['result']) if j['state'] != 'chay' and j.get('result') else ''
+        lines.append('%s%s %s %s%s%s%s' % ('  ' * depth, VIEC_ICON.get(j['state'], '?'), j['id'], j['name'], took, last, res))
+        for k in jobs:
+            if k['parent'] == j['id']:
+                walk(k, depth + 1)
+    for j in jobs:
+        if not j['parent'] or j['parent'] not in ids:
+            walk(j, 0)
+    return '\n'.join(lines) or '(không có việc nào đang chạy hay mới xong)'
+
+
+def viec_view():
+    """For the app: running work and what closed today, flat, with parents; the app draws the tree."""
+    try:
+        book = viec_load()
+    except Exception:
+        return []
+    since = (datetime.datetime.now() - datetime.timedelta(hours=18)).strftime('%Y-%m-%d %H:%M')
+    return [{k: j.get(k) for k in ('id', 'name', 'parent', 'state', 'start', 'end', 'result', 'kind')} | {'step': (j['steps'][-1]['text'] if j['steps'] else '')}
+            for j in book['jobs'] if j['state'] in ('chay', 'cho') or str(j.get('end') or '') >= since][-40:]
+
+
+def viec_report(closed):
+    """Tells the owner in the chat that a piece of work closed. No token: the text is the job's own."""
+    for j in closed:
+        if j.get('reported'):
+            continue
+        kids = ''
+        head = '%s %s %s: %s' % (VIEC_ICON.get(j['state']), 'Xong' if j['state'] == 'xong' else 'Lỗi', j['id'], j['name'])
+        text = head + (('\n' + j['result']) if j.get('result') else '') + kids
+        sent = give_files(j['files'], text)[0] if j.get('files') else []
+        if not sent:
+            chat_log('boss', text, {'viec': j['id']})
+
+    def mark(book):
+        for c in closed:
+            viec_find(book, c['id'])['reported'] = True
+    viec_edit(mark)
+
+
+def _resolve_exe(argv):
+    exe = shutil.which(argv[0]) or argv[0]
+    if os.name == 'nt' and exe.lower().endswith(('.cmd', '.bat')):
+        return ['cmd', '/c', exe] + argv[1:]
+    return [exe] + argv[1:]
+
+
+def viec_spawn(j):
+    """Starts the watcher of a background job as its own process: it outlives the chat turn that asked for it."""
+    py = sys.executable
+    if py.lower().endswith('pythonw.exe') and Path(py[:-5] + '.exe').is_file():
+        py = py[:-5] + '.exe'
+    flags = 0
+    if os.name == 'nt':
+        flags = getattr(subprocess, 'DETACHED_PROCESS', 0) | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0) | getattr(subprocess, 'CREATE_NO_WINDOW', 0)
+    kw = {'start_new_session': True} if os.name != 'nt' else {}
+    subprocess.Popen([py, str(Path(__file__).resolve()), '_theo', j['id']], cwd=j.get('cwd') or str(HUB), stdin=subprocess.DEVNULL,
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, creationflags=flags, **kw)
+
+
+def cmd_theo(args):
+    """The watcher: runs the job's command, keeps its output in out/viec/<id>.log, closes the node with the exit code."""
+    book = viec_load()
+    j = viec_find(book, args.id)
+    VIEC_LOGS.mkdir(parents=True, exist_ok=True)
+    code = None
+    with open(j['log'], 'ab') as log:
+        try:
+            pr = subprocess.Popen(_resolve_exe(j['cmd']), cwd=j.get('cwd') or str(HUB), stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+                                  creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+            viec_edit(lambda b: viec_find(b, j['id']).update(pid=pr.pid))
+            code = pr.wait()
+        except Exception as e:
+            log.write(('\n[dp viec] không chạy được: %s\n' % e).encode('utf-8'))
+            code = -1
+    try:
+        tail = Path(j['log']).read_bytes()[-400:].decode('utf-8', 'replace').strip().splitlines()[-1:]
+    except (OSError, IndexError):
+        tail = []
+    viec_close(j['id'], 'xong' if code == 0 else 'loi', 'mã thoát %s%s' % (code, (' · ' + one_line(tail[0], 160)) if tail else ''), code=code)
+    return 0
+
+
+def viec_loop():
+    """Inside `dp serve`: a background job that closed wakes the CEO to check what it made and tell the owner; a job
+    closed by hand (`dp viec xong`) is already told. A watcher that died leaves its job running: closed as failed."""
+    time.sleep(30)
+    while True:
+        try:
+            book = viec_load()
+            for j in book['jobs']:
+                if j['state'] == 'chay' and j.get('kind') == 'nen' and j.get('pid') and not pid_alive(j['pid']) and not j.get('_grace'):
+                    viec_edit(lambda b, i=j['id']: viec_find(b, i).update(_grace=True))
+                elif j['state'] == 'chay' and j.get('_grace') and j.get('pid') and not pid_alive(j['pid']):
+                    viec_close(j['id'], 'loi', 'tiến trình đã dừng mà không báo kết quả')
+            book = viec_load()
+            todo = [j for j in book['jobs'] if j['state'] in ('xong', 'loi') and not j.get('reported') and j.get('kind') == 'nen']
+            if todo and not GAME['on'] and not CHAT['busy']:
+                j = todo[0]
+                viec_edit(lambda b, i=j['id']: viec_find(b, i).update(reported=True))
+                chat_send('/sonnet [Việc nền %s %s] %s\nKết quả: %s\nNhật ký: %s\nKiểm thành phẩm (mở tệp, xem ảnh, chạy thử nếu cần) rồi báo anh ngắn: '
+                          'xong hay còn hở. Còn việc kế tiếp trong cây thì làm luôn. Cây hiện tại:\n%s'
+                          % (j['id'], 'xong' if j['state'] == 'xong' else 'lỗi', j['name'], j.get('result'), j.get('log'), viec_tree(book)), who='viec',
+                          show='%s %s %s: %s · CEO đang kiểm thành phẩm' % (VIEC_ICON.get(j['state']), 'Xong' if j['state'] == 'xong' else 'Lỗi', j['id'], j['name']))
+        except Exception:
+            pass
+        time.sleep(20)
+
+
+def pid_alive(pid):
+    try:
+        pid = int(pid)
+        if os.name == 'nt':
+            r = subprocess.run(['tasklist', '/FI', 'PID eq %d' % pid, '/NH'], capture_output=True, text=True, timeout=10,
+                               creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+            return str(pid) in r.stdout
+        os.kill(pid, 0)
+        return True
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return False
+
+
+def _viec_opts(args):
+    """Options may come after the name (argparse leaves them in `rest`): --cha X, --cay, --tep a b ... (until --)."""
+    rest, out, i = list(args.rest), [], 0
+    while i < len(rest):
+        w = rest[i]
+        if w == '--':
+            out += rest[i:]
+            break
+        if w == '--cha' and i + 1 < len(rest):
+            args.cha, i = rest[i + 1], i + 2
+        elif w == '--cay':
+            args.cay, i = True, i + 1
+        elif w == '--tep':
+            i += 1
+            args.tep = list(args.tep or [])
+            while i < len(rest) and not rest[i].startswith('--'):
+                args.tep.append(rest[i])
+                i += 1
+        else:
+            out.append(w)
+            i += 1
+    args.rest = out
+
+
+def cmd_viec(args):
+    _viec_opts(args)
+    a = args.action
+    if a in (None, 'xem'):
+        print(viec_tree(days=int(args.days or 1)))
+        return 0
+    if a == 'mo':
+        j = viec_new(' '.join(args.rest), args.cha, kind='cay' if args.cay else 'tay')
+        print(j['id'])
+        return 0
+    if a == 'chay':
+        rest = list(args.rest)
+        if '--' not in rest:
+            print('dp viec chay "tên" -- <lệnh ...>')
+            return 2
+        cut = rest.index('--')
+        name, cmd = ' '.join(rest[:cut]), rest[cut + 1:]
+        if not name or not cmd:
+            print('dp viec chay "tên" -- <lệnh ...>')
+            return 2
+        j = viec_new(name, args.cha, kind='nen', cmd=cmd, cwd=os.getcwd())
+        VIEC_LOGS.mkdir(parents=True, exist_ok=True)
+        viec_spawn(j)
+        print('%s đang chạy nền; xong thì hub tự báo CEO kiểm rồi báo anh. Nhật ký: %s' % (j['id'], j['log']))
+        return 0
+    if not args.rest:
+        print('thiếu mã việc')
+        return 2
+    jid, text = args.rest[0], ' '.join(args.rest[1:])
+    if a == 'buoc':
+        viec_step(jid, text)
+        print('đã ghi bước cho %s' % jid.upper())
+    elif a in ('xong', 'loi'):
+        closed = viec_close(jid, a, text, files=args.tep)
+        viec_report(closed)
+        print('đã đóng %s và báo anh' % ', '.join(c['id'] for c in closed))
+    elif a == 'cho':
+        viec_edit(lambda b: viec_find(b, jid).update(state='cho', steps=viec_find(b, jid)['steps'] + [{'t': _now()[11:16], 'text': 'chờ: ' + short(text, 180)}]))
+        print('%s đang chờ' % jid.upper())
     return 0
 
 
@@ -2560,6 +2876,17 @@ def main(argv=None):
     mo.add_argument('name')
     mo.add_argument('item', nargs='?')
     mo.set_defaults(fn=cmd_mo)
+    vc = sub.add_parser('viec', help='cây tiến độ: mở, ghi bước, đóng việc; chạy nền có báo khi xong')
+    vc.add_argument('action', nargs='?', choices=['xem', 'mo', 'chay', 'buoc', 'xong', 'loi', 'cho'])
+    vc.add_argument('rest', nargs=argparse.REMAINDER)
+    vc.add_argument('--cha', help='mã việc cha (V-001)')
+    vc.add_argument('--cay', action='store_true', help='việc cha tự đóng khi mọi việc con xong')
+    vc.add_argument('--tep', nargs='*', help='thành phẩm gửi kèm khi đóng')
+    vc.add_argument('--days', default=1)
+    vc.set_defaults(fn=cmd_viec)
+    th = sub.add_parser('_theo')
+    th.add_argument('id')
+    th.set_defaults(fn=cmd_theo)
     i = sub.add_parser('init')
     i.add_argument('id')
     i.set_defaults(fn=cmd_init)
