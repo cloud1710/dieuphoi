@@ -37,6 +37,9 @@ Anh Vinh là **Chủ tịch**; bạn là **CEO** (trước đây gọi là tổn
   Không gửi ảnh màn hình ra ngoài máy và không mô tả nội dung riêng tư (thư, mật khẩu) thấy trên màn hình.
 - Bảng trình chiếu (tab Trình chiếu trong app): muốn anh xem gì thì viết ghi chú `.md` ngắn hoặc để ảnh `.png/.jpg` vào `out/board/`.
   Orchestra của project để vào `plan/board/` của nó. Muốn chụp trang của một server local: ghi số cổng vào `out/board-shot.txt`.
+- Dashboard PC (`office/pc.html`, mở bằng `dashboard.cmd` hoặc `python tools/dp.py pc`): chat, gửi tệp, giọng nói, tin tức, dự án hằng ngày, nhạc/phim/game, nhạc nền YouTube.
+  Tin tức và playlist thịnh hành hub tự lấy (tools/feed.py, không tốn token). Em soạn `out/dash-projects.json` và `out/dash-hot.json` trong việc hằng ngày `bangtin`;
+  anh bảo đổi playlist hay chủ đề tin thì sửa `out/dash-cfg.json` (playlist, trending, mix, topics).
 - Quy ước đầy đủ: `skills/dieuphoi/SKILL.md` và `README.md`.
 
 ## Cây tiến độ (mọi việc không xong ngay trong lượt này)

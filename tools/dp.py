@@ -415,6 +415,10 @@ class Handler(SimpleHTTPRequestHandler):
                 if port not in b.ports():
                     raise ValueError('no such local server')
                 return self.reply(200, {'ok': True, 'name': b.shot(HUB, port)})
+            if path == '/api/dash':                       # the dashboard's settings: playlists, news topics
+                cfg = _feed().cfg_save(HUB, data)
+                threading.Thread(target=lambda: _feed().refresh(HUB), daemon=True).start()
+                return self.reply(200, {'ok': True, 'cfg': cfg})
             if path == '/api/game':
                 return self.reply(200, {'ok': True, 'result': game_set(bool(data.get('on')), 'manual: app')})
             if path == '/api/power':
@@ -554,6 +558,11 @@ class Handler(SimpleHTTPRequestHandler):
             self.send_header('Content-Length', str(len(got[0])))
             self.end_headers()
             return self.wfile.write(got[0])
+        if path == '/api/dash':
+            try:
+                return self.reply(200, _feed().view(HUB))
+            except Exception as e:
+                return self.reply(500, {'error': '%s: %s' % (type(e).__name__, e)})
         if path == '/api/activity':
             try:
                 return self.reply(200, activity())
@@ -1091,7 +1100,7 @@ def token_loop():
 
 def reload_on_change():
     """A hidden server cannot be restarted by hand: leave when its own code changes, the start script runs it again."""
-    files = [Path(__file__).resolve(), Path(__file__).resolve().parent / 'hw.py', Path(__file__).resolve().parent / 'board.py', Path(__file__).resolve().parent / 'xoa.py', Path(__file__).resolve().parent / 'voice.py']      # guard.py is run fresh each time
+    files = [Path(__file__).resolve(), Path(__file__).resolve().parent / 'hw.py', Path(__file__).resolve().parent / 'board.py', Path(__file__).resolve().parent / 'xoa.py', Path(__file__).resolve().parent / 'voice.py', Path(__file__).resolve().parent / 'feed.py']      # guard.py is run fresh each time
     seen = [f.stat().st_mtime_ns if f.is_file() else 0 for f in files]
     while True:
         time.sleep(20)
@@ -1121,6 +1130,32 @@ def self_watch(port):
                 heal_log('server không còn nhận kết nối (%s): tự khởi động lại' % one_line(e, 120))
                 os._exit(4)
         time.sleep(60)
+
+
+def _feed():
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import feed
+    return feed
+
+
+def feed_loop():
+    """Inside `dp serve`: news and the trending playlist for the PC dashboard, every 30 minutes, without a model."""
+    time.sleep(45)
+    while True:
+        try:
+            if not GAME['on']:
+                _feed().refresh(HUB)
+        except Exception as e:
+            heal_log('dashboard feed: %s: %s' % (type(e).__name__, one_line(e, 120)))
+        time.sleep(1800)
+
+
+def cmd_pc(args):
+    """Opens the PC dashboard in the default browser, already paired (the key travels in the URL fragment, never to a server)."""
+    import webbrowser
+    webbrowser.open('http://127.0.0.1:%d/pc.html#k=%s' % (args.port, token()))
+    print('đã mở dashboard trên trình duyệt')
+    return 0
 
 
 def auto_publish():
@@ -2502,6 +2537,7 @@ def cmd_serve(args):
         threading.Thread(target=bootstrap, daemon=True).start()
         threading.Thread(target=sched_loop, daemon=True).start()
         threading.Thread(target=viec_loop, daemon=True).start()
+        threading.Thread(target=feed_loop, daemon=True).start()
     def _dump_hw():
         try:
             hw_state()
@@ -2931,6 +2967,9 @@ def main(argv=None):
     pw.add_argument('action', nargs='?', default='tat', choices=['tat', 'khoidong', 'ngu', 'huy'])
     pw.set_defaults(fn=lambda a: print(power('cancel') if a.action == 'huy' else 'đã hỏi anh %s: %s' % (POWER_VI[POWER_CLI[a.action]], ask_owner(
         'CEO đề nghị %s PC. Anh xác nhận?' % POWER_VI[POWER_CLI[a.action]], [POWER_VI[POWER_CLI[a.action]].capitalize(), 'Không'], 'CEO', POWER_CLI[a.action]))) or 0)
+    pc = sub.add_parser('pc', help='mở dashboard PC trên trình duyệt')
+    pc.add_argument('--port', type=int, default=8765)
+    pc.set_defaults(fn=cmd_pc)
     gv = sub.add_parser('gui', help='giao tệp cho anh Vinh qua ô chat (anh bấm để mở hay tải)')
     gv.add_argument('paths', nargs='+')
     gv.add_argument('--loi', nargs='*', help='một câu kèm theo')
