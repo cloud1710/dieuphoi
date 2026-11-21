@@ -1151,10 +1151,25 @@ def feed_loop():
 
 
 def cmd_pc(args):
-    """Opens the PC dashboard in the default browser, already paired (the key travels in the URL fragment, never to a server)."""
-    import webbrowser
-    webbrowser.open('http://127.0.0.1:%d/pc.html#k=%s' % (args.port, token()))
-    print('đã mở dashboard trên trình duyệt')
+    """Opens the PC dashboard as a full-screen app window (Edge or Chrome in app mode), already paired: the key travels
+    in the URL fragment, never to a server. F11 or the button on the page leaves full screen. --tab = a normal tab."""
+    url = 'http://127.0.0.1:%d/pc.html#k=%s' % (args.port, token())
+    exe = None
+    if os.name == 'nt':
+        roots = [os.environ.get(k, '') for k in ('ProgramFiles(x86)', 'ProgramFiles', 'LOCALAPPDATA')]
+        for rel in ('Microsoft/Edge/Application/msedge.exe', 'Google/Chrome/Application/chrome.exe'):
+            exe = exe or next((str(Path(r) / rel) for r in roots if r and (Path(r) / rel).is_file()), None)
+    else:
+        exe = next((x for x in map(shutil.which, ('microsoft-edge', 'google-chrome', 'chromium')) if x), None)
+    if exe and not args.tab:
+        flags = (getattr(subprocess, 'DETACHED_PROCESS', 0) | getattr(subprocess, 'CREATE_NEW_PROCESS_GROUP', 0)) if os.name == 'nt' else 0
+        subprocess.Popen([exe, '--app=' + url, '--start-fullscreen', '--autoplay-policy=no-user-gesture-required'], creationflags=flags,
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print('đã mở dashboard toàn màn hình (F11 để thoát toàn màn hình, Alt+F4 để đóng)')
+    else:
+        import webbrowser
+        webbrowser.open(url)
+        print('đã mở dashboard trên trình duyệt')
     return 0
 
 
@@ -2969,6 +2984,7 @@ def main(argv=None):
         'CEO đề nghị %s PC. Anh xác nhận?' % POWER_VI[POWER_CLI[a.action]], [POWER_VI[POWER_CLI[a.action]].capitalize(), 'Không'], 'CEO', POWER_CLI[a.action]))) or 0)
     pc = sub.add_parser('pc', help='mở dashboard PC trên trình duyệt')
     pc.add_argument('--port', type=int, default=8765)
+    pc.add_argument('--tab', action='store_true', help='mở thành tab thường, không toàn màn hình')
     pc.set_defaults(fn=cmd_pc)
     gv = sub.add_parser('gui', help='giao tệp cho anh Vinh qua ô chat (anh bấm để mở hay tải)')
     gv.add_argument('paths', nargs='+')

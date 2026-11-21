@@ -108,6 +108,87 @@ def playlist(pid):
     return parse_playlist(_get('https://www.youtube.com/feeds/videos.xml?playlist_id=' + urllib.parse.quote(pid)))
 
 
+CHARTS = [('vn', 15), ('us', 8)]          # Apple Music most-played by country: free, no key; mixed into the player
+
+
+def chart(country, n):
+    raw = _get('https://rss.applemarketingtools.com/api/v2/%s/music/most-played/%d/songs.json' % (country, n))
+    return [{'title': str(r.get('name') or '')[:160], 'by': str(r.get('artistName') or '')[:80]} for r in json.loads(raw)['feed']['results'] if r.get('name')]
+
+
+def yt_find(query):
+    """The first video YouTube's own search page returns for a song: no API key, no model."""
+    raw = _get('https://www.youtube.com/results?search_query=' + urllib.parse.quote(query)).decode('utf-8', 'replace')
+    m = re.search(r'"videoRenderer":\{"videoId":"([\w-]{11})"', raw) or re.search(r'"videoId":"([\w-]{11})"', raw)
+    return m.group(1) if m else ''
+
+
+def trending(hub, limit=8):
+    """This week's most played songs (Vietnam, then US) as YouTube videos. Each song is looked up once and kept in
+    out/dash-yt-cache.json; at most `limit` new lookups per run, so a full chart fills in over a few runs."""
+    f = Path(hub) / 'out' / 'dash-yt-cache.json'
+    try:
+        cache = json.loads(f.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        cache = {}
+    out, errors, looked = [], [], 0
+    for country, n in CHARTS:
+        try:
+            songs = chart(country, n)
+        except Exception as e:
+            errors.append('bảng xếp hạng %s: %s' % (country, type(e).__name__))
+            continue
+        for sg in songs:
+            key = (sg['title'] + ' | ' + sg['by']).lower()
+            if key not in cache and looked < limit:
+                looked += 1
+                try:
+                    cache[key] = yt_find('%s %s' % (sg['title'], sg['by']))
+                except Exception as e:
+                    errors.append('tìm YouTube: %s' % type(e).__name__)
+                    break
+            if cache.get(key):
+                out.append({'id': cache[key], 'title': sg['title'], 'by': sg['by']})
+    f.write_text(json.dumps(cache, ensure_ascii=False), encoding='utf-8')
+    return out, errors
+
+
+FORUMS = [('Hacker News', 'hn', 'https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=12'),
+          ('r/MachineLearning', 'atom', 'https://www.reddit.com/r/MachineLearning/top/.rss?t=day&limit=6'),
+          ('r/LocalLLaMA', 'atom', 'https://www.reddit.com/r/LocalLLaMA/top/.rss?t=day&limit=6'),
+          ('r/ClaudeAI', 'atom', 'https://www.reddit.com/r/ClaudeAI/top/.rss?t=day&limit=6')]
+
+
+def parse_atom(raw, src, n=6):
+    ns = {'a': 'http://www.w3.org/2005/Atom'}
+    out = []
+    for e in ET.fromstring(raw).findall('a:entry', ns)[:n]:
+        link = e.find('a:link', ns)
+        url = link.get('href') if link is not None else ''
+        title = html.unescape(e.findtext('a:title', '', ns)).strip()
+        if title and str(url).startswith('http'):
+            out.append({'title': title[:220], 'url': url, 'src': src, 'at': (e.findtext('a:updated', '', ns) or '')[:16].replace('T', ' ')})
+    return out
+
+
+def forums():
+    """Tech and AI forums that are free to read without an account. Returns (items, errors)."""
+    items, errors = [], []
+    for name, kind, url in FORUMS:
+        try:
+            raw = _get(url)
+            if kind == 'hn':
+                for h in json.loads(raw).get('hits', []):
+                    if h.get('title'):
+                        items.append({'title': h['title'][:220], 'url': h.get('url') or 'https://news.ycombinator.com/item?id=%s' % h.get('objectID'),
+                                      'src': '%s · %s điểm' % (name, h.get('points') or 0), 'at': str(h.get('created_at') or '')[:16].replace('T', ' ')})
+            else:
+                items += parse_atom(raw, name)
+        except Exception as e:
+            errors.append('%s: %s' % (name, type(e).__name__))
+    return items, errors
+
+
 def refresh(hub):
     """Fetches everything once and writes out/dash-news.json. A source that fails keeps what it had."""
     hub = Path(hub)
@@ -126,13 +207,22 @@ def refresh(hub):
             got['errors'].append('%s: %s' % (t['name'], type(e).__name__))
             if t['name'] in kept:
                 got['topics'].append(kept[t['name']])
+    items, errs = forums()
+    got['errors'] += errs
+    if items:
+        got['topics'].append({'name': 'Diễn đàn công nghệ, AI', 'items': items})
+    elif 'Diễn đàn công nghệ, AI' in kept:
+        got['topics'].append(kept['Diễn đàn công nghệ, AI'])
     if cfg.get('trending'):
         try:
             got['trend'] = playlist(cfg['trending'])
         except Exception as e:
             got['errors'].append('playlist thịnh hành: %s' % type(e).__name__)
-    else:
-        got['trend'] = []
+    else:                                        # no playlist of the owner's choosing: the charts, by script
+        tr, errs = trending(hub)
+        got['errors'] += errs
+        if tr:
+            got['trend'] = tr
     f.write_text(json.dumps(got, ensure_ascii=False, indent=1), encoding='utf-8')
     return got
 
@@ -148,6 +238,6 @@ def view(hub):
         except (OSError, ValueError):
             return default
     cfg = cfg_load(hub)
-    return {'news': read('dash-news.json', {}), 'hot': read('dash-hot.json', {}), 'projects': read('dash-projects.json', {}),
+    return {'social': read('dash-social.json', {}), 'news': read('dash-news.json', {}), 'hot': read('dash-hot.json', {}), 'projects': read('dash-projects.json', {}),
             'cfg': {'playlist': cfg.get('playlist') or '', 'trending': cfg.get('trending') or '', 'mix': cfg.get('mix', 3),
                     'topics': cfg.get('topics') or DEFAULT_TOPICS}}

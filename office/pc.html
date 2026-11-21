@@ -89,6 +89,7 @@ section.drop{outline:2px dashed var(--blue)}
   <span id="ceo"><i></i><span id="ceot">đang nối…</span></span>
   <button id="hands" title="Rảnh tay: nói &quot;CEO ơi, …&quot; để nhắn; &quot;phát nhạc&quot;, &quot;dừng nhạc&quot;, &quot;bài tiếp&quot;, &quot;đọc tin&quot; chạy ngay">🎙 Rảnh tay</button>
   <button id="tts" title="Đọc to câu trả lời của CEO">🔈 Đọc trả lời</button>
+  <button id="full" title="Toàn màn hình (F11)">⛶</button>
   <button id="gear" title="Cài đặt">⚙</button>
 </header>
 <main>
@@ -220,7 +221,7 @@ function command(said) {
   if (/bai (tiep|ke|khac)|chuyen bai|qua bai/.test(f)) { P.next(); return true; }
   if (/(nhac )?to (len|hon)/.test(f)) { P.vol(+20); return true; }
   if (/(nhac )?nho (xuong|lai|hon)/.test(f)) { P.vol(-20); return true; }
-  if (/doc tin/.test(f)) { const t = (DASH.news.topics || [])[NTAB]; if (t) speak(t.name + '. ' + t.items.slice(0, 5).map(x => x.title).join('. ')); return true; }
+  if (/doc tin/.test(f)) { const t = [].concat((DASH.social || {}).topics || [], DASH.news.topics || [])[NTAB]; if (t) speak(t.name + '. ' + t.items.slice(0, 5).map(x => x.title).join('. ')); return true; }
   if (/(dung|thoi|ngung) doc|im lang/.test(f)) { speechSynthesis.cancel(); return true; }
   return false;
 }
@@ -261,10 +262,10 @@ $('mic').onclick = async () => {
 };
 
 /* ---------- dashboard data ---------- */
-let DASH = {news: {}, hot: {}, projects: {}, cfg: {}}, NTAB = 0, HTAB = 'music';
+let DASH = {news: {}, social: {}, hot: {}, projects: {}, cfg: {}}, NTAB = 0, HTAB = 'music';
 function tabs(box, names, cur, onpick) { box.textContent = ''; names.forEach((n, i) => { const b = E('button', (n[0] === cur ? 'on' : ''), n[1]); b.onclick = () => onpick(n[0]); box.append(b); }); }
 function drawNews() {
-  const ts = DASH.news.topics || []; $('ndate').textContent = DASH.news.time ? 'cập nhật ' + DASH.news.time.slice(11) : '';
+  const ts = [].concat((DASH.social || {}).topics || [], DASH.news.topics || []); $('ndate').textContent = DASH.news.time ? 'cập nhật ' + DASH.news.time.slice(11) : '';
   if (NTAB >= ts.length) NTAB = 0;
   tabs($('ntabs'), ts.map((t, i) => [i, t.name]), NTAB, i => { NTAB = i; drawNews(); });
   const box = $('news'); box.textContent = '';
@@ -345,6 +346,7 @@ const P = (() => {
 })();
 function duck(on) { P.duck(on); }
 
+$('full').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
 /* ---------- settings ---------- */
 $('gear').onclick = () => { const c = DASH.cfg || {}; $('s-pl').value = c.playlist || ''; $('s-tr').value = c.trending || ''; $('s-mix').value = c.mix ?? 3; $('s-top').value = (c.topics || []).map(t => [t.name, t.q, t.lang || 'vi'].join(' | ')).join('\n'); $('set').classList.add('show'); };
 $('s-x').onclick = () => $('set').classList.remove('show');
