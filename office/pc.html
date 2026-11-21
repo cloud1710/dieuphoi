@@ -6,35 +6,73 @@
 <title>Điều phối · Dashboard</title>
 <link rel="icon" href="icon-192.png">
 <style>
-:root{--bg:#0d1117;--panel:#151b24;--panel2:#1b2330;--line:#263042;--ink:#e6edf3;--dim:#8b98a9;--gold:#d4a72c;--blue:#4c8dff;--green:#3fb950;--red:#f85149;--amber:#d29922}
+:root{--bg:#0d1117;--panel:#151b24;--panel2:#1b2330;--line:#263042;--ink:#e6edf3;--soft:#c2ccd8;--dim:#9aa7b8;--gold:#f0c14b;--teal:#7fd1c7;--blue:#8fb4ff;--green:#3fb950;--red:#f85149;--amber:#d29922}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
-body{background:var(--bg);color:var(--ink);font:14px/1.5 "Segoe UI",system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden}
-button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 11px;cursor:pointer}
-button:hover{border-color:var(--blue)}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 "Segoe UI",Inter,system-ui,sans-serif;display:flex;flex-direction:column;overflow:hidden}
+button{font:inherit;color:inherit;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:0 14px;min-height:40px;cursor:pointer}
+button:hover{border-color:var(--gold)}
 button.on{background:var(--gold);border-color:var(--gold);color:#16130a;font-weight:600}
 button.rec{background:var(--red);border-color:var(--red);color:#fff}
+button.sm{min-height:28px;padding:0 9px;border-radius:8px;font-size:12.5px}
 input,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px;width:100%}
-a{color:var(--ink);text-decoration:none}a:hover{color:var(--blue)}
-header{display:flex;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid var(--line);flex:none}
-header h1{font-size:16px;margin:0;letter-spacing:.3px}
-header h1 b{color:var(--gold)}
-#clock{font-variant-numeric:tabular-nums;color:var(--dim)}
-#ceo{display:flex;align-items:center;gap:7px;color:var(--dim);margin-left:auto}
+a{color:var(--ink);text-decoration:none}a:hover{color:var(--gold)}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin:0 0 10px;font-weight:600;display:flex;gap:8px;align-items:center}
+h2 small{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400}
+header{display:flex;align-items:center;flex-wrap:wrap;gap:14px;padding:10px 20px;border-bottom:1px solid var(--line);flex:none}
+header h1{font-size:17px;margin:0;color:var(--gold);letter-spacing:.3px}
+#tabs{display:flex;flex-wrap:wrap;gap:4px}
+#tabs button{border:0;background:transparent;color:var(--soft);font-weight:500}
+#tabs button.on{background:var(--gold);color:#16130a;font-weight:600}
+#tabs button b{margin-left:6px;padding:1px 7px;border-radius:9px;background:var(--line);color:var(--ink);font-size:12px;font-weight:500}
+#tabs button.on b{background:rgba(0,0,0,.18);color:#16130a}
+#tabs button.relax{border:1px solid var(--line);color:var(--teal)}
+#right{margin-left:auto;display:flex;align-items:center;flex-wrap:wrap;gap:12px;color:var(--dim)}
+#clock{font-variant-numeric:tabular-nums}
+#ceo{display:flex;align-items:center;gap:7px}
 #ceo i{width:9px;height:9px;border-radius:50%;background:var(--green);display:inline-block}
 #ceo.busy i{background:var(--amber);animation:pulse 1s infinite}
 #ceo.off i{background:var(--red)}
 @keyframes pulse{50%{opacity:.3}}
-main{flex:1;min-height:0;display:grid;grid-template-columns:minmax(330px,380px) minmax(0,1fr) minmax(340px,400px);gap:14px;padding:14px 18px}
-section{background:var(--panel);border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;min-height:0}
-section>h2{font-size:12px;text-transform:uppercase;letter-spacing:1px;color:var(--dim);margin:0;padding:11px 14px 8px;display:flex;align-items:center;gap:8px;flex:none}
-section>h2 small{margin-left:auto;text-transform:none;letter-spacing:0;font-weight:400}
-.col{display:flex;flex-direction:column;gap:14px;min-height:0}
-.scroll{overflow:auto;min-height:0;flex:1;padding:0 14px 12px}
-.scroll::-webkit-scrollbar{width:8px}.scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
-.empty{color:var(--dim);padding:10px 0}
-/* chat */
-#log{display:flex;flex-direction:column;gap:8px;padding-top:4px}
+#body{flex:1;min-height:0;display:flex;gap:14px;padding:14px 20px}
+#view{flex:1;min-width:0;overflow:auto;padding-right:4px}
+#view::-webkit-scrollbar,.scroll::-webkit-scrollbar{width:8px}#view::-webkit-scrollbar-thumb,.scroll::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+.cols{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:14px;align-items:start}
+.two{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:14px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:14px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.empty{color:var(--dim)}
+.item{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.item:last-child{border:0;padding-bottom:0}
+.item .tx{flex:1;min-width:0}
+.item .tx a{display:block;font-weight:500}
+.item small{color:var(--dim)}
+.item.read .tx a{color:var(--dim);font-weight:400}
+.item .tag{flex:none;width:86px;font-size:12px;padding-top:2px}
+.item .pin{flex:none;min-height:28px;padding:0 8px;border-radius:8px;background:transparent;color:var(--dim);font-size:12px}
+.item .pin.on{color:var(--gold);border-color:var(--gold)}
+.score{float:right;margin-left:8px;border:1px solid var(--gold);color:var(--gold);border-radius:6px;padding:0 6px;font-size:12px}
+.proj h3{margin:0 0 5px;font-size:14px;display:flex;gap:8px;align-items:center}
+.proj h3 i{width:8px;height:8px;border-radius:50%;flex:none;background:var(--green)}
+.proj h3 i.chu-y{background:var(--amber);border-radius:2px}.proj h3 i.loi{background:var(--red);border-radius:0}
+.proj p{margin:4px 0;color:var(--soft)}
+.proj p.view{border-left:2px solid var(--gold);padding-left:9px;color:var(--ink)}
+.proj p.next{color:var(--dim);font-size:12.5px}
+.tree div{padding:3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--soft)}
+.tree small{color:var(--dim)}
+#chat{flex:none;width:68px;display:flex;flex-direction:column;background:var(--panel);border:1px solid var(--line);border-radius:14px;min-height:0;transition:width .18s}
+body.chat #chat{width:400px}
+#rail{display:flex;flex-direction:column;align-items:center;gap:10px;padding:12px 0}
+#rail button{width:46px;height:46px;min-height:0;padding:0;border-radius:50%;position:relative}
+#rail #openchat{background:var(--gold);border-color:var(--gold);color:#16130a;font-weight:700;font-size:12px}
+#rail #openchat.new::after{content:"";position:absolute;top:0;right:0;width:12px;height:12px;border-radius:50%;background:var(--red);border:2px solid var(--panel)}
+#rail span{writing-mode:vertical-rl;color:var(--dim);font-size:12px;margin-top:6px}
+body.chat #rail{display:none}
+#drawer{display:none;flex-direction:column;min-height:0;flex:1}
+body.chat #drawer{display:flex}
+#drawer h2{padding:12px 14px 0;margin:0}
+.scroll{overflow:auto;min-height:0;flex:1;padding:8px 14px 12px}
+#log{display:flex;flex-direction:column;gap:8px}
 .msg{max-width:92%;padding:8px 11px;border-radius:12px;white-space:pre-wrap;word-wrap:break-word;background:var(--panel2);align-self:flex-start}
 .msg.vinh{align-self:flex-end;background:#1f3a66}
 .msg small{display:block;color:var(--dim);font-size:11px;margin-top:3px}
@@ -44,322 +82,362 @@ section>h2 small{margin-left:auto;text-transform:none;letter-spacing:0;font-weig
 #step{color:var(--amber);font-size:12px;padding:0 14px 6px;min-height:20px;flex:none}
 #compose{display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--line);align-items:flex-end;flex:none}
 #compose textarea{resize:none;height:42px;max-height:140px}
+#compose button{padding:0 10px}
 #picked{display:flex;flex-wrap:wrap;gap:6px;padding:0 12px;flex:none}
-#picked span{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:2px 8px;color:var(--dim)}
-section.drop{outline:2px dashed var(--blue)}
-/* cards */
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
-.card{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px 13px}
-.card h3{margin:0 0 5px;font-size:14px;display:flex;gap:8px;align-items:center}
-.card h3 i{width:8px;height:8px;border-radius:50%;flex:none;background:var(--green)}
-.card h3 i.chu-y{background:var(--amber)}.card h3 i.loi{background:var(--red)}
-.card p{margin:4px 0;color:#c9d3df}
-.card p.view{border-left:2px solid var(--gold);padding-left:9px;color:var(--ink)}
-.card p.next{color:var(--dim);font-size:12.5px}
-.tabs{display:flex;gap:6px;flex-wrap:wrap;padding:0 14px 8px;flex:none}
-.tabs button{padding:3px 10px;border-radius:14px;font-size:12.5px}
-.item{display:block;padding:8px 0;border-bottom:1px solid var(--line)}
-.item:last-child{border:0}
-.item b{font-weight:500;display:block}
-.item small{color:var(--dim)}
-.item .score{float:right;margin-left:8px;border:1px solid var(--gold);color:var(--gold);border-radius:6px;padding:0 6px;font-size:12px}
-.tree div{padding:3px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tree small{color:var(--dim)}
-/* player */
-#ytwrap{aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden;margin:0 14px;flex:none}
+#picked span{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:2px 8px;color:var(--dim);cursor:pointer}
+#chat.drop{outline:2px dashed var(--blue)}
+footer{display:flex;align-items:center;flex-wrap:wrap;gap:14px;padding:8px 20px;border-top:1px solid var(--line);background:#11161e;flex:none;position:relative;z-index:6}
+#ytwrap{width:96px;height:54px;background:#000;border-radius:6px;overflow:hidden;flex:none;cursor:pointer}
+#ytwrap.big{position:fixed;right:20px;bottom:84px;width:480px;height:270px;border:1px solid var(--line);border-radius:10px;z-index:7}
 #ytwrap>div,#ytwrap iframe{width:100%;height:100%;border:0}
-#now{padding:8px 14px 2px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:none}
+#nowbox{flex:1;min-width:200px;overflow:hidden}
+#now{font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #now small{color:var(--gold);font-weight:400;margin-right:6px}
-#pctl{display:flex;gap:6px;align-items:center;padding:6px 14px 12px;flex:none}
-#pctl input{flex:1;padding:0;accent-color:var(--gold)}
-/* settings */
+#qinfo{color:var(--dim);font-size:12px}
+footer label{display:flex;align-items:center;gap:8px;color:var(--dim)}
+footer input[type=range]{width:140px;padding:0;accent-color:var(--gold)}
+#relax{position:fixed;inset:0;z-index:5;display:none;background:#04202c;color:#eaf6f8}
+body.relax #relax{display:block}
+body.relax #body,body.relax header{visibility:hidden}
+#relax canvas,#relax #rv,#relax iframe.office{position:absolute;inset:0;width:100%;height:100%;border:0}
+#rv{pointer-events:none;display:none}
+#rv iframe{width:100%;height:100%;border:0;transform:scale(1.18)}
+#rtop{position:absolute;left:0;right:0;top:0;display:flex;align-items:center;gap:12px;padding:16px 20px;transition:opacity .6s}
+#rtop button,#rbot button{background:rgba(4,26,38,.55);border-color:rgba(234,246,248,.35);color:#eaf6f8;border-radius:22px}
+#rtop button{border-radius:10px}
+#rbot button.on{background:var(--teal);border-color:var(--teal);color:#06222e}
+#rnote{margin-left:auto;padding:8px 14px;border-radius:10px;background:rgba(4,26,38,.55);display:flex;gap:8px;align-items:center}
+#rclock{position:absolute;left:0;right:0;top:34%;text-align:center;pointer-events:none;text-shadow:0 2px 24px rgba(4,26,38,.7)}
+#rclock b{display:block;font:500 120px/1 "Segoe UI",system-ui,sans-serif;letter-spacing:-2px}
+#rclock span{font-size:18px;color:#d3ecef}
+#rbot{position:absolute;left:0;right:0;bottom:0;padding:16px 20px;display:flex;flex-direction:column;gap:10px;background:linear-gradient(180deg,rgba(4,26,38,0),rgba(4,26,38,.85));transition:opacity .6s}
+#rbot .row{display:flex;align-items:center;flex-wrap:wrap;gap:8px}
+#rbot .row>span{width:70px;color:#d3ecef}
+#relax.idle #rbot,#relax.idle #rtop{opacity:0}
+#relax.idle{cursor:none}
 #set{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9}
 #set.show{display:flex}
-#set form{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;width:min(620px,92vw);display:flex;flex-direction:column;gap:8px}
+#set form{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px;width:min(640px,92vw);max-height:92vh;overflow:auto;display:flex;flex-direction:column;gap:8px}
 #set label{color:var(--dim);font-size:12.5px;margin-top:6px}
 #set .row{display:flex;gap:8px;justify-content:flex-end;margin-top:10px}
-#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--gold);border-radius:10px;padding:8px 14px;display:none;z-index:10}
-@media(max-width:1100px){main{grid-template-columns:1fr;overflow:auto}body{overflow:auto}section{min-height:360px}}
+#toast{position:fixed;bottom:84px;left:50%;transform:translateX(-50%);background:var(--panel2);border:1px solid var(--gold);border-radius:10px;padding:8px 14px;display:none;z-index:10;max-width:70vw}
+@media(max-width:1000px){.two{grid-template-columns:1fr}.cols{grid-template-columns:1fr}body.chat #chat{position:fixed;inset:60px 10px 80px 10px;width:auto;z-index:8}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 </head>
 <body>
 <header>
-  <h1><b>Điều phối</b> · Dashboard</h1>
-  <span id="clock"></span>
-  <span id="ceo"><i></i><span id="ceot">đang nối…</span></span>
-  <button id="hands" title="Rảnh tay: nói &quot;CEO ơi, …&quot; để nhắn; &quot;phát nhạc&quot;, &quot;dừng nhạc&quot;, &quot;bài tiếp&quot;, &quot;đọc tin&quot; chạy ngay">🎙 Rảnh tay</button>
-  <button id="tts" title="Đọc to câu trả lời của CEO">🔈 Đọc trả lời</button>
-  <button id="full" title="Toàn màn hình (F11)">⛶</button>
-  <button id="gear" title="Cài đặt">⚙</button>
+  <h1>Điều phối</h1>
+  <nav id="tabs"></nav>
+  <div id="right">
+    <span id="clock"></span>
+    <span id="ceo"><i></i><span id="ceot">đang nối…</span></span>
+    <button id="hands" title="Rảnh tay: nói &quot;CEO ơi, …&quot; để nhắn; &quot;phát nhạc&quot;, &quot;bài tiếp&quot;, &quot;đọc cập nhật&quot;, &quot;thư giãn&quot; chạy ngay">Rảnh tay</button>
+    <button id="tts" title="Đọc to câu trả lời của CEO">Đọc trả lời</button>
+    <button id="full" title="Toàn màn hình (F11)" aria-label="Toàn màn hình">⛶</button>
+    <button id="gear" title="Cài đặt" aria-label="Cài đặt">⚙</button>
+  </div>
 </header>
-<main>
-  <section id="chat">
-    <h2>CEO <small id="model"></small></h2>
-    <div class="scroll" id="logbox"><div id="log"></div></div>
-    <div id="step"></div>
-    <div id="picked"></div>
-    <div id="compose">
-      <button id="clip" title="Gửi tệp (hoặc kéo thả vào đây)">📎</button>
-      <input type="file" id="file" multiple hidden>
-      <textarea id="text" placeholder="Nhắn CEO… (Enter để gửi, Shift+Enter xuống dòng)"></textarea>
-      <button id="mic" title="Nói để nhắn">🎤</button>
-      <button id="send">Gửi</button>
+<div id="body">
+  <main id="view"></main>
+  <aside id="chat">
+    <div id="rail">
+      <button id="openchat" title="Mở ô chat với CEO">CEO</button>
+      <button id="railmic" title="Nói để nhắn CEO" aria-label="Nói để nhắn CEO">🎤</button>
+      <span>Bấm để mở chat</span>
     </div>
-  </section>
-  <div class="col">
-    <section style="flex:0 1 auto;max-height:46%">
-      <h2>Dự án hằng ngày <small id="pdate"></small></h2>
-      <div class="scroll"><div class="grid" id="projects"></div><div class="tree" id="tree"></div></div>
-    </section>
-    <section style="flex:1">
-      <h2>Tin anh có thể quan tâm <small id="ndate"></small></h2>
-      <div class="tabs" id="ntabs"></div>
-      <div class="scroll" id="news"></div>
-    </section>
-  </div>
-  <div class="col">
-    <section style="flex:none">
-      <h2>Nhạc nền <small id="qinfo"></small></h2>
-      <div id="ytwrap"><div id="yt"></div></div>
-      <div id="now">Chưa phát</div>
-      <div id="pctl">
-        <button id="play">▶ Phát</button><button id="next" title="Bài tiếp">⏭</button>
-        <input type="range" id="vol" min="0" max="100" value="45" title="Âm lượng">
+    <div id="drawer">
+      <h2>CEO <small id="model"></small><button class="sm" id="closechat" aria-label="Thu gọn ô chat">Thu gọn</button></h2>
+      <div class="scroll" id="logbox"><div id="log"></div></div>
+      <div id="step"></div>
+      <div id="picked"></div>
+      <div id="compose">
+        <button id="clip" title="Gửi tệp (hoặc kéo thả vào đây)" aria-label="Gửi tệp">📎</button>
+        <input type="file" id="file" multiple hidden>
+        <textarea id="text" placeholder="Nhắn CEO… (Enter để gửi)"></textarea>
+        <button id="mic" title="Nói để nhắn" aria-label="Nói để nhắn">🎤</button>
+        <button id="send">Gửi</button>
       </div>
-    </section>
-    <section style="flex:1">
-      <h2>Đang hot <small id="hdate"></small></h2>
-      <div class="tabs" id="htabs"></div>
-      <div class="scroll" id="hot"></div>
-    </section>
+    </div>
+  </aside>
+</div>
+<footer>
+  <div id="ytwrap" title="Bấm để phóng to hoặc thu nhỏ video"><div id="yt"></div></div>
+  <div id="nowbox"><div id="now">Chưa phát</div><div id="qinfo"></div></div>
+  <button id="play">▶ Phát</button><button id="next" aria-label="Bài tiếp" title="Bài tiếp">⏭</button>
+  <label>Âm lượng <input type="range" id="vol" min="0" max="100" value="45"></label>
+</footer>
+
+<div id="relax">
+  <canvas id="rc"></canvas>
+  <div id="rv"><div id="rvp"></div></div>
+  <div id="rclock"><b id="rtime"></b><span id="rdate"></span></div>
+  <div id="rtop"><button id="rback">Quay lại dashboard</button><div id="rnote"></div></div>
+  <div id="rbot">
+    <div class="row" id="rscenes"><span>Cảnh</span></div>
+    <div class="row" id="rsounds"><span>Âm nền</span></div>
   </div>
-</main>
+</div>
+
 <div id="set"><form id="setf">
   <b>Cài đặt dashboard</b>
-  <label>Playlist YouTube anh hay nghe (dán đường dẫn có list=… hoặc mã playlist)</label><input id="s-pl">
-  <label>Playlist thịnh hành để xen bài mới (bỏ trống thì dùng danh sách nhạc hot của CEO)</label><input id="s-tr">
+  <label>Playlist YouTube anh hay nghe (dán đường dẫn có list=… hoặc mã playlist; bỏ trống thì dùng danh sách bài đã thích)</label><input id="s-pl">
+  <label>Playlist thịnh hành để xen bài mới (bỏ trống thì dùng bảng xếp hạng tự lấy)</label><input id="s-tr">
   <label>Cứ mấy bài của anh thì xen một bài mới (0 = không xen)</label><input id="s-mix" type="number" min="0" max="10">
-  <label>Chủ đề tin tức, mỗi dòng: Tên | từ khoá tìm | vi hoặc en</label><textarea id="s-top" rows="6"></textarea>
-  <label>Nguồn mạng xã hội công khai (mỗi dòng một đường dẫn nhóm hoặc trang Facebook; đọc mỗi sáng, không đăng nhập)</label><textarea id="s-soc" rows="5"></textarea>
+  <label>Chủ đề tin tức, mỗi dòng: Tên | từ khoá tìm | vi hoặc en</label><textarea id="s-top" rows="5"></textarea>
+  <label>Nguồn mạng xã hội công khai (mỗi dòng một đường dẫn nhóm hoặc trang Facebook)</label><textarea id="s-soc" rows="5"></textarea>
+  <label><input type="checkbox" id="s-idle" style="width:auto"> Tự chuyển sang Thư giãn sau 5 phút không dùng máy</label>
   <div class="row"><button type="button" id="s-x">Đóng</button><button class="on">Lưu</button></div>
 </form></div>
 <div id="toast"></div>
+
 <script>
 'use strict';
 const $ = id => document.getElementById(id);
 const E = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
-let KEY = ''; try { KEY = localStorage.getItem('dp-key') || ''; } catch (e) {}
-if (location.hash.startsWith('#k=')) { KEY = decodeURIComponent(location.hash.slice(3)); try { localStorage.setItem('dp-key', KEY); } catch (e) {} history.replaceState(null, '', location.pathname); }
+const LS = {get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : v; } catch (e) { return d; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }};
+let KEY = LS.get('dp-key', '');
+if (location.hash.startsWith('#k=')) { KEY = decodeURIComponent(location.hash.slice(3)); LS.set('dp-key', KEY); history.replaceState(null, '', location.pathname); }
 const api = async (path, body) => {
   const r = await fetch(path, body === undefined ? {headers: {'X-DP-Key': KEY}} : {method: 'POST', headers: {'X-DP-Key': KEY, 'Content-Type': 'application/json'}, body: JSON.stringify(body)});
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error === 'key' ? 'Chưa ghép: chạy "python tools/dp.py pc" trên PC để mở trang này kèm khoá' : (j.error || 'lỗi ' + r.status));
+  if (!r.ok) throw new Error(j.error === 'key' ? 'Chưa ghép: trên PC chạy dashboard.cmd; ở máy khác, mở app điều phối để ghép trước' : (j.error || 'lỗi ' + r.status));
   return j;
 };
 const toast = t => { const b = $('toast'); b.textContent = t; b.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => b.style.display = 'none', 4500); };
 const fold = t => String(t).toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd');
 const safeUrl = u => /^https?:\/\//i.test(String(u || '')) ? u : null;
-const link = (cls, url) => { const a = E(safeUrl(url) ? 'a' : 'div', cls); if (safeUrl(url)) { a.href = url; a.target = '_blank'; a.rel = 'noopener noreferrer'; } return a; };
-setInterval(() => { const d = new Date(); $('clock').textContent = d.toLocaleDateString('vi-VN', {weekday: 'long', day: 'numeric', month: 'numeric'}) + ' · ' + d.toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'}); }, 1000);
+function tick() { const d = new Date(), hm = d.toLocaleTimeString('vi-VN', {hour: '2-digit', minute: '2-digit'}), day = d.toLocaleDateString('vi-VN', {weekday: 'long', day: 'numeric', month: 'numeric'});
+  $('clock').textContent = day + ' · ' + hm; $('rtime').textContent = hm; $('rdate').textContent = day; }
+setInterval(tick, 1000); tick();
+
+/* ---------- data and tabs ---------- */
+let DASH = {news: {}, social: {}, hot: {}, projects: {}, cfg: {}}, VIEC = [], STATE = null, TAB = LS.get('dp-tab', 'today');
+const TABS = [['today', 'Hôm nay'], ['pro', 'Chuyên môn'], ['tech', 'Công nghệ'], ['proj', 'Dự án'], ['fun', 'Giải trí']];
+const TAG = {pro: ['Chuyên môn', 'var(--teal)'], tech: ['Công nghệ', 'var(--blue)'], proj: ['Dự án', 'var(--gold)'], fun: ['Giải trí', 'var(--soft)']};
+const tabOf = name => /cập nhật|giải phẫu|y khoa|patholog/i.test(name) ? 'pro' : /chứng khoán/i.test(name) ? 'proj' : /bóng đá|thể thao|giải trí|handheld/i.test(name) ? 'fun' : 'tech';
+const topics = () => [].concat((DASH.social || {}).topics || [], DASH.news.topics || []);
+const idOf = x => (x.url || '') + '|' + String(x.title).slice(0, 60);
+let READ = new Set(JSON.parse(LS.get('dp-read', '[]'))), PINS = JSON.parse(LS.get('dp-pins', '[]'));
+function markRead(x) { READ.add(idOf(x)); LS.set('dp-read', JSON.stringify([...READ].slice(-1200))); drawTabs(); }
+function togglePin(x) { const i = PINS.findIndex(p => idOf(p) === idOf(x)); if (i >= 0) PINS.splice(i, 1); else PINS.unshift({title: x.title, url: x.url, src: x.src, at: x.at}); PINS = PINS.slice(0, 60); LS.set('dp-pins', JSON.stringify(PINS)); draw(); }
+const unread = tab => topics().filter(t => tabOf(t.name) === tab).reduce((n, t) => n + t.items.filter(x => x.url && !READ.has(idOf(x))).length, 0);
+function drawTabs() { const box = $('tabs'); box.textContent = '';
+  TABS.forEach(([id, name]) => { const b = E('button', id === TAB ? 'on' : '', name), n = id === 'today' ? 0 : unread(id); if (n) b.append(E('b', '', n)); b.onclick = () => { TAB = id; LS.set('dp-tab', id); draw(); }; box.append(b); });
+  const r = E('button', 'relax', 'Thư giãn'); r.onclick = () => Relax.open(); box.append(r); }
+function itemRow(x, tag) { const row = E('div', 'item' + (READ.has(idOf(x)) ? ' read' : ''));
+  if (tag) { const t = E('span', 'tag', TAG[tag][0]); t.style.color = TAG[tag][1]; row.append(t); }
+  const tx = E('div', 'tx'), u = safeUrl(x.url), a = E(u ? 'a' : 'div', '', x.title); if (u) { a.href = u; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.addEventListener('click', () => { markRead(x); row.classList.add('read'); }); }
+  tx.append(a, E('small', '', [x.src, x.at].filter(Boolean).join(' · '))); row.append(tx);
+  if (u) { const on = PINS.some(p => idOf(p) === idOf(x)), p = E('button', 'pin' + (on ? ' on' : ''), on ? 'Đã ghim' : 'Ghim'); p.onclick = () => togglePin(x); row.append(p); }
+  return row; }
+function topicCard(t) { const c = E('section', 'card'), h = E('h2', '', t.name); const n = t.items.filter(x => x.url && !READ.has(idOf(x))).length; if (n) h.append(E('small', '', n + ' mới')); c.append(h);
+  if (!t.items.length) c.append(E('div', 'empty', 'Chưa có mục nào.')); t.items.forEach(x => c.append(itemRow(x))); return c; }
+function projCards(short) { const p = DASH.projects || {}, out = [];
+  (p.items || []).forEach(x => { const d = E('div', 'proj'), h = E('h3'); h.append(E('i', x.status || ''), document.createTextNode(x.name || x.id || '')); d.append(h);
+    if (short) d.append(E('p', '', x.view || x.summary || '')); else { if (x.summary) d.append(E('p', '', x.summary)); if (x.view) d.append(E('p', 'view', x.view)); if (x.next) d.append(E('p', 'next', 'Kế tiếp: ' + x.next)); } out.push(d); });
+  return out; }
+function treeBox() { const box = E('div', 'tree'), vs = VIEC || []; if (!vs.length) { box.append(E('div', 'empty', 'Không có việc nào đang chạy hay mới xong.')); return box; }
+  const ids = new Set(vs.map(v => v.id)), IC = {chay: '⏳', xong: '✅', loi: '❌', cho: '⏸'};
+  const walk = (v, dep) => { const r = E('div'); r.style.paddingLeft = dep * 18 + 'px'; r.append(document.createTextNode((IC[v.state] || '•') + ' ' + v.name + ' '), E('small', '', v.state === 'chay' ? (v.step || 'từ ' + String(v.start).slice(11, 16)) : (v.result || ''))); box.append(r); vs.filter(k => k.parent === v.id).forEach(k => walk(k, dep + 1)); };
+  vs.filter(v => !v.parent || !ids.has(v.parent)).forEach(v => walk(v, 0)); return box; }
+function card(title, small, ...kids) { const c = E('section', 'card'), h = E('h2', '', title); if (small) h.append(E('small', '', small)); c.append(h); kids.flat().forEach(k => c.append(k)); return c; }
+function picks() { /* by rule, no model: the newest unread item of each source group, specialist first */
+  const out = []; ['pro', 'tech', 'proj', 'fun'].forEach(tab => topics().filter(t => tabOf(t.name) === tab).forEach(t => { const x = t.items.find(i => i.url && !READ.has(idOf(i))); if (x) out.push([x, tab]); }));
+  return out.slice(0, 7); }
+function questions() { const out = []; ((STATE || {}).projects || []).forEach(p => (p.questions || []).forEach(q => { if (!q.answer && q.status !== 'answered') out.push('@' + p.id + ': ' + (q.title || q.text || q.q || q.id)); })); return out; }
+function draw() { drawTabs(); const v = $('view'); v.textContent = '';
+  if (TAB === 'today') { const two = E('div', 'two'), L = E('div', 'stack'), R = E('div', 'stack'), qs = questions(), pk = picks();
+    L.append(card('Chờ anh quyết', qs.length ? qs.length + ' việc' : '', qs.length ? qs.slice(0, 5).map(q => E('div', 'item', q)) : E('div', 'empty', 'Không có việc nào chờ anh.')));
+    L.append(card('Đáng đọc hôm nay', DASH.news.time ? 'cập nhật ' + DASH.news.time.slice(11) : '', pk.length ? pk.map(([x, tab]) => itemRow(x, tab)) : E('div', 'empty', 'Anh đã đọc hết, hoặc hub chưa lấy xong tin.')));
+    const pc = projCards(true); R.append(card('Dự án, một dòng mỗi dự án', (DASH.projects || {}).date || '', pc.length ? pc : E('div', 'empty', 'CEO soạn mỗi sáng lúc 07:05.')));
+    R.append(card('Việc CEO đang theo', '', treeBox()));
+    R.append(card('Đọc sau', PINS.length ? PINS.length + ' mục' : '', PINS.length ? PINS.map(x => itemRow(x)) : E('div', 'empty', 'Bấm Ghim ở mục nào anh muốn đọc sau.')));
+    two.append(L, R); v.append(two); return; }
+  if (TAB === 'proj') { const g = E('div', 'cols'), pc = projCards(false);
+    if (!pc.length) g.append(card('Dự án hằng ngày', '', E('div', 'empty', 'Chưa có tổng kết: CEO soạn mỗi sáng lúc 07:05 từ kết quả của từng dự án.')));
+    pc.forEach(d => { const c = E('section', 'card'); c.append(d); g.append(c); }); g.append(card('Việc CEO đang theo', '', treeBox()));
+    topics().filter(t => tabOf(t.name) === 'proj').forEach(t => g.append(topicCard(t))); v.append(g); return; }
+  const g = E('div', 'cols');
+  if (TAB === 'fun') { const h = DASH.hot || {}; [['music', 'Nhạc đang hot'], ['film', 'Phim mới, hay'], ['game', 'Game mới, hot']].forEach(([k, name]) => { const c = card(name, h.date || '');
+      if (!(h[k] || []).length) c.append(E('div', 'empty', 'CEO soạn mỗi sáng lúc 07:05.'));
+      (h[k] || []).forEach(x => { const row = E('div', 'item'), tx = E('div', 'tx'), u = safeUrl(x.url || (x.yt ? 'https://www.youtube.com/watch?v=' + encodeURIComponent(x.yt) : '')), a = E(u ? 'a' : 'div', '', x.title + (x.by ? ' · ' + x.by : '')); if (u) { a.href = u; a.target = '_blank'; a.rel = 'noopener noreferrer'; }
+        if (x.score) tx.append(E('span', 'score', x.score)); tx.append(a, E('small', '', x.why || '')); row.append(tx);
+        if (k === 'music' && /^[\w-]{11}$/.test(x.yt || '')) { const b = E('button', 'pin', '▶ Nghe'); b.onclick = () => P.playNow({id: x.yt, title: x.title, by: x.by, trend: true}); row.append(b); } c.append(row); }); g.append(c); }); }
+  topics().filter(t => tabOf(t.name) === TAB).forEach(t => g.append(topicCard(t)));
+  if (!g.children.length) g.append(card(TABS.find(t => t[0] === TAB)[1], '', E('div', 'empty', TAB === 'pro' ? 'Bản cập nhật từ X chạy mỗi sáng lúc 06:47; tin chuyên môn hub lấy 30 phút một lần.' : 'Chưa có mục nào.')));
+  v.append(g); }
+async function pollDash() { try { DASH = await api('api/dash'); P.feed(); } catch (e) {} try { VIEC = (await api('api/activity')).viec || []; } catch (e) {} try { STATE = await api('api/state'); } catch (e) {} draw(); Relax.note(); Relax.buttons(); }
+setInterval(pollDash, 5 * 60000);
 
 /* ---------- chat with the CEO ---------- */
 let SEEN = null, LASTSIG = '', PICKED = [];
+function openChat(on) { document.body.classList.toggle('chat', on); LS.set('dp-chat', on ? '1' : '0'); if (on) { $('openchat').classList.remove('new'); $('logbox').scrollTop = 1e9; } }
+$('openchat').onclick = () => openChat(true); $('closechat').onclick = () => openChat(false);
 function drawChat(st) {
-  $('ceo').className = st.busy ? 'busy' : ''; $('ceot').textContent = st.busy ? 'CEO đang làm' + (st.model ? ' (' + String(st.model).replace(/^claude-fable.*/, 'fable') + ')' : '') : 'CEO sẵn sàng';
+  const mdl = st.model ? String(st.model).replace(/^claude-fable.*/, 'fable') : '';
+  $('ceo').className = st.busy ? 'busy' : ''; $('ceot').textContent = st.busy ? 'CEO đang làm' + (mdl ? ' (' + mdl + ')' : '') : 'CEO sẵn sàng';
   $('step').textContent = st.busy ? (st.step || 'đang làm') + '…' + (st.queued ? ' · còn ' + st.queued + ' tin chờ' : '') : '';
   const ms = (st.messages || []).slice(-80), sig = ms.length + '|' + (ms.length ? ms[ms.length - 1].t + ms[ms.length - 1].text.length : '');
   if (sig === LASTSIG) return; LASTSIG = sig;
   const log = $('log'); log.textContent = '';
-  ms.forEach(m => {
-    const d = E('div', 'msg ' + (m.who === 'vinh' ? 'vinh' : 'boss'), m.text), meta = m.meta || {};
+  ms.forEach(m => { const d = E('div', 'msg ' + (m.who === 'vinh' ? 'vinh' : 'boss'), m.text), meta = m.meta || {};
     if (meta.files) { const fl = E('div', 'files'); meta.files.forEach(f => { const src = 'api/upload?id=' + encodeURIComponent(f.id) + '&k=' + encodeURIComponent(KEY), a = E('a'); a.href = src; a.target = '_blank';
       if (f.image) { const im = E('img'); im.src = src; im.alt = f.name; a.append(im); } else a.textContent = '📄 ' + f.name; fl.append(a); }); d.append(fl); }
-    d.append(E('small', '', String(m.t || '').slice(11, 16) + (meta.model ? ' · ' + String(meta.model).replace(/^claude-fable.*/, 'fable') : '') + (meta.why ? ' · ' + meta.why : '')));
-    log.append(d);
-  });
+    d.append(E('small', '', String(m.t || '').slice(11, 16) + (meta.model ? ' · ' + String(meta.model).replace(/^claude-fable.*/, 'fable') : '') + (meta.why ? ' · ' + meta.why : ''))); log.append(d); });
   $('logbox').scrollTop = 1e9;
   const boss = ms.filter(m => m.who !== 'vinh'), last = boss[boss.length - 1], id = last ? last.t + '|' + last.text.length : '';
-  if (SEEN !== null && id && id !== SEEN && TTS) speak(last.text);
-  SEEN = id;
-}
+  if (SEEN !== null && id && id !== SEEN) { if (TTS) speak(last.text); if (!document.body.classList.contains('chat')) { $('openchat').classList.add('new'); toast('CEO: ' + last.text.split('\n')[0].slice(0, 140)); } }
+  SEEN = id; }
 async function pollChat() { let wait = 6000; try { const st = await api('api/chat'); drawChat(st); if (st.busy) wait = 2500; } catch (e) { $('ceo').className = 'off'; $('ceot').textContent = e.message; } setTimeout(pollChat, document.hidden ? 15000 : wait); }
 async function upload(f) { const r = await fetch('api/upload?name=' + encodeURIComponent(f.name), {method: 'POST', headers: {'X-DP-Key': KEY, 'Content-Type': 'application/octet-stream'}, body: f}); const j = await r.json(); if (!r.ok || !j.ok) throw new Error(j.error || 'tải lên lỗi'); return j.id; }
-function drawPicked() { const b = $('picked'); b.textContent = ''; PICKED.forEach((f, i) => { const s = E('span', '', '📎 ' + f.name + ' ✕'); s.style.cursor = 'pointer'; s.onclick = () => { PICKED.splice(i, 1); drawPicked(); }; b.append(s); }); }
-function pick(files) { for (const f of files) { if (f.size > 40 * 1048576) toast(f.name + ' lớn hơn 40 MB'); else PICKED.push(f); } drawPicked(); }
-async function send(text) {
-  text = (text === undefined ? $('text').value : text).trim(); const files = PICKED; if (!text && !files.length) return;
-  $('send').disabled = true;
-  try { const ids = []; for (const f of files) ids.push(await upload(f)); await api('api/chat', {text, files: ids}); $('text').value = ''; PICKED = []; drawPicked(); LASTSIG = ''; drawChat(await api('api/chat')); }
-  catch (e) { toast('Chưa gửi được: ' + e.message); }
-  $('send').disabled = false;
-}
+function drawPicked() { const b = $('picked'); b.textContent = ''; PICKED.forEach((f, i) => { const s = E('span', '', '📎 ' + f.name + ' ✕'); s.onclick = () => { PICKED.splice(i, 1); drawPicked(); }; b.append(s); }); }
+function pick(files) { for (const f of files) { if (f.size > 40 * 1048576) toast(f.name + ' lớn hơn 40 MB'); else PICKED.push(f); } drawPicked(); openChat(true); }
+async function send(text) { text = (text === undefined ? $('text').value : text).trim(); const files = PICKED; if (!text && !files.length) return; $('send').disabled = true;
+  try { const ids = []; for (const f of files) ids.push(await upload(f)); await api('api/chat', {text, files: ids}); $('text').value = ''; PICKED = []; drawPicked(); LASTSIG = ''; drawChat(await api('api/chat')); } catch (e) { toast('Chưa gửi được: ' + e.message); }
+  $('send').disabled = false; }
 $('send').onclick = () => send();
 $('text').onkeydown = e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } };
-$('clip').onclick = () => $('file').click();
-$('file').onchange = e => { pick(e.target.files); e.target.value = ''; };
+$('clip').onclick = () => $('file').click(); $('file').onchange = e => { pick(e.target.files); e.target.value = ''; };
 const chatBox = $('chat');
-['dragenter', 'dragover'].forEach(n => chatBox.addEventListener(n, e => { e.preventDefault(); chatBox.classList.add('drop'); }));
-['dragleave', 'drop'].forEach(n => chatBox.addEventListener(n, e => { e.preventDefault(); chatBox.classList.remove('drop'); }));
-chatBox.addEventListener('drop', e => pick(e.dataTransfer.files));
+['dragenter', 'dragover'].forEach(n => document.addEventListener(n, e => { e.preventDefault(); chatBox.classList.add('drop'); }));
+['dragleave', 'drop'].forEach(n => document.addEventListener(n, e => { e.preventDefault(); chatBox.classList.remove('drop'); }));
+document.addEventListener('drop', e => { if (e.dataTransfer && e.dataTransfer.files.length) pick(e.dataTransfer.files); });
 
-/* ---------- voice: speak the answers, talk to send, hands-free commands ---------- */
-let TTS = false, HANDS = false, SPEAKING = false; try { TTS = localStorage.getItem('dp-tts') === '1'; } catch (e) {}
+/* ---------- voice ---------- */
+let TTS = LS.get('dp-tts', '0') === '1', HANDS = false, SPEAKING = false;
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-function speak(text) {
-  if (!('speechSynthesis' in window)) return;
-  const u = new SpeechSynthesisUtterance(String(text).replace(/```[\s\S]*?```/g, ' ').replace(/[*_`#>|]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').slice(0, 900));
+function speak(text) { if (!('speechSynthesis' in window)) return;
+  const u = new SpeechSynthesisUtterance(String(text).replace(/```[\s\S]*?```/g, ' ').replace(/[*_`#>|]/g, '').replace(/\[([^\]]+)\]\([^)]+\)/g, '$1').slice(0, 1200));
   u.lang = 'vi-VN'; const v = speechSynthesis.getVoices().find(x => /^vi/i.test(x.lang)); if (v) u.voice = v; u.rate = 1.05;
-  u.onstart = () => { SPEAKING = true; duck(true); }; u.onend = u.onerror = () => { SPEAKING = false; duck(false); };
-  speechSynthesis.cancel(); speechSynthesis.speak(u);
-}
-function drawTts() { $('tts').classList.toggle('on', TTS); $('tts').textContent = (TTS ? '🔊' : '🔈') + ' Đọc trả lời'; }
-$('tts').onclick = () => { TTS = !TTS; try { localStorage.setItem('dp-tts', TTS ? '1' : '0'); } catch (e) {} drawTts(); if (!TTS) speechSynthesis.cancel(); }; drawTts();
-/* a spoken command the page runs itself (no message to the CEO, no token); returns true when it was one */
-function command(said) {
-  const f = fold(said);
+  u.onstart = () => { SPEAKING = true; duck(true); }; u.onend = u.onerror = () => { SPEAKING = false; duck(false); }; speechSynthesis.cancel(); speechSynthesis.speak(u); }
+function drawTts() { $('tts').classList.toggle('on', TTS); }
+$('tts').onclick = () => { TTS = !TTS; LS.set('dp-tts', TTS ? '1' : '0'); drawTts(); if (!TTS) speechSynthesis.cancel(); }; drawTts();
+function readTab(tab) { const ts = topics().filter(t => tabOf(t.name) === tab); if (!ts.length) return speak('Chưa có mục nào.'); speak(ts.map(t => t.name + '. ' + t.items.slice(0, 5).map(x => x.title).join('. ')).join('. ')); }
+function command(said) { const f = fold(said);
   if (/(phat|mo|bat) nhac/.test(f)) { P.play(); return true; }
   if (/(dung|tat|ngung|tam dung) nhac/.test(f)) { P.pause(); return true; }
   if (/bai (tiep|ke|khac)|chuyen bai|qua bai/.test(f)) { P.next(); return true; }
   if (/(nhac )?to (len|hon)/.test(f)) { P.vol(+20); return true; }
   if (/(nhac )?nho (xuong|lai|hon)/.test(f)) { P.vol(-20); return true; }
-  if (/doc tin/.test(f)) { const t = [].concat((DASH.social || {}).topics || [], DASH.news.topics || [])[NTAB]; if (t) speak(t.name + '. ' + t.items.slice(0, 5).map(x => x.title).join('. ')); return true; }
+  if (/doc cap nhat|doc chuyen mon/.test(f)) { readTab('pro'); return true; }
+  if (/doc (tin )?cong nghe/.test(f)) { readTab('tech'); return true; }
+  if (/doc tin/.test(f)) { readTab(TAB === 'today' ? 'pro' : TAB); return true; }
   if (/(dung|thoi|ngung) doc|im lang/.test(f)) { speechSynthesis.cancel(); return true; }
-  return false;
-}
-function heard(said, direct) {
-  said = said.trim(); if (!said) return;
+  if (/thu gian|be ca|ho ca/.test(f)) { Relax.open(); return true; }
+  if (/(quay lai|ve) (dashboard|bang tin)|thoat thu gian/.test(f)) { Relax.close(); return true; }
+  return false; }
+function heard(said, direct) { said = said.trim(); if (!said) return;
   if (command(said)) { toast('🎙 ' + said); return; }
-  if (direct) { $('text').value = ($('text').value + ' ' + said).trim(); return; }
-  const m = fold(said).match(/^(ceo|xe o|si i o|em)( oi)?[, ]+/);          /* hands-free: only what is addressed to the CEO is sent */
-  if (m) { const rest = said.split(/\s+/).slice(m[0].trim().split(/\s+/).length).join(' ').replace(/^[, ]+/, ''); if (rest) { toast('🎙 gửi CEO: ' + rest); send(rest); } }
-}
+  if (direct) { $('text').value = ($('text').value + ' ' + said).trim(); openChat(true); return; }
+  const m = fold(said).match(/^(ceo|xe o|si i o|em)( oi)?[, ]+/);
+  if (m) { const rest = said.split(/\s+/).slice(m[0].trim().split(/\s+/).length).join(' ').replace(/^[, ]+/, ''); if (rest) { toast('🎙 gửi CEO: ' + rest); send(rest); } } }
 let rec = null, recMode = '';
-function listen(mode) {
-  if (!SR) return false;
-  stopListen(); recMode = mode; rec = new SR(); rec.lang = 'vi-VN'; rec.interimResults = false; rec.continuous = mode === 'hands';
+function micUi(on) { $('mic').classList.toggle('rec', on); $('railmic').classList.toggle('rec', on); }
+function listen(mode) { if (!SR) return false; stopListen(); recMode = mode; rec = new SR(); rec.lang = 'vi-VN'; rec.interimResults = false; rec.continuous = mode === 'hands';
   rec.onresult = e => { for (let i = e.resultIndex; i < e.results.length; i++) if (e.results[i].isFinal && !SPEAKING) heard(e.results[i][0].transcript, mode === 'mic'); };
-  rec.onerror = e => { if (e.error === 'not-allowed') { toast('Trình duyệt chưa cho dùng micro'); HANDS = false; drawHands(); } };
-  rec.onend = () => { if (recMode === 'hands' && HANDS) { try { rec.start(); } catch (e) {} } else { $('mic').classList.remove('rec'); duck(false); rec = null; } };
-  try { rec.start(); } catch (e) { return false; }
-  if (mode === 'mic') { $('mic').classList.add('rec'); duck(true); }
-  return true;
-}
-function stopListen() { if (rec) { const r = rec; rec = null; recMode = ''; r.onend = null; try { r.stop(); } catch (e) {} } $('mic').classList.remove('rec'); }
-function drawHands() { $('hands').classList.toggle('on', HANDS); }
-$('hands').onclick = () => { if (!SR) return toast('Trình duyệt này không nhận giọng nói liên tục; dùng Chrome hoặc Edge'); HANDS = !HANDS; drawHands(); if (HANDS) { listen('hands'); toast('Đang nghe. Nói "CEO ơi, …" để nhắn; "phát nhạc", "bài tiếp", "đọc tin" chạy ngay.'); } else stopListen(); };
-/* the mic button: the browser's recognition when it has one, else record and let the PC transcribe (api/voice) */
+  rec.onerror = e => { if (e.error === 'not-allowed') { toast('Trình duyệt chưa cho dùng micro'); HANDS = false; $('hands').classList.remove('on'); } };
+  rec.onend = () => { if (recMode === 'hands' && HANDS) { try { rec.start(); } catch (e) {} } else { micUi(false); duck(false); rec = null; if (HANDS) listen('hands'); } };
+  try { rec.start(); } catch (e) { return false; } if (mode === 'mic') { micUi(true); duck(true); } return true; }
+function stopListen() { if (rec) { const r = rec; rec = null; recMode = ''; r.onend = null; try { r.stop(); } catch (e) {} } micUi(false); }
+$('hands').onclick = () => { if (!SR) return toast('Trình duyệt này không nhận giọng nói liên tục; dùng Chrome hoặc Edge'); HANDS = !HANDS; $('hands').classList.toggle('on', HANDS); if (HANDS) { listen('hands'); toast('Đang nghe. Nói "CEO ơi, …" để nhắn; "phát nhạc", "đọc cập nhật", "thư giãn" chạy ngay.'); } else stopListen(); };
 let mrec = null;
-$('mic').onclick = async () => {
+async function micClick() {
   if (rec && recMode === 'mic') { stopListen(); if (HANDS) listen('hands'); return; }
   if (mrec) { mrec.stop(); return; }
-  if (SR && listen('mic')) { rec.onend = () => { $('mic').classList.remove('rec'); duck(false); rec = null; if (HANDS) listen('hands'); }; return; }
-  try {
-    const st = await navigator.mediaDevices.getUserMedia({audio: true}), parts = []; mrec = new MediaRecorder(st); $('mic').classList.add('rec'); duck(true);
+  if (SR && listen('mic')) return;
+  try { const st = await navigator.mediaDevices.getUserMedia({audio: true}), parts = []; mrec = new MediaRecorder(st); micUi(true); duck(true);
     mrec.ondataavailable = e => parts.push(e.data);
-    mrec.onstop = async () => { st.getTracks().forEach(t => t.stop()); $('mic').classList.remove('rec'); duck(false); const b = new Blob(parts, {type: mrec.mimeType}), ext = /ogg/.test(b.type) ? 'ogg' : /mp4/.test(b.type) ? 'm4a' : 'webm'; mrec = null;
+    mrec.onstop = async () => { st.getTracks().forEach(t => t.stop()); micUi(false); duck(false); const b = new Blob(parts, {type: mrec.mimeType}), ext = /ogg/.test(b.type) ? 'ogg' : /mp4/.test(b.type) ? 'm4a' : 'webm'; mrec = null;
       try { const r = await fetch('api/voice?name=giong-noi.' + ext, {method: 'POST', headers: {'X-DP-Key': KEY, 'Content-Type': 'application/octet-stream'}, body: b}), j = await r.json(); if (!r.ok) throw new Error(j.error); heard(j.text || '', true); } catch (e) { toast('Chưa nhận được giọng nói: ' + e.message); } };
-    mrec.start();
-  } catch (e) { toast('Không mở được micro: ' + e.message); }
-};
+    mrec.start(); } catch (e) { toast('Không mở được micro: ' + e.message); } }
+$('mic').onclick = micClick; $('railmic').onclick = micClick;
 
-/* ---------- dashboard data ---------- */
-let DASH = {news: {}, social: {}, hot: {}, projects: {}, cfg: {}}, NTAB = 0, HTAB = 'music';
-function tabs(box, names, cur, onpick) { box.textContent = ''; names.forEach((n, i) => { const b = E('button', (n[0] === cur ? 'on' : ''), n[1]); b.onclick = () => onpick(n[0]); box.append(b); }); }
-function drawNews() {
-  const ts = [].concat((DASH.social || {}).topics || [], DASH.news.topics || []); $('ndate').textContent = DASH.news.time ? 'cập nhật ' + DASH.news.time.slice(11) : '';
-  if (NTAB >= ts.length) NTAB = 0;
-  tabs($('ntabs'), ts.map((t, i) => [i, t.name]), NTAB, i => { NTAB = i; drawNews(); });
-  const box = $('news'); box.textContent = '';
-  if (!ts.length) return box.append(E('div', 'empty', 'Chưa có tin: hub lấy tin lần đầu sau khi khởi động khoảng một phút.'));
-  const items = ts[NTAB].items || []; if (!items.length) box.append(E('div', 'empty', 'Ba ngày qua chưa có tin cho chủ đề này.'));
-  items.forEach(x => { const a = link('item', x.url); a.append(E('b', '', x.title), E('small', '', [x.src, x.at].filter(Boolean).join(' · '))); box.append(a); });
-}
-function drawHot() {
-  const h = DASH.hot || {}; $('hdate').textContent = h.date || '';
-  tabs($('htabs'), [['music', 'Nhạc'], ['film', 'Phim'], ['game', 'Game']], HTAB, k => { HTAB = k; drawHot(); });
-  const box = $('hot'); box.textContent = ''; const items = h[HTAB] || [];
-  if (!items.length) return box.append(E('div', 'empty', 'Chưa có danh sách: CEO soạn mỗi sáng lúc 07:05. Muốn có ngay, nhắn CEO "chạy việc bangtin".'));
-  items.forEach(x => { const a = link('item', x.url || (x.yt ? 'https://www.youtube.com/watch?v=' + encodeURIComponent(x.yt) : ''));
-    if (x.score) a.append(E('span', 'score', x.score)); a.append(E('b', '', x.title + (x.by ? ' · ' + x.by : '')), E('small', '', x.why || ''));
-    if (HTAB === 'music' && /^[\w-]{11}$/.test(x.yt || '')) { const b = E('button', '', '▶'); b.style.cssText = 'float:right;padding:1px 8px;margin-left:6px'; b.onclick = e => { e.preventDefault(); P.playNow({id: x.yt, title: x.title, by: x.by, trend: true}); }; a.prepend(b); }
-    box.append(a); });
-}
-function drawProjects() {
-  const p = DASH.projects || {}; $('pdate').textContent = p.date || ''; const box = $('projects'); box.textContent = '';
-  if (!(p.items || []).length) box.append(E('div', 'empty', 'Chưa có tổng kết: CEO soạn mỗi sáng lúc 07:05 từ kết quả của từng dự án.'));
-  (p.items || []).forEach(x => { const c = E('div', 'card'), h = E('h3'); h.append(E('i', x.status || ''), document.createTextNode(x.name || x.id || '')); c.append(h);
-    if (x.summary) c.append(E('p', '', x.summary)); if (x.view) c.append(E('p', 'view', x.view)); if (x.next) c.append(E('p', 'next', 'Kế tiếp: ' + x.next)); box.append(c); });
-}
-function drawTree(vs) {
-  const box = $('tree'); box.textContent = ''; if (!vs || !vs.length) return; const ids = new Set(vs.map(v => v.id)), IC = {chay: '⏳', xong: '✅', loi: '❌', cho: '⏸'};
-  box.append(E('div', 'empty', 'Việc CEO đang theo'));
-  const walk = (v, dep) => { const r = E('div'); r.style.paddingLeft = dep * 18 + 'px'; r.append(document.createTextNode((IC[v.state] || '•') + ' ' + v.name + ' '), E('small', '', v.state === 'chay' ? (v.step || 'từ ' + String(v.start).slice(11, 16)) : (v.result || ''))); box.append(r); vs.filter(k => k.parent === v.id).forEach(k => walk(k, dep + 1)); };
-  vs.filter(v => !v.parent || !ids.has(v.parent)).forEach(v => walk(v, 0));
-}
-async function pollDash() {
-  try { DASH = await api('api/dash'); drawNews(); drawHot(); drawProjects(); P.feed(); } catch (e) {}
-  try { drawTree((await api('api/activity')).viec); } catch (e) {}
-  setTimeout(pollDash, 5 * 60000);
-}
-
-/* ---------- background music: the owner's playlist, shuffled, with a trending song every few tracks ---------- */
+/* ---------- background music ---------- */
+let YTQ = [], YTREADY = false; window.onYouTubeIframeAPIReady = () => { YTREADY = true; YTQ.forEach(f => f()); YTQ = []; };
+const whenYT = f => YTREADY ? f() : YTQ.push(f);
+{ const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; s.onerror = () => { $('now').textContent = 'Không tải được trình phát YouTube (kiểm tra mạng)'; }; document.head.append(s); }
 const P = (() => {
-  let yt = null, ready = false, mine = [], trend = [], queue = [], cur = null, count = 0, wantPlay = false, loadedList = '', volume = 45, ducked = false;
-  try { volume = +(localStorage.getItem('dp-vol') || 45); } catch (e) {}
+  let yt = null, ready = false, mine = [], trend = [], cur = null, count = 0, wantPlay = false, loadedList = null, volume = +LS.get('dp-vol', 45), ducked = false, bagMine = [], bagTrend = [];
   const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
-  let bagMine = [], bagTrend = [];
-  function pickNext() {
-    const mix = +(DASH.cfg.mix ?? 3);
-    const takeTrend = trend.length && (!mine.length || (mix > 0 && count > 0 && count % (mix + 1) === mix));
-    count++;
+  function pickNext() { const mix = +(DASH.cfg.mix ?? 3), takeTrend = trend.length && (!mine.length || (mix > 0 && count > 0 && count % (mix + 1) === mix)); count++;
     if (takeTrend) { if (!bagTrend.length) bagTrend = shuffle(trend); return Object.assign({trend: true}, bagTrend.pop()); }
-    if (!mine.length) return null;
-    if (!bagMine.length) bagMine = shuffle(mine); return {id: bagMine.pop()};
-  }
-  function show() { const d = yt && yt.getVideoData ? yt.getVideoData() : {}; const n = $('now'); n.textContent = '';
-    if (!cur) { n.textContent = mine.length || trend.length ? 'Sẵn sàng' : 'Chưa có playlist: bấm ⚙ để dán playlist YouTube của anh'; return; }
-    if (cur.trend) n.append(E('small', '', 'MỚI ·')); n.append(document.createTextNode((cur.title || d.title || '…') + ((cur.by || d.author) ? ' · ' + (cur.by || d.author) : '')));
-    $('qinfo').textContent = (mine.length ? mine.length + ' bài của anh' : '') + (trend.length ? (mine.length ? ' + ' : '') + trend.length + ' bài mới' : ''); }
-  function start(item) { cur = item; if (!cur) return show(); yt.loadVideoById(cur.id); yt.setVolume(ducked ? Math.min(volume, 12) : volume); $('play').textContent = '⏸ Dừng'; setTimeout(show, 1500); show(); }
+    if (!mine.length) return null; if (!bagMine.length) bagMine = shuffle(mine); return {id: bagMine.pop()}; }
+  const playing = () => !!(ready && cur && yt.getPlayerState() === 1);
+  function show() { const d = yt && yt.getVideoData ? yt.getVideoData() : {}, n = $('now'); n.textContent = '';
+    $('qinfo').textContent = (mine.length ? mine.length + ' bài của anh' : '') + (trend.length ? (mine.length ? ', xen ' : '') + trend.length + ' bài thịnh hành' : '');
+    if (!cur) { n.textContent = mine.length || trend.length ? 'Sẵn sàng phát' : 'Chưa có bài: bấm ⚙ để dán playlist YouTube của anh'; return; }
+    if (cur.trend) n.append(E('small', '', 'MỚI ·')); n.append(document.createTextNode((cur.title || d.title || '…') + ((cur.by || d.author) ? ' · ' + (cur.by || d.author) : ''))); }
+  function start(item) { cur = item; if (!cur) return show(); yt.loadVideoById(cur.id); yt.setVolume(ducked ? Math.min(volume, 12) : volume); $('play').textContent = '⏸ Dừng'; setTimeout(show, 1500); show(); Relax.mix(); }
   function next() { if (!ready) return; wantPlay = true; start(pickNext()); }
   function loadMine() { const ids = DASH.cfg.mine || [], list = DASH.cfg.playlist || ('ids:' + ids.join(',')); if (!ready || list === loadedList) return; loadedList = list; bagMine = [];
     if (list.startsWith('ids:')) { mine = ids.slice(); if (wantPlay && !cur) next(); } else { mine = []; yt.cuePlaylist({list, listType: 'playlist'}); } }
-  function onState(e) {
-    if (e.data === 5 && !mine.length && loadedList && !loadedList.startsWith('ids:')) { mine = (yt.getPlaylist() || []).slice(); show(); if (wantPlay) next(); }     /* cued: the playlist's video ids are known */
-    if (e.data === 0) next();                                                                                                   /* ended */
-    if (e.data === 1) show();
-  }
-  window.onYouTubeIframeAPIReady = () => { yt = new YT.Player('yt', {playerVars: {controls: 1, rel: 0, playsinline: 1}, events: {onReady: () => { ready = true; yt.setVolume(volume); loadMine(); show(); }, onStateChange: onState, onError: () => { if (cur) setTimeout(next, 800); }}}); };
-  const s = document.createElement('script'); s.src = 'https://www.youtube.com/iframe_api'; s.onerror = () => { $('now').textContent = 'Không tải được trình phát YouTube (kiểm tra mạng)'; }; document.head.append(s);
-  $('vol').value = volume;
-  $('vol').oninput = e => { volume = +e.target.value; try { localStorage.setItem('dp-vol', volume); } catch (x) {} if (ready) yt.setVolume(volume); };
-  const api = {
-    feed() { const seen = new Set(); trend = [].concat(DASH.news.trend || [], (DASH.hot.music || []).filter(x => /^[\w-]{11}$/.test(x.yt || '')).map(x => ({id: x.yt, title: x.title, by: x.by}))).filter(x => !seen.has(x.id) && seen.add(x.id)); bagTrend = []; loadMine(); show(); },
-    play() { if (!ready) return; wantPlay = true; if (cur && yt.getPlayerState() === 2) { yt.playVideo(); $('play').textContent = '⏸ Dừng'; } else if (!cur || yt.getPlayerState() !== 1) next(); },
+  function onState(e) { if (e.data === 5 && !mine.length && loadedList && !loadedList.startsWith('ids:')) { mine = (yt.getPlaylist() || []).slice(); show(); if (wantPlay) next(); }
+    if (e.data === 0) next(); if (e.data === 1) show(); Relax.mix(); }
+  whenYT(() => { yt = new YT.Player('yt', {playerVars: {controls: 1, rel: 0, playsinline: 1}, events: {onReady: () => { ready = true; yt.setVolume(volume); loadMine(); show(); }, onStateChange: onState, onError: () => { if (cur) setTimeout(next, 800); }}}); });
+  $('vol').value = volume; $('vol').oninput = e => { volume = +e.target.value; LS.set('dp-vol', volume); if (ready) yt.setVolume(volume); Relax.mix(); };
+  $('ytwrap').onclick = () => $('ytwrap').classList.toggle('big');
+  const out = {
+    feed() { const seen = new Set(); trend = [].concat(DASH.news.trend || [], ((DASH.hot || {}).music || []).filter(x => /^[\w-]{11}$/.test(x.yt || '')).map(x => ({id: x.yt, title: x.title, by: x.by}))).filter(x => !seen.has(x.id) && seen.add(x.id)); bagTrend = []; loadMine(); show(); },
+    play() { if (!ready) return; wantPlay = true; if (cur && yt.getPlayerState() === 2) { yt.playVideo(); $('play').textContent = '⏸ Dừng'; } else if (!playing()) next(); },
     pause() { wantPlay = false; if (ready && cur) yt.pauseVideo(); $('play').textContent = '▶ Phát'; },
-    next, playNow(item) { if (ready) { wantPlay = true; start(item); } },
-    vol(d) { volume = Math.max(0, Math.min(100, volume + d)); $('vol').value = volume; if (ready) yt.setVolume(volume); },
+    next, playing, playNow(item) { if (ready) { wantPlay = true; start(item); } },
+    vol(d) { volume = Math.max(0, Math.min(100, volume + d)); $('vol').value = volume; LS.set('dp-vol', volume); if (ready) yt.setVolume(volume); },
     duck(on) { ducked = on; if (ready) yt.setVolume(on ? Math.min(volume, 12) : volume); },
-    state: () => ({mine: mine.length, trend: trend.length, cur, count})
-  };
-  $('play').onclick = () => (ready && cur && yt.getPlayerState() === 1) ? api.pause() : api.play();
-  $('next').onclick = next;
-  return api;
+    state: () => ({mine: mine.length, trend: trend.length, cur, count}) };
+  $('play').onclick = () => playing() ? out.pause() : out.play(); $('next').onclick = next;
+  return out;
 })();
 function duck(on) { P.duck(on); }
 
-$('full').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
-/* ---------- settings ---------- */
-$('gear').onclick = () => { const c = DASH.cfg || {}; $('s-pl').value = c.playlist || ''; $('s-tr').value = c.trending || ''; $('s-mix').value = c.mix ?? 3; $('s-soc').value = (c.social || []).join('\n'); $('s-top').value = (c.topics || []).map(t => [t.name, t.q, t.lang || 'vi'].join(' | ')).join('\n'); $('set').classList.add('show'); };
-$('s-x').onclick = () => $('set').classList.remove('show');
-$('setf').onsubmit = async e => { e.preventDefault();
-  const topics = $('s-top').value.split('\n').map(l => l.split('|').map(x => x.trim())).filter(p => p.length >= 2 && p[1]).map(p => ({name: p[0], q: p[1], lang: p[2] === 'en' ? 'en' : 'vi'}));
-  try { const r = await api('api/dash', {playlist: $('s-pl').value, trending: $('s-tr').value, mix: +$('s-mix').value, topics, social: $('s-soc').value.split('\n').map(x => x.trim()).filter(Boolean)});
-    if ($('s-pl').value.trim() && !r.cfg.playlist) toast('Không đọc được mã playlist: dán đường dẫn có "list=…"'); else toast('Đã lưu; tin và nhạc cập nhật sau khoảng một phút');
-    $('set').classList.remove('show'); setTimeout(pollDashOnce, 1500); setTimeout(pollDashOnce, 40000); } catch (x) { toast('Chưa lưu được: ' + x.message); } };
-async function pollDashOnce() { try { DASH = await api('api/dash'); drawNews(); drawHot(); drawProjects(); P.feed(); } catch (e) {} }
+/* ---------- relax mode: scenes and ambient sound ---------- */
+const Relax = (() => {
+  const SCENES = [['aq3d', 'Bể cá 3D'], ['aqua', 'Bể cá thật'], ['rain', 'Mưa bên cửa sổ'], ['fire', 'Lửa trại'], ['forest', 'Suối rừng'], ['stars', 'Trời sao'], ['office', 'Văn phòng 3D']];
+  const SOUNDS = [['canh', 'Theo cảnh'], ['nuoc', 'Nước chảy'], ['mua', 'Mưa'], ['song', 'Sóng biển'], ['lua', 'Lửa tí tách'], ['nau', 'Tiếng ồn nâu'], ['tat', 'Tắt']];
+  const NATURAL = {aq3d: 'nuoc', aqua: 'nuoc', rain: 'mua', fire: 'lua', forest: 'nuoc', stars: 'nau', office: 'tat'};
+  let mod = null, live = null, vp = null, scene = LS.get('dp-scene', 'aq3d'), sound = LS.get('dp-sound', 'canh'), isOpen = false, idleT = 0, hideT = 0, frame = null;
+  const load = async () => mod || (mod = await import('./relax.js'));
+  const isVideo = k => ['aqua', 'rain', 'fire', 'forest'].includes(k);
+  const has = k => !isVideo(k) || !!(DASH.news.scenes || {})[k];
+  function buttons() { [['rscenes', SCENES, () => scene, k => setScene(k)], ['rsounds', SOUNDS, () => sound, k => setSound(k)]].forEach(([id, list, cur, pick]) => { const box = $(id); [...box.querySelectorAll('button')].forEach(b => b.remove());
+    list.forEach(([k, name]) => { if (!has(k)) return; const b = E('button', k === cur() ? 'on' : '', name); b.onclick = () => pick(k); box.append(b); }); }); }
+  function stopScene() { if (live) { live.stop(); live = null; } if (frame) { frame.remove(); frame = null; } $('rv').style.display = 'none'; if (vp && vp.pauseVideo) vp.pauseVideo(); $('rc').style.display = 'none'; }
+  async function setScene(k) { if (!has(k)) k = 'aq3d'; scene = k; LS.set('dp-scene', k); stopScene(); buttons(); if (!isOpen) return;
+    if (k === 'office') { frame = E('iframe', 'office'); frame.src = 'm.html'; frame.title = 'Văn phòng 3D'; $('relax').insertBefore(frame, $('rclock')); }
+    else if (isVideo(k)) { $('rv').style.display = 'block'; const id = DASH.news.scenes[k];
+      whenYT(() => { if (vp && vp.loadVideoById) vp.loadVideoById(id); else vp = new YT.Player('rvp', {videoId: id, playerVars: {autoplay: 1, controls: 0, loop: 1, playlist: id, rel: 0, playsinline: 1, mute: 1}, events: {onReady: () => { vp.playVideo(); mix(); }, onStateChange: e => { if (e.data === 0) vp.playVideo(); }}}); mix(); }); }
+    else { const m = await load(); if (scene !== k || !isOpen) return; const c = $('rc'), fresh = c.cloneNode(false); c.replaceWith(fresh); fresh.style.display = 'block';   /* a canvas keeps its first context type */
+      try { live = k === 'stars' ? m.stars(fresh) : m.aquarium(fresh); } catch (e) { live = m.stars(fresh); toast('Máy này không chạy được cảnh 3D, em chuyển sang trời sao'); } }
+    mix(); }
+  /* who makes the sound: the scene's own video when "Theo cảnh" and it has one, else the synth; music playing ducks both */
+  async function mix() { if (!isOpen) return; const music = P.playing(), k = sound === 'canh' ? NATURAL[scene] : sound, useVideo = sound === 'canh' && isVideo(scene), vol = +LS.get('dp-vol', 45);
+    if (vp && vp.mute) { if (useVideo && !music) { vp.unMute(); vp.setVolume(vol); } else vp.mute(); }
+    const m = await load(); if (!isOpen) return; const want = useVideo || k === 'tat' ? '' : k; if (m.Ambient.kind() !== want) m.Ambient.play(want); m.Ambient.volume(vol / 100 * 0.8); m.Ambient.duck(music); }
+  function setSound(k) { sound = k; LS.set('dp-sound', k); buttons(); mix(); }
+  function wake() { $('relax').classList.remove('idle'); clearTimeout(hideT); hideT = setTimeout(() => $('relax').classList.add('idle'), 6000); }
+  function note() { const n = questions().length, box = $('rnote'); box.textContent = ''; const i = E('i'); i.style.cssText = 'width:9px;height:9px;border-radius:50%;background:' + ($('ceo').className === 'busy' ? 'var(--amber)' : 'var(--green)'); box.append(i, document.createTextNode($('ceot').textContent + (n ? ' · ' + n + ' việc chờ anh' : ''))); }
+  function open() { if (isOpen) return; isOpen = true; $('relax').style.bottom = document.querySelector('footer').offsetHeight + 'px'; document.body.classList.add('relax'); note(); setScene(scene); wake(); }
+  function close() { if (!isOpen) return; isOpen = false; document.body.classList.remove('relax'); stopScene(); if (mod) mod.Ambient.stop(); armIdle(); }
+  function armIdle() { clearTimeout(idleT); if (LS.get('dp-idle', '1') === '1') idleT = setTimeout(() => { if (!document.hidden && !rec) open(); }, 5 * 60000); }
+  ['mousemove', 'keydown', 'pointerdown', 'wheel'].forEach(n => addEventListener(n, () => { if (isOpen) wake(); else armIdle(); }, {passive: true}));
+  addEventListener('keydown', e => { if (e.key === 'Escape' && isOpen) close(); });
+  $('rback').onclick = close; armIdle();
+  return {open, close, mix, note, buttons, isOpen: () => isOpen, state: () => ({scene, sound, live: !!live})};
+})();
 
-pollChat(); pollDash();
+/* ---------- settings ---------- */
+$('full').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen().catch(() => {});
+$('gear').onclick = () => { const c = DASH.cfg || {}; $('s-pl').value = c.playlist || ''; $('s-tr').value = c.trending || ''; $('s-mix').value = c.mix ?? 3; $('s-soc').value = (c.social || []).join('\n'); $('s-idle').checked = LS.get('dp-idle', '1') === '1';
+  $('s-top').value = (c.topics || []).map(t => [t.name, t.q, t.lang || 'vi'].join(' | ')).join('\n'); $('set').classList.add('show'); };
+$('s-x').onclick = () => $('set').classList.remove('show');
+$('setf').onsubmit = async e => { e.preventDefault(); LS.set('dp-idle', $('s-idle').checked ? '1' : '0');
+  const tp = $('s-top').value.split('\n').map(l => l.split('|').map(x => x.trim())).filter(p => p.length >= 2 && p[1]).map(p => ({name: p[0], q: p[1], lang: p[2] === 'en' ? 'en' : 'vi'}));
+  try { const r = await api('api/dash', {playlist: $('s-pl').value, trending: $('s-tr').value, mix: +$('s-mix').value, topics: tp, social: $('s-soc').value.split('\n').map(x => x.trim()).filter(Boolean)});
+    if ($('s-pl').value.trim() && !r.cfg.playlist) toast('Không đọc được mã playlist: dán đường dẫn có "list=…"'); else toast('Đã lưu; tin và nhạc cập nhật sau khoảng một phút');
+    $('set').classList.remove('show'); setTimeout(pollDash, 1500); setTimeout(pollDash, 45000); } catch (x) { toast('Chưa lưu được: ' + x.message); } };
+
+if (LS.get('dp-chat', '0') === '1') openChat(true);
+draw(); pollChat(); pollDash();
 </script>
 </body>
 </html>

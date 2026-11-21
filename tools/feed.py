@@ -158,6 +158,31 @@ def trending(hub, limit=8):
     return out, errors
 
 
+SCENES = {'aqua': 'aquarium 4K coral reef fish tank relaxing 3 hours', 'rain': 'rain on window 4K relaxing ambience 3 hours no music',
+          'fire': 'fireplace 4K crackling fire 3 hours no music', 'forest': 'forest stream 4K nature sounds 3 hours no music'}
+
+
+def scenes(hub):
+    """A long ambience video per relax scene, looked up once on YouTube's search page and cached."""
+    f = Path(hub) / 'out' / 'dash-yt-cache.json'
+    try:
+        cache = json.loads(f.read_text(encoding='utf-8'))
+    except (OSError, ValueError):
+        cache = {}
+    out = {}
+    for key, q in SCENES.items():
+        k = 'scene:' + key
+        if not cache.get(k):
+            try:
+                cache[k] = yt_find(q)
+            except Exception:
+                cache[k] = ''
+        if cache.get(k):
+            out[key] = cache[k]
+    f.write_text(json.dumps(cache, ensure_ascii=False), encoding='utf-8')
+    return out
+
+
 FORUMS = [('Hacker News', 'hn', 'https://hn.algolia.com/api/v1/search?tags=front_page&hitsPerPage=12'),
           ('r/MachineLearning', 'atom', 'https://www.reddit.com/r/MachineLearning/top/.rss?t=day&limit=6'),
           ('r/LocalLLaMA', 'atom', 'https://www.reddit.com/r/LocalLLaMA/top/.rss?t=day&limit=6'),
@@ -228,6 +253,10 @@ def refresh(hub):
         got['errors'] += errs
         if tr:
             got['trend'] = tr
+    try:
+        got['scenes'] = scenes(hub)
+    except Exception:
+        got['scenes'] = old.get('scenes') or {}
     f.write_text(json.dumps(got, ensure_ascii=False, indent=1), encoding='utf-8')
     return got
 
