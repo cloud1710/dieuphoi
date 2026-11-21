@@ -241,6 +241,8 @@ def view(hub):
         except (OSError, ValueError):
             return default
     cfg = cfg_load(hub)
-    return {'social': read('dash-social.json', {}), 'news': read('dash-news.json', {}), 'hot': read('dash-hot.json', {}), 'projects': read('dash-projects.json', {}),
+    social, digest = read('dash-social.json', {}), read('dash-digest.json', {})       # digest: the morning read of the owner's groups
+    social['topics'] = (digest.get('topics') or []) + (social.get('topics') or [])
+    return {'social': social, 'news': read('dash-news.json', {}), 'hot': read('dash-hot.json', {}), 'projects': read('dash-projects.json', {}),
             'cfg': {'playlist': cfg.get('playlist') or '', 'trending': cfg.get('trending') or '', 'mix': cfg.get('mix', 3), 'social': cfg.get('social') or [],
                     'topics': cfg.get('topics') or DEFAULT_TOPICS}}
