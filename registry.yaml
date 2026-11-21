@@ -24,7 +24,7 @@ games: {auto: true, nvidia: false, stream: true, stream_fps: 120, processes: ['L
 # Mỗi model giữ một phiên riêng; phiên vượt max_context token thì lượt sau mở phiên mới (kèm vài tin gần nhất) để đỡ tốn.
 # voice: mô hình nhận giọng nói trên PC khi trình duyệt không tự nhận được (tools/voice.py): small, medium, large-v3-turbo.
 voice: {model: small}
-chat: {model: auto, light: haiku, normal: sonnet, deep: opus, max_context: 120000}
+chat: {model: auto, light: haiku, normal: sonnet, deep: opus, fable: claude-fable-5-2, council: true, max_context: 120000}
 groups:
   - {id: luan-van, name: Luận văn SEAL}
   - {id: benh-vien, name: Sản phẩm giải phẫu bệnh và bệnh viện}

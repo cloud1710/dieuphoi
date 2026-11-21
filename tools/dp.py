@@ -1497,11 +1497,13 @@ def claude_cmd():
 def pick_model(text):
     """Which model answers this message. `chat.model` in registry.yaml: a fixed name, or `auto` = a quick look at
     the message: status questions go to the light model, design and analysis to the deep one, the rest to the
-    normal one. The owner can force it by starting the message with /haiku, /sonnet or /opus."""
+    normal one. The owner can force it by starting the message with /haiku, /sonnet, /opus or /fable.
+    A deep message then goes before the shareholders' council (see `council`), which decides Opus or Fable."""
     cfg = registry().get('chat') or {}
-    m = re.match(r'\s*/(haiku|sonnet|opus)\b\s*', text, re.I)
+    m = re.match(r'\s*/(haiku|sonnet|opus|fable)\b\s*', text, re.I)
     if m:
-        return m.group(1).lower(), text[m.end():] or text, 'anh chọn'
+        name = m.group(1).lower()
+        return (fable_name(cfg) if name == 'fable' else name), text[m.end():] or text, 'anh chọn'
     fixed = str(cfg.get('model') or 'auto')
     if fixed != 'auto':
         return fixed, text, 'cố định'
@@ -1517,7 +1519,71 @@ def pick_model(text):
     return str(cfg.get('normal') or 'sonnet'), text, 'việc thường'
 
 
-def boss_usage(add=None):
+def fable_name(cfg=None):
+    cfg = cfg if cfg is not None else (registry().get('chat') or {})
+    return str(cfg.get('fable') or 'claude-fable-5-2')
+
+
+COUNCIL_SYS = ('You are one member of a shareholders council that picks the model for an AI agent (the CEO). '
+               'You cannot use tools. Answer with exactly one line of JSON and nothing else.')
+COUNCIL_ASK = '''Chủ tịch (anh Vinh) vừa giao cho CEO việc dưới đây. CEO là một agent Claude Code điều phối các project trên PC của anh.
+Hãy chọn model cho CEO làm việc này:
+- "opus": rất mạnh, đủ cho hầu hết việc thiết kế, phân tích, lập kế hoạch, sửa code nhiều tệp.
+- "fable": mạnh nhất (bậc Mythos) nhưng đắt hơn Opus nhiều; chỉ đáng khi việc thật sự khó: suy luận sâu nhiều bước, kiến trúc lớn, nghiên cứu khó, làm sai thì tốn kém hoặc khó sửa.
+Trả lời đúng một dòng JSON: {"vote": "fable" hoặc "opus", "why": "một câu tiếng Việt ngắn"}
+
+Việc:
+<<<
+%s
+>>>'''
+
+
+def council_vote(member, text, out):
+    """One shareholder reads only the message (no tools, no project files) and votes opus or fable."""
+    try:
+        cmd = claude_cmd()
+        room = HUB / 'out' / 'council'
+        room.mkdir(parents=True, exist_ok=True)
+        cmd += ['-p', '--output-format', 'json', '--max-turns', '1', '--model', member, '--strict-mcp-config', '--system-prompt', COUNCIL_SYS]
+        pr = subprocess.run(cmd, cwd=str(room), input=(COUNCIL_ASK % text[:4000]).encode('utf-8'), capture_output=True, timeout=150,
+                            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        j = json.loads(pr.stdout.decode('utf-8', 'replace').strip().splitlines()[-1])
+        said = str(j.get('result') or '')
+        v = json.loads(re.search(r'\{.*\}', said, re.S).group(0))
+        use = j.get('usage') if isinstance(j.get('usage'), dict) else {}
+        out[member] = {'vote': 'fable' if 'fable' in str(v.get('vote')).lower() else 'opus', 'why': one_line(str(v.get('why') or ''), 160),
+                       'tokens': sum(int(use.get(k) or 0) for k in ('input_tokens', 'output_tokens', 'cache_read_input_tokens', 'cache_creation_input_tokens')),
+                       'cost_usd': round(float(j.get('total_cost_usd') or 0), 4)}
+    except Exception as e:                       # a member who cannot vote abstains
+        out[member] = {'vote': None, 'why': 'không bỏ phiếu được (%s)' % one_line(e, 80), 'tokens': 0, 'cost_usd': 0}
+
+
+def council(text, cfg):
+    """The shareholders' council: Opus, Sonnet and Haiku vote at the same time on whether this hard message is worth
+    Fable. Fable needs at least two of three votes; otherwise Opus does it. Returns (model, why, votes)."""
+    members = [str(m) for m in (cfg.get('council_members') or ('opus', 'sonnet', 'haiku'))]
+    out = {}
+    threads = [threading.Thread(target=council_vote, args=(m, text, out), daemon=True) for m in members]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(160)
+    votes = [dict(out.get(m) or {'vote': None, 'why': 'quá giờ', 'tokens': 0, 'cost_usd': 0}, member=m) for m in members]
+    yes = sum(1 for v in votes if v['vote'] == 'fable')
+    said = sum(1 for v in votes if v['vote'])
+    need = int(cfg.get('council_need') or 2)
+    boss_usage({'model': 'hội đồng', 'tokens': sum(v['tokens'] for v in votes), 'cost_usd': round(sum(v['cost_usd'] for v in votes), 4)}, turn=False)
+    if yes >= need:
+        return fable_name(cfg), 'hội đồng cổ đông %d/%d chọn Fable' % (yes, len(members)), votes
+    deep = str(cfg.get('deep') or 'opus')
+    if not said:
+        return deep, 'việc cần nghĩ sâu, hội đồng không họp được', votes
+    if yes:
+        return deep, 'hội đồng cổ đông: Fable %d phiếu, chưa đủ %d, nên dùng Opus' % (yes, need), votes
+    return deep, 'hội đồng cổ đông %d/%d chọn Opus' % (said, len(members)), votes
+
+
+def boss_usage(add=None, turn=True):
     """Today's cost of the manager's chat: turns, tokens, seconds, per model. Kept in out/boss-usage.json."""
     f = HUB / 'out' / 'boss-usage.json'
     today = datetime.date.today().isoformat()
@@ -1527,7 +1593,13 @@ def boss_usage(add=None):
         u = {}
     if u.get('day') != today:
         u = {'day': today, 'turns': 0, 'in': 0, 'out': 0, 'cache_read': 0, 'cache_write': 0, 'cost_usd': 0.0, 'secs': 0, 'models': {}, 'last': None}
-    if add:
+    if add and not turn:                         # the council's votes: counted in cost, not as an answer
+        u['cost_usd'] = round(u['cost_usd'] + (add.get('cost_usd') or 0), 4)
+        row = u['models'].setdefault(add['model'], {'turns': 0, 'tokens': 0})
+        row['turns'] += 1
+        row['tokens'] += add.get('tokens') or 0
+        f.write_text(json.dumps(u, ensure_ascii=False, indent=1), encoding='utf-8')
+    elif add:
         u['turns'] += 1
         for k in ('in', 'out', 'cache_read', 'cache_write', 'secs'):
             u[k] += add.get(k) or 0
@@ -1629,11 +1701,14 @@ def chat_run(text):
     """One turn: the message goes to `claude -p` on standard input (never on the command line), the steps are
     followed from the JSON stream, the final text is the reply. The session is resumed on the next turn."""
     CHAT.update(busy=True, step='đang đọc tin nhắn', since=datetime.datetime.now().strftime('%H:%M:%S'))
-    reply, meta, began = None, {}, time.time()
+    reply, meta, began, votes = None, {}, time.time(), None
     try:
         model, text, why = pick_model(text)
-        CHAT['model'] = model
         cfg = registry().get('chat') or {}
+        if why == 'việc cần nghĩ sâu' and cfg.get('council', True) is not False:
+            CHAT['step'] = 'hội đồng cổ đông đang họp'
+            model, why, votes = council(text, cfg)
+        CHAT['model'] = model
         normal = str(cfg.get('normal') or 'sonnet')
         light = model == str(cfg.get('light') or 'haiku') and model != normal
         book = chat_sessions()
@@ -1649,10 +1724,11 @@ def chat_run(text):
             if session:                                     # the kept session is gone or broken: start a clean one
                 CHAT['step'] = 'mở phiên mới'
                 why += ', phiên cũ lỗi nên mở mới'
-            elif model != normal:                           # the chosen model was refused: the normal one answers
-                CHAT['step'] = 'đổi sang model %s' % normal
+            elif model != normal:                           # the chosen model was refused: Fable falls back to Opus, the rest to the normal one
+                back = str(cfg.get('deep') or 'opus') if model == fable_name(cfg) else normal
+                CHAT['step'] = 'đổi sang model %s' % back
                 why += ', %s lỗi nên đổi' % model
-                model, light = normal, False
+                model, light = back, False
                 CHAT['model'] = model
             else:
                 raise
@@ -1664,6 +1740,8 @@ def chat_run(text):
                 'cost_usd': round(float(result.get('total_cost_usd') or 0), 4), 'steps': result.get('num_turns')}
         size = (meta['in'] + meta['cache_read'] + meta['cache_write']) // max(1, int(meta['steps'] or 1))
         meta['context'] = size
+        if votes:
+            meta['council'] = [{'m': v['member'], 'vote': v['vote'], 'why': v['why']} for v in votes]
         if not light:
             book = chat_sessions()
             if size > int(cfg.get('max_context') or 120000):      # a long talk costs its whole length on every step
