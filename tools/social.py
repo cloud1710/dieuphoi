@@ -50,7 +50,7 @@ class Posts(HTMLParser):
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
-        if tag == 'title':
+        if tag == 'title' and not self.title:
             self.in_title = True
         if tag in VOID:
             return
@@ -137,8 +137,9 @@ def sig(urls):
     return hashlib.sha1('\n'.join(urls).encode('utf-8')).hexdigest()[:12]
 
 
-def due(hub, urls, hour=6):
-    """True when today's read has not been done for this list (after `hour`), or the list changed."""
+def due(hub, urls, hours=4):
+    """True when the list changed or the last read is older than `hours`. Without a login Facebook shows only the top
+    post of a group, so the hub reads a few times a day and keeps what it has seen."""
     try:
         old = json.loads((Path(hub) / 'out' / 'dash-social.json').read_text(encoding='utf-8'))
     except (OSError, ValueError):
@@ -146,7 +147,10 @@ def due(hub, urls, hour=6):
     now = datetime.datetime.now()
     if old.get('sig') != sig(urls):
         return True
-    return old.get('date') != now.strftime('%Y-%m-%d') and now.hour >= hour
+    try:
+        return hours is not None and (now - datetime.datetime.strptime(old.get('time'), '%Y-%m-%d %H:%M')).total_seconds() > hours * 3600
+    except (TypeError, ValueError):
+        return True
 
 
 def refresh(hub, urls):
@@ -155,6 +159,11 @@ def refresh(hub, urls):
     got = {'date': now.strftime('%Y-%m-%d'), 'time': now.strftime('%Y-%m-%d %H:%M'), 'sig': sig(urls), 'topics': [], 'errors': []}
     exe = browser()
     items = []
+    try:
+        old = json.loads((hub / 'out' / 'dash-social.json').read_text(encoding='utf-8'))
+        kept = [x for t in old.get('topics') or [] for x in t.get('items') or [] if x.get('url') and x.get('at')]
+    except (OSError, ValueError):
+        kept = []
     if urls and not exe:
         got['errors'].append('PC không có Edge hay Chrome để đọc trang')
     raw_dir = hub / 'out' / 'social-raw'
@@ -167,9 +176,12 @@ def refresh(hub, urls):
             if not posts:
                 got['errors'].append('%s: %s' % (title if title != url else url, 'cần đăng nhập' if '/login' in page[:200000] and 'role="article"' not in page else 'không đọc được bài nào'))
             for p in posts:
-                items.append({'title': p['title'], 'url': p['url'], 'src': title[:50] + ((' · ' + p['by']) if p['by'] else ''), 'at': ''})
+                items.append({'title': p['title'], 'url': p['url'], 'src': title[:50] + ((' · ' + p['by']) if p['by'] else ''), 'at': got['time']})
         except Exception as e:
             got['errors'].append('%s: %s' % (url, type(e).__name__))
+    seen = {x['url'] for x in items}
+    items += [x for x in kept if x['url'] not in seen and any(x['url'].startswith(u.rstrip('/')) for u in urls)]      # earlier reads, newest first
+    items = items[:40]
     items += [{'title': '⚠ ' + e, 'url': '', 'src': 'chưa đọc được', 'at': ''} for e in got['errors']]
     if items:
         got['topics'].append({'name': 'Mạng xã hội', 'items': items})

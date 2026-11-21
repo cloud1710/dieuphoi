@@ -1155,7 +1155,7 @@ def feed_loop():
             time.sleep(30)
             try:
                 import social
-                if social.due(HUB, social.clean_list(_feed().cfg_load(HUB).get('social')), hour=25):
+                if social.due(HUB, social.clean_list(_feed().cfg_load(HUB).get('social')), hours=None):
                     break
             except Exception:
                 pass
