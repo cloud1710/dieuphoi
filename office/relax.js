@@ -112,6 +112,15 @@ export function aquarium(canvas) {
     for (let i = 0; i < 7; i++) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.28 + Math.random() * 0.34, 8, 6), mat); m.position.set(x + (Math.random() - 0.5) * 1.6, -3.9 + Math.random() * 0.9, z + (Math.random() - 0.5) * 1.4); scene.add(m); } });
   scene.add(new THREE.HemisphereLight('#bfeef5', '#0a3040', 1.5)); const sun = new THREE.DirectionalLight('#ffffff', 1.3); sun.position.set(3, 10, 4); scene.add(sun);
 
+  /* a reef: branching corals, table corals, tube sponges (anemones come with the seaweed below) */
+  const RC = ['#ff6b6b', '#ff9f43', '#f368e0', '#feca57', '#ff8fab', '#c56cf0', '#48dbfb'], lam = c => new THREE.MeshLambertMaterial({color: c, flatShading: true}), rnd = (a, b) => a + Math.random() * (b - a);
+  const branch = (x, z, c, n, k = 1) => { const m = lam(c); for (let i = 0; i < n; i++) { const h = rnd(0.7, 1.7) * k, g = new THREE.CylinderGeometry(0.045 * k, 0.12 * k, h, 6); g.translate(0, h / 2, 0); const b = new THREE.Mesh(g, m); b.position.set(x + rnd(-0.25, 0.25), -4.5, z + rnd(-0.25, 0.25)); b.rotation.set(rnd(-0.7, 0.7), rnd(0, 6), rnd(-0.7, 0.7)); scene.add(b);
+      const t = new THREE.Mesh(new THREE.SphereGeometry(0.09 * k, 6, 5), m); t.position.set(0, h, 0); b.add(t); if (h > 1.1 * k) { const g2 = new THREE.CylinderGeometry(0.035 * k, 0.07 * k, h * 0.55, 5); g2.translate(0, h * 0.27, 0); const b2 = new THREE.Mesh(g2, m); b2.position.y = h * 0.5; b2.rotation.z = rnd(0.5, 1) * (i % 2 ? 1 : -1); b.add(b2); } } };
+  const table = (x, z, c, r) => { const m = lam(c), st = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.2, 0.8, 7), m); st.position.set(x, -4.1, z); scene.add(st); const top = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.35, 0.22, 11), m); top.position.set(x, -3.62, z); top.rotation.z = rnd(-0.12, 0.12); scene.add(top); };
+  const tubes = (x, z, c) => { const m = new THREE.MeshLambertMaterial({color: c, flatShading: true, side: THREE.DoubleSide}); for (let i = 0; i < 5; i++) { const h = rnd(0.6, 1.5), t = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.11, h, 8, 1, true), m); t.position.set(x + rnd(-0.35, 0.35), -4.5 + h / 2, z + rnd(-0.35, 0.35)); t.rotation.z = rnd(-0.15, 0.15); scene.add(t); } };
+  [[-6.6, -1.2, 0, 7], [-8.8, -2.4, 3, 6], [6.2, -2.6, 1, 8], [8.8, -4.2, 4, 6], [2.4, -6.5, 2, 7], [-2.2, -3, 5, 6], [11, -6, 0, 7], [-12, -6.5, 1, 6], [0.4, 0.6, 6, 5], [-4.6, 1.4, 3, 5], [4.6, 1.8, 4, 5]].forEach(([x, z, c, n]) => branch(x, z, RC[c], n, z > 0 ? 0.7 : 1));
+  [[-4.2, -5.2, 1, 1.1], [4.4, -4.6, 2, 0.9], [10.2, -8, 3, 1.3], [-10.4, -4.4, 6, 1], [7.2, 0.6, 0, 0.7]].forEach(([x, z, c, r]) => table(x, z, RC[c], r));
+  [[-1.2, -5.6, 3], [5.6, -6.6, 5], [-7.8, -5.8, 4], [2.6, 1.2, 1]].forEach(([x, z, c]) => tubes(x, z, RC[c]));
   /* seaweed: ribbons that sway more toward the tip */
   const weedMat = (c, a = 1) => new THREE.ShaderMaterial({side: THREE.DoubleSide, transparent: a < 1, depthWrite: a >= 1, uniforms: {uT: U.uT, uC: {value: new THREE.Color(c)}, uFog: {value: FOG}, uPh: {value: Math.random() * 6}, uA: {value: a}}, vertexShader: `
     uniform float uT, uPh; varying float vY, vD; void main(){ vec3 p = position; float k = uv.y; vY = k; p.x += sin(uT * 0.9 + uPh + k * 3.0) * 0.55 * k * k; p.z += cos(uT * 0.7 + uPh + k * 2.0) * 0.3 * k * k;
@@ -125,6 +134,7 @@ export function aquarium(canvas) {
     for (let i = 0; i < 6; i++) { const h = 3 + Math.random() * 4.5, g = new THREE.PlaneGeometry(0.34, h, 1, 14); g.translate(0, h / 2, 0);
       const m = new THREE.Mesh(g, weedMat(c)); m.position.set(x + (Math.random() - 0.5) * 1.8, -4.5, z + (Math.random() - 0.5) * 1.5); m.rotation.y = Math.random() * 3; scene.add(m); } });
 
+  [[-2.8, 0.2, '#ff8fab'], [6.4, -1.4, '#ffd1a6'], [-9.6, -1.2, '#c9a6ff']].forEach(([x, z, c]) => { for (let i = 0; i < 16; i++) { const h = rnd(0.5, 1.1), g = new THREE.PlaneGeometry(0.09, h, 1, 8); g.translate(0, h / 2, 0); const m = new THREE.Mesh(g, weedMat(c)); m.position.set(x + rnd(-0.3, 0.3), -4.45, z + rnd(-0.3, 0.3)); m.rotation.y = rnd(0, 3); scene.add(m); } });
   /* fish */
   const geo = fishGeometry(), fish = [];
   const add = (sp, n, box) => { for (let i = 0; i < n; i++) {
@@ -149,6 +159,9 @@ export function aquarium(canvas) {
     const bell = new THREE.Mesh(new THREE.SphereGeometry(0.9, 20, 12, 0, 6.3, 0, 1.75), new THREE.MeshBasicMaterial({color: c, transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending}));
     g.add(bell); for (let i = 0; i < 7; i++) { const h = 1.6 + Math.random() * 1.8, pg = new THREE.PlaneGeometry(0.07, h, 1, 10); pg.translate(0, h / 2, 0); pg.rotateZ(Math.PI); const r = new THREE.Mesh(pg, weedMat(c, 0.5)); r.position.set(Math.cos(i) * 0.5, -0.2, Math.sin(i) * 0.5); r.rotation.y = i; g.add(r); }
     g.position.set(x, y, z); scene.add(g); jellies.push({g, bell, y, ph: Math.random() * 6}); });
+  /* soft shadows on the sand under the larger fish: darker and smaller when the fish is low */
+  const shGeo = new THREE.CircleGeometry(1, 20); shGeo.rotateX(-Math.PI / 2); shGeo.scale(1.5, 1, 0.6);
+  fish.forEach(f => { const m = new THREE.Mesh(shGeo, new THREE.MeshBasicMaterial({color: '#02202c', transparent: true, opacity: 0.2, depthWrite: false})); m.renderOrder = 1; scene.add(m); f.sh = m; f.size = f.g.children[0].scale.x; });
   const at = (f, t, out) => { const a = t * f.sp + f.ph; return out.set(f.c.x + Math.cos(a) * f.rx, f.c.y + Math.sin(a * f.k) * f.ry, f.c.z + Math.sin(a + (f.zp || 0)) * f.rz); };
 
   /* bubbles and drifting specks */
@@ -167,7 +180,7 @@ export function aquarium(canvas) {
   function size() { const w = canvas.clientWidth || innerWidth, h = canvas.clientHeight || innerHeight; R.setSize(w, h, false); WW = WH * w / h; layRim(); }
   addEventListener('resize', size); size();
   function frame(ms) { if (!alive) return; raf = requestAnimationFrame(frame); if (document.hidden) return; const dt = Math.min(0.05, (ms - last) / 1000 || 0.016); last = ms; t += dt; U.uT.value = t;
-    fish.forEach(f => { at(f, t, v1); at(f, t + 0.25 * Math.sign(f.sp), v2); f.g.position.copy(v1); f.g.lookAt(v2); });
+    fish.forEach(f => { at(f, t, v1); at(f, t + 0.25 * Math.sign(f.sp), v2); f.g.position.copy(v1); f.g.lookAt(v2); if (f.sh) { const hgt = v1.y + 4.4, k = Math.max(0, 1 - hgt / 9); f.sh.position.set(v1.x + hgt * 0.12, -4.08, v1.z - hgt * 0.2); f.sh.rotation.y = f.g.rotation.y + Math.PI / 2; f.sh.scale.setScalar(f.size * (1.1 + hgt * 0.12)); f.sh.material.opacity = v1.z > ZW - 1 || f.size > 4 ? 0 : 0.26 * k; } });
     rays.forEach(r => { r.material.opacity = 0.16 + 0.14 * Math.sin(t * 0.5 + r.userData.ph); r.position.x += Math.sin(t * 0.2 + r.userData.ph) * 0.002; });
     const b = bubbles.geometry.attributes.position; for (let i = 0; i < b.count; i++) { let y = b.getY(i) + dt * (1.1 + (i % 5) * 0.25); if (y > 8) y = -4.5; b.setY(i, y); b.setX(i, b.getX(i) + Math.sin(t * 2 + i) * 0.003); } b.needsUpdate = true;
     specks.rotation.y = Math.sin(t * 0.05) * 0.08; specks.position.y = Math.sin(t * 0.1) * 0.3;
