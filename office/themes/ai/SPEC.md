@@ -10,7 +10,7 @@ cùng cách làm của xoi-man (`tools/art/gem.py`, PixelLab create_character + 
 - Ghi toạ độ pixel (trên ảnh 1920x1080) của: ghế CEO, ghế khách, cửa thang máy, ghế Chủ tịch vào `manifest.json`.
 
 ## Nhân vật (PixelLab, cao khoảng 64 px, nhìn 4 hướng, nền trong suốt)
-- `ceo`: nam, vest xanh navy, cà vạt đỏ. `chairman`: nam, vest xám than, đeo kính.
+- `ceo`: nữ, dáng cao, tóc dài, vest + chân váy xanh navy, khăn cài túi đỏ (bản nam cũ ở `ceo_old/`). `chairman`: nam, vest xám than, đeo kính.
 - `staff_1` … `staff_8`: nhân viên văn phòng khác nhau (nam, nữ, tóc, áo khác nhau).
 - Mỗi nhân vật: `walk` 4 hướng (mỗi hướng 4–6 khung) và `idle`/`sit` hướng nam. Xuất dạng dải PNG (strip) mỗi hoạt ảnh.
 
