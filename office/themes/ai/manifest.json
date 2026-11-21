@@ -240,6 +240,12 @@
   "night": "bg_night.png",
   "rain": "bg_rain.png"
  },
+ "seasons": {
+  "tet": "season_tet.png",
+  "christmas": "season_christmas.png",
+  "moon": "season_moon.png",
+  "halloween": "season_halloween.png"
+ },
  "chars": {
   "ceo": {
    "w": 80,

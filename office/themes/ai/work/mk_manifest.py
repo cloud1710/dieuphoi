@@ -38,6 +38,8 @@ m = {
     },
     'anchor': 'sprite feet (bottom centre of the frame, foot line y=77 of 80) sits on the spot',
     'bg': {'day': 'bg_day.png', 'night': 'bg_night.png', 'rain': 'bg_rain.png'},
+    'seasons': {'tet': 'season_tet.png', 'christmas': 'season_christmas.png', 'moon': 'season_moon.png',
+                'halloween': 'season_halloween.png'},
     'chars': chars,
 }
 json.dump(m, open(W + 'manifest.json', 'w', encoding='utf-8'), indent=1)
