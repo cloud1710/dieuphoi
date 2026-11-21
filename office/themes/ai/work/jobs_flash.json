@@ -1,0 +1,12 @@
+{
+  "model": "gemini-2.5-flash-image",
+  "out": "D:/dieuphoi/office/themes/ai/work/gem",
+  "jobs": [
+    {
+      "id": "bg_day",
+      "aspect": "16:9",
+      "refs": [],
+      "prompt": "Crisp high-resolution pixel art game background, cozy management sim style like Stardew Valley or Eastward: a single top-down three-quarter view (high camera looking down at about 60 degrees, walls seen from the front, no isometric diagonal, straight horizontal and vertical walls). The scene is the top floor of a modern office tower in Saigon, Vietnam, on a sunny afternoon with warm light and soft shadows. LAYOUT, keep it clear and readable: LEFT HALF of the frame is the CEO office, a large room with a warm wooden floor, cream walls and tall glass windows. In the middle of the CEO office stands one large dark walnut executive desk facing the viewer; behind the desk (above it in the image) is one big black leather CEO office chair, empty, facing the viewer; on the desk two computer monitors stand with their screens turned toward the CEO chair, so the viewer sees the backs of the monitors; a small lamp, a plant and papers on the desk. In front of the desk (below it in the image) stand two small grey guest armchairs side by side, empty. On the left wall of the CEO office is a pair of closed brushed steel elevator doors with a small call button panel. Bookshelves and a potted plant in the corners. TOP CENTER, behind the CEO office, is a smaller private room for the Chairman with dark green carpet and wood panelling, a smaller wooden desk and one high-backed burgundy leather chair behind it facing the viewer, empty, a framed landscape painting and a tea table; a glass door connects it to the CEO office. RIGHT HALF of the frame is an open rooftop terrace: light stone tiles, a turquoise rectangular swimming pool, two sun loungers, tropical palm and frangipani plants in planters, wooden benches, and strings of warm round light bulbs hanging across the terrace. Beyond the glass railing at the top right is the Saigon skyline with tall towers and a hint of the river under a blue sky with a few clouds. One coherent limited palette of warm wood browns, cream, teal, leafy greens and soft blue, clean dark outlines on objects, readable flat shapes, open floor space for characters to walk. Absolutely no people, no characters, no animals, no text, no letters, no numbers, no logos, no signs with writing, no UI, no watermark."
+    }
+  ]
+}
