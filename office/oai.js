@@ -19,6 +19,7 @@ const ready = fetch(BASE + 'manifest.json', {cache:'no-cache'}).then(r => r.ok ?
 
 // where people sit: spots.desks [[x,y],...] or desk_* spots if the artist gave them, else the guest chair, then standing places toward the lift
 function deskFor(i) { const s = M.spots, d = (Array.isArray(s.desks) ? s.desks : Object.keys(s).filter(k => /^desk/.test(k)).sort().map(k => s[k])).filter(isPt);
+  if (Array.isArray(s.seats)) { const q = s.seats.filter(x => x && isPt(x.p)); if (i < q.length) return {p:q[i].p, sit:true, via:(q[i].via || []).filter(isPt)}; }
   if (!d.length) d.push(isPt(s.guest) ? s.guest : s.ceo); if (i < d.length) return {p:d[i], sit:d[i] !== s.ceo};
   const a = d[0], L = s.lift, u = .2 + .12 * ((i - d.length) % 5), j = ((i * 37) % 7 - 3) * M.size[0] / 120; return {p:[a[0] + (L[0] - a[0]) * u + j, a[1] + (L[1] - a[1]) * u - j * .4], sit:false}; }
 function set(s) { if (!s || !M) return; const L = M.spots.lift, old = Object.fromEntries(staff.map(w => [w.id, w]));
@@ -26,10 +27,12 @@ function set(s) { if (!s || !M) return; const L = M.spots.lift, old = Object.fro
   staff = act.map((p, i) => { const lx = (hsh(p.id) % 5 - 2) * M.size[0] / 110, w = old[p.id] || {id:p.id, x:L[0] + lx, y:L[1], ph:'lift', t:rnd(.3, 4), dir:'s', walk:false};
     return Object.assign(w, {p, lx, ch:'staff_' + (i % 8 + 1), desk:deskFor(i)}); }); }
 function step(dt) { const L = M.spots.lift, v = M.size[0] / 20; for (const w of staff) {
-    if (w.ph === 'lift' || w.ph === 'stay') { w.walk = false; if ((w.t -= dt) > 0) continue; w.ph = w.ph === 'lift' ? 'in' : 'out'; }
-    const tx = w.ph === 'in' ? w.desk.p[0] : L[0] + w.lx, ty = w.ph === 'in' ? w.desk.p[1] : L[1], dx = tx - w.x, dy = ty - w.y, d = Math.hypot(dx, dy);
+    if (w.ph === 'lift' || w.ph === 'stay') { w.walk = false; if ((w.t -= dt) > 0) continue; w.ph = w.ph === 'lift' ? 'in' : 'out'; w.vi = 0; }
+    const vv = w.desk.via || [], route = w.ph === 'in' ? vv.concat([w.desk.p]) : vv.slice().reverse().concat([[L[0] + w.lx, L[1]]]), vi = Math.min(w.vi || 0, route.length - 1), last = vi === route.length - 1;
+    const tx = route[vi][0], ty = route[vi][1], dx = tx - w.x, dy = ty - w.y, d = Math.hypot(dx, dy);
+    if (d <= 2 && !last) { w.vi = vi + 1; continue; }
     if (d > 2) { const k = Math.min(d, v * dt); w.x += dx / d * k; w.y += dy / d * k; w.walk = true; w.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'e' : 'w') : (dy > 0 ? 's' : 'n'); continue; }
-    w.x = tx; w.y = ty; w.walk = false; w.dir = 's'; if (w.ph === 'in') { w.ph = 'stay'; w.t = rnd(8, 18); } else { w.ph = 'lift'; w.t = rnd(2, 6); } } }
+    w.x = tx; w.y = ty; w.walk = false; w.dir = 's'; w.vi = 0; if (w.ph === 'in') { w.ph = 'stay'; w.t = rnd(8, 18); } else { w.ph = 'lift'; w.t = rnd(2, 6); } } }
 
 // one frame of a strip; a missing west walk is the east one mirrored (and back); no strip at all is a dot
 function sprite(key, mode, dir, t, x, y) { const C = CH[key], sx = fit.x + x * fit.k, sy = fit.y + y * fit.k;
