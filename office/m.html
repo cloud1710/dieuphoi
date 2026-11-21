@@ -88,6 +88,7 @@ textarea{min-height:84px;resize:vertical}
 #log h3{display:none}
 #log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#log b{font-weight:650}#log i{font-style:normal;color:var(--mute);margin-right:5px}
 #stage.zoomin #hint{display:none}#stage.v3 #hint{display:none}
+#cvai{position:absolute;inset:0;width:100%;height:100%;display:none;touch-action:none}#stage.vai #cvai{display:block}#stage.vai #cv,#stage.vai #hint{display:none}
 #act3{position:absolute;left:8px;top:78px;bottom:70px;display:none;flex-direction:column;gap:5px;overflow:hidden;max-width:48%;pointer-events:none}#stage.v3 #act3{display:flex}#back.on~#act3{top:114px}
 .ar{display:flex;align-items:center;gap:6px;background:rgba(14,16,22,.58);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border-radius:17px;padding:2px 10px 2px 2px;color:#f2f3f6;font:600 11.5px/1.2 system-ui,sans-serif;width:max-content;max-width:100%;pointer-events:auto;cursor:pointer;flex:none}
 .ar img{width:28px;height:28px;border-radius:50%;flex:none;box-shadow:0 0 0 2px #3f9d74}.ar span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.ar.meet{background:rgba(47,79,122,.85)}.ar.meet img{box-shadow:0 0 0 2px #5fd39a,0 0 8px #5fd39a}.ar.sel{outline:2px solid #fff}.ar small{opacity:.7;font-weight:500;margin-left:2px}.ar.none{padding:5px 10px;font-weight:500;opacity:.85}#stats,#log{transition:opacity .4s}#stage.zoomin #stats,#stage.zoomin #log{opacity:0;pointer-events:none}
@@ -786,17 +787,20 @@ const office2d = (() => {
 })();
 
 // ---- which office is on screen: the 3D island (default) or the pixel map; the 3D one loads on demand
-const O = () => VIEW === '3d' && window.O3D;
-const office = {set(s) { office2d.set(s); if (O()) O3D.set(s); }, note(k, id, t) { office2d.note(k, id, t); if (O()) O3D.note(k, id, t); }, boss() { office2d.boss(); if (O()) O3D.boss(); },
-  focus(id) { O() ? O3D.focus(id) : office2d.focus(id); }, wake() { office2d.wake(); if (O()) O3D.wake(); }, sky() { office2d.sky(); if (window.O3D) O3D.sky(); }};
-function setView(v) { if (v !== '3d' && v !== 'pixel') v = '3d'; VIEW = v; try { localStorage.setItem('dp-view', v); } catch (e) {} drawThemes();
-  if (v === '3d') { let ok = false; try { ok = !!document.createElement('canvas').getContext('webgl2'); } catch (e) {} if (!ok) return setView('pixel');
+const O = () => VIEW === '3d' ? window.O3D : VIEW === 'ai' ? window.OAI : null;
+const office = {set(s) { office2d.set(s); if (O()) O().set(s); }, note(k, id, t) { office2d.note(k, id, t); if (O()) O().note(k, id, t); }, boss() { office2d.boss(); if (O()) O().boss(); },
+  focus(id) { O() ? O().focus(id) : office2d.focus(id); }, wake() { office2d.wake(); if (O()) O().wake(); }, sky() { office2d.sky(); if (window.O3D) O3D.sky(); }};
+function setView(v) { if (v !== '3d' && v !== 'pixel' && v !== 'ai') v = '3d'; VIEW = v; try { localStorage.setItem('dp-view', v); } catch (e) {} drawThemes();
+  if (v !== 'ai' && window.OAI) OAI.show(false);
+  if (v === 'ai') { if (window.O3D) O3D.show(false);
+    (window.OAI ? Promise.resolve() : import('./oai.js')).then(() => OAI.ready).then(ok => { if (!ok) throw new Error('theme'); if (VIEW !== 'ai') return; office2d.wake(); OAI.show(true); if (STATE) OAI.set(STATE); }).catch(() => setView('pixel')); }
+  else if (v === '3d') { let ok = false; try { ok = !!document.createElement('canvas').getContext('webgl2'); } catch (e) {} if (!ok) return setView('pixel');
     (window.O3D ? Promise.resolve() : import('./o3d.js')).then(() => { if (VIEW !== '3d') return; O3D.show(true); if (STATE) O3D.set(STATE); }).catch(() => setView('pixel')); }
   else { if (window.O3D) O3D.show(false); if (STATE) office2d.set(STATE); office2d.wake(); } }
 function drawThemes() { const t = $('themes'); if (!t) return; t.textContent = '';
   [['3d', 'Tòa tháp 3D', 'Penthouse CEO, phòng Chủ tịch, thời tiết, trang trí theo mùa'], ['pixel', 'Pixel', 'Bản đồ phẳng đủ các phòng orchestra'],
-   ['ai', 'Pixel AI', 'Nhân vật và cảnh vẽ bằng Gemini và PixelLab: đang dựng, cần khoá API']].forEach(([k, n, d]) => {
-    const b = E('button', 'th' + (VIEW === k ? ' on' : ''), n); b.append(E('small', '', d)); if (k === 'ai') b.disabled = true; b.onclick = () => { setView(k); $('pair').classList.remove('on'); tab('office'); }; t.append(b); }); }
+   ['ai', 'Pixel AI', 'Nhân vật và cảnh vẽ bằng Gemini và PixelLab, có ngày và đêm']].forEach(([k, n, d]) => {
+    const b = E('button', 'th' + (VIEW === k ? ' on' : ''), n); b.append(E('small', '', d)); b.onclick = () => { setView(k); $('pair').classList.remove('on'); tab('office'); }; t.append(b); }); }
 setView(VIEW);
 
 const live = $('live'), when = $('when');
