@@ -1725,6 +1725,34 @@ def chat_recent(n=6):
 NO_BYPASS = []
 
 
+def full_rights():
+    try:
+        return json.loads((HUB / 'quyen-tong-quan.json').read_text(encoding='utf-8')).get('toan_quyen') is True
+    except (OSError, ValueError, AttributeError):
+        return False
+
+
+def agent_cmd(model='sonnet'):
+    """A background Claude agent for `dp viec agent`: the same gate (guard.py) and the same rights as the CEO's chat."""
+    cmd = claude_cmd()
+    if not cmd:
+        raise ValueError('PC không tìm thấy lệnh claude')
+    py = sys.executable.replace('\\', '/')
+    if py.lower().endswith('pythonw.exe') and Path(py[:-5] + '.exe').is_file():
+        py = py[:-5] + '.exe'
+    sets = {'hooks': {'PreToolUse': [{'matcher': '', 'hooks': [{'type': 'command', 'command': '"%s" "%s"' % (py, str(HUB / 'tools' / 'guard.py').replace('\\', '/'))}]}]}}
+    full = full_rights() and not NO_BYPASS
+    if full:
+        sets['permissions'] = {'defaultMode': 'bypassPermissions'}
+    sfile = HUB / 'out' / 'agent-settings.json'
+    sfile.write_text(json.dumps(sets), encoding='utf-8')
+    cmd += ['-p', '--output-format', 'text', '--max-turns', '200', '--model', model, '--settings', str(sfile),
+            '--permission-mode', 'bypassPermissions' if full else 'acceptEdits']
+    if full:
+        cmd += ['--add-dir', str(HUB.anchor or HUB.parent)]
+    return cmd
+
+
 def chat_turn(text, model, session=None):
     """Runs `claude -p` once. Returns (reply, result event)."""
     cmd = claude_cmd()
@@ -2594,7 +2622,7 @@ def viec_find(book, jid):
     return j
 
 
-def viec_new(name, parent=None, kind='tay', by='CEO', cmd=None, cwd=None):
+def viec_new(name, parent=None, kind='tay', by='CEO', cmd=None, cwd=None, extra=None):
     def go(book):
         if parent:
             viec_find(book, parent)
@@ -2603,6 +2631,7 @@ def viec_new(name, parent=None, kind='tay', by='CEO', cmd=None, cwd=None):
              'by': by, 'state': 'chay', 'start': _now(), 'end': None, 'steps': [], 'result': '', 'files': [], 'reported': False}
         if cmd:
             j.update(cmd=cmd, cwd=cwd, log=str(VIEC_LOGS / (j['id'] + '.log')))
+        j.update(extra or {})
         book['jobs'].append(j)
         return j
     return viec_edit(go)
@@ -2722,9 +2751,14 @@ def cmd_theo(args):
     code = None
     with open(j['log'], 'ab') as log:
         try:
-            pr = subprocess.Popen(_resolve_exe(j['cmd']), cwd=j.get('cwd') or str(HUB), stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+            feed = j.get('stdin')
+            pr = subprocess.Popen(j['cmd'] if j.get('resolved') else _resolve_exe(j['cmd']), cwd=j.get('cwd') or str(HUB),
+                                  stdin=subprocess.PIPE if feed else subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
                                   creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
             viec_edit(lambda b: viec_find(b, j['id']).update(pid=pr.pid))
+            if feed:
+                pr.stdin.write(feed.encode('utf-8'))
+                pr.stdin.close()
             code = pr.wait()
         except Exception as e:
             log.write(('\n[dp viec] không chạy được: %s\n' % e).encode('utf-8'))
@@ -2786,6 +2820,8 @@ def _viec_opts(args):
             break
         if w == '--cha' and i + 1 < len(rest):
             args.cha, i = rest[i + 1], i + 2
+        elif w == '--model' and i + 1 < len(rest):
+            args.model, i = rest[i + 1], i + 2
         elif w == '--cay':
             args.cay, i = True, i + 1
         elif w == '--tep':
@@ -2824,6 +2860,17 @@ def cmd_viec(args):
         VIEC_LOGS.mkdir(parents=True, exist_ok=True)
         viec_spawn(j)
         print('%s đang chạy nền; xong thì hub tự báo CEO kiểm rồi báo anh. Nhật ký: %s' % (j['id'], j['log']))
+        return 0
+    if a == 'agent':
+        if len(args.rest) < 2:
+            print('dp viec agent "tên" "lời giao việc" [--cha V-xxx] [--model opus]')
+            return 2
+        ask = ' '.join(args.rest[1:]) + ('\n\nLàm đến khi có thành phẩm thật và tự kiểm lại. Đây là việc chạy nền, không ai trả lời câu hỏi: '
+                                         'tự quyết. Dòng cuối in: KẾT QUẢ: <thành phẩm ở đâu, còn hở gì>.')
+        j = viec_new(args.rest[0], args.cha, kind='nen', cmd=agent_cmd(args.model or 'sonnet'), cwd=str(HUB), extra={'stdin': ask, 'resolved': True})
+        VIEC_LOGS.mkdir(parents=True, exist_ok=True)
+        viec_spawn(j)
+        print('%s: agent làm nền; xong thì hub gọi em kiểm rồi báo anh.' % j['id'])
         return 0
     if not args.rest:
         print('thiếu mã việc')
@@ -2898,7 +2945,8 @@ def main(argv=None):
     mo.add_argument('item', nargs='?')
     mo.set_defaults(fn=cmd_mo)
     vc = sub.add_parser('viec', help='cây tiến độ: mở, ghi bước, đóng việc; chạy nền có báo khi xong')
-    vc.add_argument('action', nargs='?', choices=['xem', 'mo', 'chay', 'buoc', 'xong', 'loi', 'cho'])
+    vc.add_argument('action', nargs='?', choices=['xem', 'mo', 'chay', 'agent', 'buoc', 'xong', 'loi', 'cho'])
+    vc.add_argument('--model')
     vc.add_argument('rest', nargs=argparse.REMAINDER)
     vc.add_argument('--cha', help='mã việc cha (V-001)')
     vc.add_argument('--cay', action='store_true', help='việc cha tự đóng khi mọi việc con xong')

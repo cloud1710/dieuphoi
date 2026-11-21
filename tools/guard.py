@@ -54,10 +54,17 @@ def verdict(event, rules):
     readonly = [str(x) for x in rules.get('chi_doc') or []]
     closed = [str(x) for x in rules.get('cam_vao') or []]
     path = args.get('file_path') or args.get('notebook_path') or args.get('path') or ''
+    secrets = ('out/token.txt', 'out/pass.hash', '.env', 'id_rsa', 'id_ed25519', 'authtoken.secret', 'credentials.json')
+    if tool in ('Read', 'Grep', 'Glob', 'Edit', 'Write', 'MultiEdit') and any(_norm(path).endswith(x) for x in secrets):
+        return 'Khoá và mật khẩu không được đọc hay in ra.'
+    if tool == 'Bash' and not re.match(r'\s*(python|python3|py)(\.exe)?\s+tools/dp\.py\s', _norm(args.get('command'))) \
+            and any(x in _norm(args.get('command')) for x in secrets):
+        return 'Khoá và mật khẩu không được đọc hay in ra.'
     own_files = ('quyen-tong-quan.json', 'tools/guard.py', 'chat-settings.json')          # the gate does not open itself
     if tool != 'Bash' and tool not in ('Read', 'Grep', 'Glob') and any(_norm(path).endswith(f) for f in own_files):
         return 'Tệp quyền và gác cổng chỉ anh Vinh được sửa.'
-    if tool == 'Bash' and any(f.split('/')[-1] in _norm(args.get('command')) for f in own_files) and not re.match(r'\s*(cat|type|head)\s+[\w./\\:-]+\s*$', str(args.get('command') or '')):
+    own_cmd = tool == 'Bash' and re.match(r'\s*(python|python3|py)(\.exe)?\s+tools/dp\.py\s', _norm(args.get('command'))) and not re.search(r'[;&|`$<>]', _norm(args.get('command')))
+    if tool == 'Bash' and not own_cmd and any(f.split('/')[-1] in _norm(args.get('command')) for f in own_files) and not re.match(r'\s*(cat|type|head)\s+[\w./\\:-]+\s*$', str(args.get('command') or '')):
         return 'Tệp quyền và gác cổng chỉ anh Vinh được sửa.'
     if tool in ('Edit', 'Write', 'MultiEdit', 'NotebookEdit'):
         hit = _under(path, readonly + closed)
