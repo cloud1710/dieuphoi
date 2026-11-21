@@ -128,6 +128,7 @@ textarea{min-height:84px;resize:vertical}
 #atts img{width:34px;height:34px;object-fit:cover;border-radius:6px}#atts b{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#atts i{font-style:normal;cursor:pointer;padding:0 3px;color:var(--mute)}
 .msg .files{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}.msg .files img{max-width:180px;max-height:180px;border-radius:10px;display:block;cursor:pointer}
 .msg .files a{color:inherit;font-size:12.5px;border:1px solid currentColor;border-radius:8px;padding:2px 7px;text-decoration:none;opacity:.85}
+body.ofc{position:fixed;inset:0;overflow:hidden;overscroll-behavior:none}body.ofc #col{max-height:30vh;max-height:30dvh;overflow-y:auto;overscroll-behavior:contain}
 body.chatting{padding-bottom:calc(140px + env(safe-area-inset-bottom))}
 @media (max-width:819px){body.chatting #stage{height:42vh}}
 #pair{position:fixed;inset:0;z-index:9;background:var(--bg);padding:calc(40px + env(safe-area-inset-top)) 18px 40px;display:none;overflow-y:auto}
@@ -135,7 +136,7 @@ body.chatting{padding-bottom:calc(140px + env(safe-area-inset-bottom))}
 a{color:var(--ready)}
 </style>
 </head>
-<body>
+<body class="ofc">
 <header><h1>Điều phối</h1><span id="live"><i></i><span id="when">Đang nối…</span></span><button id="gear" aria-label="Cài đặt">⚙</button><div id="bar" aria-label="Phần cứng PC"></div></header>
 <section id="t-office" class="on"><div id="stage"><canvas id="cv"></canvas><button id="wx" aria-label="Giờ và thời tiết"></button><button class="act" id="back">‹ Toàn cảnh</button><button class="act" id="camb" aria-label="Camera"></button><span id="hint">Chạm một bàn để phóng vào</span><div id="stats"></div><div id="log"></div></div><div id="chat"></div><div id="col"></div></section>
 <section id="t-work"></section>
@@ -247,6 +248,9 @@ function draw(s) {
       vs.filter(k => k.parent === v.id).forEach(k => walk(k, dep + 1)); };
     vs.filter(v => !v.parent || !ids.has(v.parent)).forEach(v => walk(v, 0)); const run = vs.filter(v => v.state === 'chay' || v.state === 'cho').length;
     m.append(sect('w-viec', 'Cây tiến độ của CEO', vc, true, run ? run + ' đang chạy' : 'xong hết')); }
+  { const fp = feedParts(heads), kn = E('div', 'card feed'); grouped(fp.now, fp.line, open, 'col:').forEach(x => kn.append(x)); if (!fp.now.length) kn.append(E('div', 'empty', 'Chưa có việc nào đang chạy hay đang chờ anh.'));
+    m.append(sect('c-now', 'Đang làm gì', kn, false, new Set(fp.now.map(r => r[1])).size + ' project · ' + fp.now.length + ' việc'));
+    if (fp.ready.length) { const kr = E('div', 'card feed'); fp.ready.forEach(r => kr.append(fp.line(...r))); m.append(sect('c-ready', 'Sẵn sàng và đang nghỉ', kr, false, fp.ready.length + ' project')); } }
   const tr = (s.deletes || []).filter(r => r.status === 'trashed'); if (tr.length) { const tc = E('div', 'card'); tr.forEach(r => { const q = E('div', 'q'); q.append(delBody(r)); tc.append(q); });
     m.append(sect('w-trash', 'Thùng rác (khôi phục được)', tc, false, tr.length + ' đợt · ' + fbytes(tr.reduce((a, r) => a + r.items.reduce((b, i) => b + (i.bytes || 0), 0), 0)))); }
   const wc = E('div', 'card');
@@ -313,7 +317,7 @@ setInterval(pollBar, 6000);
 let hwTimer = null, cur = 'office';
 function hwBox() { if ($('hwin')) return $('hwin').parentNode; const inn = E('div'); inn.id = 'hwin'; inn.append(E('div', 'empty', 'Đang đọc phần cứng…')); const d = sect('b-hw', 'Máy, mạng, token, chế độ game, nguồn', inn, false); d.onopen = pollHw; $('hwfold').append(d); return d; }
 async function pollHw() { if (cur !== 'hw' || document.hidden || !hwBox().open) return; try { drawHw(await api('api/hw')); } catch (e) { $('hwin').textContent = ''; $('hwin').append(E('div', 'empty', liveMode ? e.message : 'Chỉ xem được khi nối trực tiếp với PC.')); } }
-function tab(t) { cur = t; $('say').classList.toggle('on', t === 'office' && liveMode); document.body.classList.toggle('chatting', t === 'office' && liveMode); if (t === 'office') { pollAct(); pollChat(); } document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === 't-' + t)); document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+function tab(t) { cur = t; document.body.classList.toggle('ofc', t === 'office'); $('say').classList.toggle('on', t === 'office' && liveMode); document.body.classList.toggle('chatting', t === 'office' && liveMode); if (t === 'office') { pollAct(); pollChat(); } document.querySelectorAll('section').forEach(s => s.classList.toggle('on', s.id === 't-' + t)); document.querySelectorAll('nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
   clearInterval(hwTimer); if (t === 'work') { if (STATE) draw(STATE); pollAct(true); } if (t === 'hw') { hwBox(); boardOpen(); pollAct(true); pollChat(); pollHw(); hwTimer = setInterval(pollHw, 10000); } if (t === 'office') office.wake(); scrollTo(0, 0); }
 document.querySelectorAll('nav button').forEach(b => b.onclick = () => tab(b.dataset.t));
 setTimeout(() => { $('hint').style.display = 'none'; }, 7000);
@@ -410,8 +414,7 @@ function drawOverlays() { const s = STATE; if (!s) return; const heads = s.proje
   if (rows.length < 1) heads.forEach(p => { if (focusId && p.id !== focusId) return; (p.questions || []).forEach(q => rows.length < 1 && rows.push(['', p.id, 'chờ anh trả lời ' + q.id])); });
   rows.forEach(([t, id, text]) => { const d = E('div'); if (t) d.append(E('i', '', t)); d.append(E('b', '', '@' + id + ' '), text); lg.append(d); }); lg.style.display = rows.length ? '' : 'none'; }
 setInterval(drawOverlays, 30000);
-function drawCol() { drawOverlays(); const s = STATE, c = $('col'); if (!s || (busy && focusId)) return; c.textContent = '';
-  const byId = Object.fromEntries(s.projects.map(p => [p.id, p])), ps = s.projects.filter(p => !stored(p) && (!focusId || p.id === focusId));
+function feedParts(ps) {
   const line = (kind, id, text) => { const d = E('div', 'row line'); d.append(E('span', 'dot ' + kind)); const nm = E('span', 'nm'); nm.append(E('b', '', '@' + id), E('small', '', text)); d.append(nm); d.onclick = () => office.focus(id); return d; };
   const now = [];
   ps.forEach(p => { (ACT.claude[p.id] || []).forEach(a => now.push([a.age < 180 ? 'work' : 'wait', p.id, (a.sub ? 'nhân viên ' : 'phiên chính ') + a.what + ' · ' + ago(a.age)]));
@@ -423,12 +426,16 @@ function drawCol() { drawOverlays(); const s = STATE, c = $('col'); if (!s || (b
     ((ACT.stuck || {})[p.id] || []).forEach(k => now.push(['ask', p.id, 'phiên ' + k.item + ' mở ' + k.mins + ' phút nhưng chưa chạy: đang chờ bấm trên màn hình PC']));
     if (p.mail) now.push(['mail', p.id, 'có ' + p.mail + ' thư chưa phiên nào đọc']); });
   const ready = []; ps.forEach(p => { if (!(p.working || []).length && (p.ready || []).length) ready.push(['ready', p.id, 'sẵn sàng làm ' + p.ready[0].id + ': ' + p.ready[0].title]); else if (!(p.working || []).length && p.waiting) ready.push(['wait', p.id, p.waiting + ' mục bị chặn']); else if (!(p.working || []).length && !(p.questions || []).length) ready.push(['', p.id, 'đang nghỉ, không có việc mở']); });
+  return {line, now, ready}; }
+function drawCol() { drawOverlays(); const s = STATE, c = $('col'); if (!s || (busy && focusId)) return; c.textContent = '';
+  const byId = Object.fromEntries(s.projects.map(p => [p.id, p])), ps = s.projects.filter(p => !stored(p) && (!focusId || p.id === focusId));
+  const {line, now, ready} = feedParts(ps);
   const k = E('div', 'card feed');
-  (focusId ? now.map(r => line(...r)) : grouped(now, line, open, 'col:')).forEach(x => k.append(x)); if (!now.length) k.append(E('div', 'empty', 'Chưa có việc nào đang chạy hay đang chờ anh.')); if (focusId) c.append(E('h2', '', 'Trong phòng @' + focusId), k); else c.append(sect('c-now', 'Đang làm gì', k, false, new Set(now.map(r => r[1])).size + ' project · ' + now.length + ' việc'));
+  if (focusId) { now.map(r => line(...r)).forEach(x => k.append(x)); if (!now.length) k.append(E('div', 'empty', 'Chưa có việc nào đang chạy hay đang chờ anh.')); c.append(E('h2', '', 'Trong phòng @' + focusId), k); }
   if (focusId && byId[focusId]) { const k2 = E('div', 'card'); k2.style.marginTop = '10px'; open.add(focusId); k2.append(head(byId[focusId], byId)); c.append(k2); }
   const ev = events.filter(e => !focusId || e.id === focusId);
   if (ev.length) { const k3 = E('div', 'card feed'); ev.slice(0, 12).forEach(e => k3.append(line(e.kind, e.id, e.t + ' · ' + e.text))); c.append(sect('c-ev', 'Vừa xảy ra', k3, false, Math.min(12, ev.length) + ' việc')); }
-  if (ready.length) { const k4 = E('div', 'card feed'); ready.forEach(r => k4.append(line(...r))); if (focusId) c.append(E('h2', '', 'Kế tiếp'), k4); else c.append(sect('c-ready', 'Sẵn sàng và đang nghỉ', k4, false, ready.length + ' project')); } }
+  if (ready.length) { const k4 = E('div', 'card feed'); ready.forEach(r => k4.append(line(...r))); if (focusId) c.append(E('h2', '', 'Kế tiếp'), k4); } }
 
 // ---- time and weather where the phone is: the iPhone's clock, its location (asked once), Open-Meteo for the sky
 const WX = (() => {
