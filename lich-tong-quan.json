@@ -11,7 +11,7 @@
    "id": "sang",
    "at": "07:30",
    "model": "haiku",
-   "prompt": "Bản tin buổi sáng cho anh Vinh, tối đa 5 dòng: việc nào đang chờ anh (out/INBOX.md, out/state.json), project nào đang chạy hay kẹt (out/act.json), phần cứng có gì bất thường (out/hw.json, out/nvidia-writes.json), token hôm qua (out/tokens.json). Không có gì đáng báo thì nói một câu."
+   "prompt": "Bản tin buổi sáng cho anh Vinh. Chỉ gạch đầu dòng, xếp theo thứ tự ưu tiên: (1) việc chờ anh quyết, việc chặn nhiều mục hay chặn luận văn lên trước; (2) sự cố (phiên kẹt, ổ đĩa sắp đầy, ghi GPU bất thường); (3) tình hình chung gộp một dòng. Mỗi dòng một câu ngắn, tối đa 7 dòng; không mở bài, không kể em đã làm gì, không nói thiếu số liệu. Nguồn: out/INBOX.md, out/state.json, out/act.json, out/hw.json, out/nvidia-writes.json, out/tokens.json (yesterday). Không có gì đáng báo thì một câu."
   }
  ]
 }

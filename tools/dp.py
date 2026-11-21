@@ -1073,7 +1073,17 @@ def token_loop():
                 pass
             hw._net_save(True)
             got = hw.token_usage([(p['id'], real(p['path'])) for p in registry()['projects']] + [('tong-quan', str(HUB))])
-            (HUB / 'out' / 'tokens.json').write_text(json.dumps({'day': hw._TOK['day'], 'projects': got}, ensure_ascii=False, indent=1), encoding='utf-8')
+            hist_f = HUB / 'out' / 'tokens-history.json'          # each day's last count, so the morning brief can say yesterday's
+            try:
+                hist = json.loads(hist_f.read_text(encoding='utf-8'))
+            except (OSError, ValueError):
+                hist = {}
+            hist[hw._TOK['day']] = got
+            hist = dict(sorted(hist.items())[-30:])
+            hist_f.write_text(json.dumps(hist, ensure_ascii=False), encoding='utf-8')
+            yday = (datetime.date.fromisoformat(hw._TOK['day']) - datetime.timedelta(days=1)).isoformat()
+            (HUB / 'out' / 'tokens.json').write_text(json.dumps({'day': hw._TOK['day'], 'projects': got, 'yesterday': {'day': yday, 'projects': hist.get(yday)}},
+                                                                ensure_ascii=False, indent=1), encoding='utf-8')
         except Exception as e:
             (HUB / 'out' / 'tokens.json').write_text(json.dumps({'error': '%s: %s' % (type(e).__name__, e)}), encoding='utf-8')
         time.sleep(300)
@@ -2174,10 +2184,88 @@ def vpn_addresses():
     return found
 
 
+def _claude_app():
+    """How to start the Claude desktop app: (program, arguments) or None. Looks for the running app first, then the
+    usual install folders. A Store (MSIX) install starts through explorer.exe shell:AppsFolder\\<family>!<app id>."""
+    found = []
+    try:
+        import psutil
+        for pr in psutil.process_iter(['name', 'exe']):
+            exe = pr.info.get('exe') or ''
+            if (pr.info.get('name') or '').lower().startswith('claude') and re.search(r'AnthropicClaude|WindowsApps|[\\/]Claude[\\/]', exe, re.I) \
+                    and not re.search(r'[\\/](\.local|npm|node_modules)[\\/]', exe, re.I):
+                found.append(Path(exe))
+    except Exception:
+        pass
+    local = Path(os.environ.get('LOCALAPPDATA', ''))
+    found += [x for x in [local / 'AnthropicClaude' / 'claude.exe', local / 'Programs' / 'Claude' / 'Claude.exe'] if x.is_file()]
+    for exe in found:
+        parts = [p.lower() for p in exe.parts]
+        if 'windowsapps' in parts:
+            root = None
+            for parent in exe.parents:
+                if (parent / 'AppxManifest.xml').is_file():
+                    root = parent
+                    break
+            if root is None:
+                continue
+            text = (root / 'AppxManifest.xml').read_text(encoding='utf-8', errors='replace')
+            name = re.search(r'<Identity[^>]*\sName="([^"]+)"', text)
+            app = re.search(r'<Application[^>]*\sId="([^"]+)"', text)
+            pub = root.name.split('__')[-1] if '__' in root.name else ''
+            if name and app and pub:
+                return 'explorer.exe', 'shell:AppsFolder\\%s_%s!%s' % (name.group(1), pub, app.group(1))
+            continue
+        return str(exe), ''
+    return None
+
+
+def ensure_autostart():
+    """At every start of the hidden server (Windows): put the hub in the Startup folder if it is missing, and the Claude
+    desktop app too when registry autostart.claude is on, so the phone and the bridge work right after a boot. Logs
+    the boot time and what it did in out/heal.log."""
+    if os.name != 'nt':
+        return
+    try:
+        import psutil
+        boot = datetime.datetime.fromtimestamp(psutil.boot_time()).strftime('%Y-%m-%d %H:%M:%S')
+    except Exception:
+        boot = '?'
+    did = []
+    try:
+        start = Path(os.environ['APPDATA']) / 'Microsoft' / 'Windows' / 'Start Menu' / 'Programs' / 'Startup'
+        hub = start / 'dieuphoi-server.vbs'
+        q = '"'
+        if not hub.is_file():
+            hub.write_text('CreateObject(%sWScript.Shell%s).Run %swscript.exe %s%s%s%s%s, 0, False\r\n'
+                           % (q, q, q, q, q, HUB / 'start-hidden.vbs', q, q * 2), encoding='utf-8')
+            did.append('đặt lại tự chạy cho hub')
+        vbs = start / 'claude-desktop.vbs'
+        if (registry().get('autostart') or {}).get('claude') and not vbs.is_file():
+            how = _claude_app()
+            if how:
+                prog, arg = how
+                line = q * 3 + prog + q * 3 if not arg else q * 3 + prog + q * 2 + ' ' + q * 2 + arg + q * 3
+                vbs.write_text('CreateObject(%sWScript.Shell%s).Run %s, 7, False\r\n' % (q, q, line), encoding='utf-8')
+                did.append('đặt Claude tự mở khi đăng nhập (%s %s)' % (Path(prog).name, arg))
+            else:
+                did.append('chưa tìm thấy ứng dụng Claude để đặt tự mở (mở Claude lên thì lần khởi động server sau sẽ đặt)')
+    except Exception as e:
+        did.append('lỗi tự chạy: %s' % e)
+    heal_log('server khởi động; máy bật lúc %s%s' % (boot, ('; ' + '; '.join(did)) if did else ''))
+
+
 def cmd_serve(args):
     hosts = [args.host]
+    tun0 = registry().get('tunnel') or {}
+    if args.reload and tun0.get('enabled'):          # the tunnel first: it reaches 127.0.0.1, which needs no VPN
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        import tunnel
+        tunnel.start(HUB, args.port, str(tun0.get('worker') or 'dieuphoi'))
+    if args.reload:
+        threading.Thread(target=ensure_autostart, daemon=True).start()
     if args.host in ('zerotier', 'tailscale', 'vpn'):
-        for attempt in range(6 if (registry().get('tunnel') or {}).get('enabled') else 18):     # at logon the VPN adapter can come up after this script
+        for attempt in range(1 if tun0.get('enabled') else 18):     # at logon the VPN adapter can come up after this script
             hosts = vpn_addresses() if args.host == 'vpn' else []
             if args.host != 'vpn':
                 try:
@@ -2186,7 +2274,8 @@ def cmd_serve(args):
                     pass
             if hosts:
                 break
-            time.sleep(10)
+            if attempt < (0 if tun0.get('enabled') else 17):
+                time.sleep(10)
         else:
             if not (registry().get('tunnel') or {}).get('enabled'):
                 raise SystemExit('dp serve: no %s adapter with an IPv4 address; is it installed and joined?' % args.host)
@@ -2197,10 +2286,6 @@ def cmd_serve(args):
     if args.reload and tun.get('enabled') and '127.0.0.1' not in hosts:
         hosts = hosts + ['127.0.0.1']               # cloudflared reaches the server here
     servers = [ThreadingHTTPServer((h, args.port), Handler) for h in hosts]
-    if args.reload and tun.get('enabled'):
-        sys.path.insert(0, str(Path(__file__).resolve().parent))
-        import tunnel
-        tunnel.start(HUB, args.port, str(tun.get('worker') or 'dieuphoi'))
     threading.Thread(target=auto_publish, daemon=True).start()
     if args.reload:
         threading.Thread(target=reload_on_change, daemon=True).start()

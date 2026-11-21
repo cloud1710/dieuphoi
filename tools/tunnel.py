@@ -94,9 +94,17 @@ def deploy_worker(hub, name, origin):
     (d / 'index.js').write_text(WORKER_JS, encoding='utf-8')
     (d / 'wrangler.toml').write_text('name = "%s"\nmain = "index.js"\ncompatibility_date = "2026-11-01"\nworkers_dev = true\n\n[vars]\nORIGIN = "%s"\n'
                                      % (name, origin), encoding='utf-8')
-    npx = ['cmd', '/c', 'npx'] if os.name == 'nt' else ['npx']
-    r = subprocess.run(npx + ['--yes', 'wrangler', 'deploy'], cwd=str(d), capture_output=True, text=True, encoding='utf-8',
+    local = d / 'node_modules' / '.bin' / ('wrangler.cmd' if os.name == 'nt' else 'wrangler')
+    if local.is_file():                            # a local copy deploys in seconds; npx resolves the package each time (about a minute)
+        cmd = (['cmd', '/c', str(local)] if os.name == 'nt' else [str(local)]) + ['deploy']
+    else:
+        cmd = (['cmd', '/c', 'npx'] if os.name == 'nt' else ['npx']) + ['--yes', 'wrangler', 'deploy']
+    r = subprocess.run(cmd, cwd=str(d), capture_output=True, text=True, encoding='utf-8',
                        errors='replace', timeout=300, stdin=subprocess.DEVNULL, creationflags=NOWIN)
+    if not local.is_file() and not r.returncode:   # keep a local copy for the next boot, in the background
+        npm = (['cmd', '/c', 'npm'] if os.name == 'nt' else ['npm']) + ['install', '--no-save', '--no-audit', '--no-fund', 'wrangler']
+        threading.Thread(target=lambda: subprocess.run(npm, cwd=str(d), capture_output=True, timeout=900, stdin=subprocess.DEVNULL,
+                                                       creationflags=NOWIN), daemon=True).start()
     out = (r.stdout or '') + (r.stderr or '')
     m = re.search(r'https://[A-Za-z0-9.-]+\.workers\.dev', out)
     if r.returncode or not m:
@@ -167,5 +175,21 @@ def run(hub, port, name='dieuphoi'):
         time.sleep(5)
 
 
+def local_wrangler(hub):
+    """Install wrangler next to the Worker once (in the background), so a deploy after a boot takes seconds."""
+    d = Path(hub) / 'out' / 'worker'
+    if (d / 'node_modules' / '.bin' / ('wrangler.cmd' if os.name == 'nt' else 'wrangler')).is_file():
+        return
+    d.mkdir(parents=True, exist_ok=True)
+    npm = (['cmd', '/c', 'npm'] if os.name == 'nt' else ['npm']) + ['install', '--no-save', '--no-audit', '--no-fund', 'wrangler']
+    try:
+        r = subprocess.run(npm, cwd=str(d), capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=900,
+                           stdin=subprocess.DEVNULL, creationflags=NOWIN)
+        _log(hub, 'local wrangler: %s' % ('installed' if not r.returncode else ' '.join(((r.stdout or '') + (r.stderr or '')).split())[-200:]))
+    except Exception as e:
+        _log(hub, 'local wrangler failed: %s' % e)
+
+
 def start(hub, port, name='dieuphoi'):
     threading.Thread(target=run, args=(hub, port, name), daemon=True).start()
+    threading.Timer(90, local_wrangler, args=(hub,)).start()
